@@ -19,14 +19,23 @@ const getWebAudioNode = function (
   const node = context.createScriptProcessor(bufferSize, 2, 2);
   const samples = new Float32Array(bufferSize * 2);
   let hasEnded = false;
+  let disconnectScheduled = false;
 
   node.onaudioprocess = (event) => {
+    // If disconnection is scheduled, disconnect and stop processing
+    if (disconnectScheduled) {
+      node.disconnect();
+      return;
+    }
+
     // If the track has already ended, fill with silence and return
     if (hasEnded) {
       let left = event.outputBuffer.getChannelData(0);
       let right = event.outputBuffer.getChannelData(1);
       left.fill(0);
       right.fill(0);
+      // Schedule disconnection for the next audio process cycle
+      disconnectScheduled = true;
       return;
     }
 
@@ -39,8 +48,7 @@ const getWebAudioNode = function (
       if (!hasEnded) {
         hasEnded = true;
         filter.onEnd();
-        // Disconnect the node to stop further processing
-        node.disconnect();
+        // Don't disconnect immediately - let one more buffer of silence play
       }
     }
     
