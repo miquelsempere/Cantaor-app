@@ -124,6 +124,9 @@ export default class AudioManager {
         throw new Error('AudioContext became null during preload operation');
       }
       
+      console.log('About to decode audio data. AudioContext:', this.audioContext);
+      console.log('AudioContext state:', this.audioContext ? this.audioContext.state : 'null');
+      
       console.log('Decoding audio data...');
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       console.log('Audio decoded successfully. Duration:', audioBuffer.duration, 'seconds');
