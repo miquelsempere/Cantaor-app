@@ -251,6 +251,15 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
+    // Immediate cleanup - if no pitchShifter exists, this call is redundant
+    if (!this.pitchShifter) {
+      return;
+    }
+    
+    // Immediately disconnect and nullify the current pitchShifter to prevent further events
+    this.pitchShifter.disconnect();
+    this.pitchShifter = null;
+    
     // Prevent multiple simultaneous transitions
     if (this.isTransitioning) {
       return;
