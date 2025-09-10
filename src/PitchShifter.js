@@ -52,6 +52,7 @@ export default class PitchShifter {
     this.sourcePosition = 0;
     this._filter = new SimpleFilter(source, this._soundtouch, () => {
       // Emit 'end' event when track finishes
+      console.log('[PitchShifter] Track finished - dispatching end event');
       const endEvent = new CustomEvent('end', {
         detail: {
           timePlayed: this.timePlayed,

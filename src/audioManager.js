@@ -306,6 +306,7 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
+    console.log('[AudioManager] onTrackEnd() called - processing track end');
     console.log(`Track ended - ${this.tracksPlayedInCycle}/${this.totalTracksInCycle} completed in cycle ${this.currentCycle}`);
     
     if (!this.isPlaying) {
