@@ -187,8 +187,8 @@ class FlamencoApp {
     const paloElement = this.trackInfo.querySelector('.track-palo');
     
     if (track) {
-      titleElement.textContent = track.title;
-      paloElement.textContent = track.palo;
+      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
+      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
     } else {
       titleElement.textContent = this.currentPalo ? 
         'Listo para reproducir' : 
@@ -200,7 +200,8 @@ class FlamencoApp {
   updatePlaybackStatus() {
     if (this.isPlaying) {
       const status = this.audioManager.getPlaybackStatus();
-      const statusText = `Ciclo ${status.currentCycle} - ${status.tracksPlayedInCycle}/${status.totalTracksInCycle} pistas`;
+      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
+      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
       
       // Update status in the track info or create a new status element
       const existingStatus = document.querySelector('.playback-status');

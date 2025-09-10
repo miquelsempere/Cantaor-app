@@ -1031,13 +1031,22 @@ const getWebAudioNode = function (context, filter, sourcePositionCallback = noop
   const node = context.createScriptProcessor(bufferSize, 2, 2);
   const samples = new Float32Array(bufferSize * 2);
   let hasEnded = false;
+  let disconnectScheduled = false;
   node.onaudioprocess = event => {
+    // If disconnection is scheduled, disconnect and stop processing
+    if (disconnectScheduled) {
+      node.disconnect();
+      return;
+    }
+
     // If the track has already ended, fill with silence and return
     if (hasEnded) {
       let left = event.outputBuffer.getChannelData(0);
       let right = event.outputBuffer.getChannelData(1);
       left.fill(0);
       right.fill(0);
+      // Schedule disconnection for the next audio process cycle
+      disconnectScheduled = true;
       return;
     }
     let left = event.outputBuffer.getChannelData(0);
@@ -1048,8 +1057,7 @@ const getWebAudioNode = function (context, filter, sourcePositionCallback = noop
       if (!hasEnded) {
         hasEnded = true;
         filter.onEnd();
-        // Disconnect the node to stop further processing
-        node.disconnect();
+        // Don't disconnect immediately - let one more buffer of silence play
       }
     }
     let i = 0;
@@ -10797,6 +10805,7 @@ const canteTracksAPI = {
 /*
  * Audio Manager for Flamenco Cante Practice App
  * Handles audio loading, playback queue management, and PitchShifter integration
+ * Now with track concatenation for smoother playback
  */
 
 class AudioManager {
@@ -10807,18 +10816,20 @@ class AudioManager {
 
     // Playback state
     this.isPlaying = false;
-    this.isTransitioning = false;
     this.currentPalo = null;
-    this.currentTrackIndex = 0;
 
     // Track management
     this.tracks = [];
     this.playQueue = [];
     this.audioBuffers = new Map(); // Cache for decoded audio buffers
 
-    // Preloading
-    this.nextTrackBuffer = null;
-    this.isPreloading = false;
+    // Concatenated cycle management
+    this.currentCycleAudioBuffer = null;
+    this.currentCycle = 1;
+    this.totalTracksInCycle = 0;
+
+    // Track timing for UI updates (optional for future enhancement)
+    this.trackTimings = []; // Array of {startTime, endTime, trackIndex}
 
     // Event listeners
     this.onTrackChangeListeners = [];
@@ -10842,7 +10853,88 @@ class AudioManager {
   }
 
   /**
-   * Load tracks for a specific palo from Supabase
+   * Concatenate multiple AudioBuffers into a single AudioBuffer
+   * @param {AudioBuffer[]} buffers - Array of AudioBuffers to concatenate
+   * @returns {AudioBuffer} Single concatenated AudioBuffer
+   */
+  _concatenateAudioBuffers(buffers) {
+    if (!buffers || buffers.length === 0) {
+      throw new Error('No buffers provided for concatenation');
+    }
+
+    // Calculate total duration and validate buffers
+    let totalLength = 0;
+    const sampleRate = buffers[0].sampleRate;
+    const numberOfChannels = buffers[0].numberOfChannels;
+    for (const buffer of buffers) {
+      if (buffer.sampleRate !== sampleRate) {
+        throw new Error('All buffers must have the same sample rate');
+      }
+      if (buffer.numberOfChannels !== numberOfChannels) {
+        throw new Error('All buffers must have the same number of channels');
+      }
+      totalLength += buffer.length;
+    }
+
+    // Create the concatenated buffer
+    const concatenatedBuffer = this.audioContext.createBuffer(numberOfChannels, totalLength, sampleRate);
+
+    // Copy data from each buffer
+    let offset = 0;
+    this.trackTimings = []; // Reset track timings
+
+    for (let i = 0; i < buffers.length; i++) {
+      const buffer = buffers[i];
+      const startTime = offset / sampleRate;
+      const endTime = (offset + buffer.length) / sampleRate;
+
+      // Store timing information for this track
+      this.trackTimings.push({
+        startTime,
+        endTime,
+        trackIndex: this.playQueue[i],
+        // Original track index
+        duration: buffer.duration
+      });
+
+      // Copy each channel
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sourceData = buffer.getChannelData(channel);
+        const destData = concatenatedBuffer.getChannelData(channel);
+        destData.set(sourceData, offset);
+      }
+      offset += buffer.length;
+    }
+    console.log(`Concatenated ${buffers.length} tracks into single buffer (${concatenatedBuffer.duration.toFixed(2)}s)`);
+    return concatenatedBuffer;
+  }
+
+  /**
+   * Prepare the current cycle buffer by concatenating tracks in playQueue order
+   */
+  async _prepareCurrentCycleBuffer() {
+    if (this.playQueue.length === 0) {
+      throw new Error('No play queue available for cycle preparation');
+    }
+    console.log(`Preparing cycle ${this.currentCycle} buffer...`);
+
+    // Get buffers in playQueue order
+    const orderedBuffers = this.playQueue.map(trackIndex => {
+      const track = this.tracks[trackIndex];
+      const buffer = this.audioBuffers.get(track.id);
+      if (!buffer) {
+        throw new Error(`Buffer not found for track: ${track.title}`);
+      }
+      return buffer;
+    });
+
+    // Concatenate all buffers
+    this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
+    console.log(`Cycle ${this.currentCycle} buffer ready: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
+  }
+
+  /**
+   * Load tracks for a specific palo from Supabase and prepare first cycle
    * @param {string} palo - The flamenco palo to load tracks for
    */
   async loadPalo(palo) {
@@ -10855,19 +10947,50 @@ class AudioManager {
         throw new Error(`No tracks found for palo: ${palo}`);
       }
       this.currentPalo = palo;
-      this.currentTrackIndex = 0;
 
-      // Create shuffled play queue
+      // Decode all audio buffers
+      console.log('Decoding all audio buffers...');
+      await this._decodeAllTracks();
+
+      // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
-
-      // Preload first track
-      await this.preloadTrack(this.playQueue[0]);
-      console.log(`Loaded ${this.tracks.length} tracks for ${palo}`);
+      await this._prepareCurrentCycleBuffer();
+      console.log(`Loaded ${this.tracks.length} tracks for ${palo}, first cycle ready`);
       return this.tracks.length;
     } catch (error) {
       console.error('Error loading palo:', error);
       throw error;
     }
+  }
+
+  /**
+   * Decode all tracks and store in audioBuffers cache
+   */
+  async _decodeAllTracks() {
+    const decodePromises = this.tracks.map(async (track, index) => {
+      try {
+        console.log(`Decoding track ${index + 1}/${this.tracks.length}: ${track.title}`);
+
+        // Fetch audio file
+        const response = await fetch(track.audio_url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+
+        // Decode audio data
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+        // Cache the buffer
+        this.audioBuffers.set(track.id, audioBuffer);
+        console.log(`Successfully decoded: ${track.title} (${audioBuffer.duration.toFixed(2)}s)`);
+      } catch (error) {
+        console.error(`Error decoding track ${track.title}:`, error);
+        throw error;
+      }
+    });
+    await Promise.all(decodePromises);
+    console.log('All tracks decoded successfully');
   }
 
   /**
@@ -10885,57 +11008,16 @@ class AudioManager {
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     this.playQueue = indices;
-    this.currentTrackIndex = 0;
-    console.log('Play queue created:', this.playQueue);
+    this.totalTracksInCycle = this.tracks.length;
+    console.log(`Play queue created for cycle ${this.currentCycle}:`, this.playQueue);
   }
 
   /**
-   * Preload an audio track by downloading and decoding it
-   * @param {number} trackIndex - Index of track to preload
-   */
-  async preloadTrack(trackIndex) {
-    if (this.isPreloading || trackIndex >= this.tracks.length) {
-      return;
-    }
-    const track = this.tracks[trackIndex];
-
-    // Check if already cached
-    if (this.audioBuffers.has(track.id)) {
-      this.nextTrackBuffer = this.audioBuffers.get(track.id);
-      return;
-    }
-    try {
-      this.isPreloading = true;
-      console.log(`Preloading track: ${track.title}`);
-
-      // Fetch audio file
-      const response = await fetch(track.audio_url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.statusText}`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-
-      // Decode audio data
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-
-      // Cache the buffer
-      this.audioBuffers.set(track.id, audioBuffer);
-      this.nextTrackBuffer = audioBuffer;
-      console.log(`Successfully preloaded: ${track.title}`);
-    } catch (error) {
-      console.error(`Error preloading track ${track.title}:`, error);
-      throw error;
-    } finally {
-      this.isPreloading = false;
-    }
-  }
-
-  /**
-   * Start playback of the current palo
+   * Start playback of the current cycle
    */
   async play() {
-    if (!this.currentPalo || this.tracks.length === 0) {
-      throw new Error('No palo loaded. Call loadPalo() first.');
+    if (!this.currentPalo || !this.currentCycleAudioBuffer) {
+      throw new Error('No cycle buffer ready. Call loadPalo() first.');
     }
     if (this.isPlaying) {
       console.log('Already playing');
@@ -10947,11 +11029,11 @@ class AudioManager {
         await this.audioContext.resume();
       }
 
-      // Start playing current track
-      await this.playCurrentTrack();
+      // Start playing current cycle
+      await this.playCurrentCycle();
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
-      console.log('Playback started');
+      console.log(`Playback started - Cycle ${this.currentCycle}`);
     } catch (error) {
       console.error('Error starting playback:', error);
       throw error;
@@ -10966,9 +11048,6 @@ class AudioManager {
       return;
     }
 
-    // Reset transition flag when stopping
-    this.isTransitioning = false;
-
     // Disconnect PitchShifter to stop audio
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
@@ -10976,16 +11055,17 @@ class AudioManager {
     }
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
-    console.log('Playback stopped');
+    console.log(`Playback stopped - Was in cycle ${this.currentCycle}`);
   }
 
   /**
-   * Play the current track in the queue
+   * Play the current concatenated cycle
    */
-  async playCurrentTrack() {
-    const currentQueueIndex = this.playQueue[this.currentTrackIndex];
-    const currentTrack = this.tracks[currentQueueIndex];
-    console.log(`Playing track: ${currentTrack.title}`);
+  async playCurrentCycle() {
+    if (!this.currentCycleAudioBuffer) {
+      throw new Error('No cycle buffer available');
+    }
+    console.log(`Playing cycle ${this.currentCycle} (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
 
     // Disconnect any existing PitchShifter to ensure clean transition
     if (this.pitchShifter) {
@@ -10993,83 +11073,85 @@ class AudioManager {
       this.pitchShifter = null;
     }
 
-    // Use preloaded buffer or load on demand
-    let audioBuffer = this.nextTrackBuffer;
-    if (!audioBuffer) {
-      await this.preloadTrack(currentQueueIndex);
-      audioBuffer = this.nextTrackBuffer;
-    }
-    if (!audioBuffer) {
-      throw new Error('Failed to load audio buffer');
-    }
-
-    // Create new PitchShifter instance
-    this.pitchShifter = new PitchShifter(this.audioContext, audioBuffer, 4096, () => this.onTrackEnd() // Callback when track ends
+    // Create new PitchShifter instance with concatenated buffer
+    this.pitchShifter = new PitchShifter(this.audioContext, this.currentCycleAudioBuffer, 4096, () => this.onCycleEnd() // Callback when cycle ends
     );
+
+    // Apply current audio settings to the new PitchShifter
+    if (this.currentTempo !== undefined) {
+      this.pitchShifter.tempo = this.currentTempo;
+    }
+    if (this.currentPitchSemitones !== undefined) {
+      this.pitchShifter.pitchSemitones = this.currentPitchSemitones;
+    }
 
     // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
 
-    // Notify track change
-    this.notifyTrackChange(currentTrack);
-
-    // Preload next track
-    this.preloadNextTrack();
+    // Notify cycle start (using first track info for UI)
+    const firstTrackIndex = this.playQueue[0];
+    const firstTrack = this.tracks[firstTrackIndex];
+    this.notifyTrackChange(firstTrack);
   }
 
   /**
-   * Handle track end - move to next track
+   * Handle cycle end - prepare and start next cycle
    */
-  onTrackEnd() {
-    // Prevent multiple simultaneous transitions
-    if (this.isTransitioning) {
-      return;
-    }
-    console.log('Track ended, moving to next');
+  onCycleEnd() {
+    console.log(`Cycle ${this.currentCycle} completed!`);
     if (!this.isPlaying) {
-      this.isTransitioning = false;
+      console.log('Playback stopped, not starting next cycle');
       return;
     }
-    this.isTransitioning = true;
 
-    // Add a small delay to ensure clean transition
-    setTimeout(() => {
+    // Increment cycle counter
+    this.currentCycle++;
+
+    // Small delay to ensure clean audio transition
+    setTimeout(async () => {
       if (!this.isPlaying) {
-        this.isTransitioning = false;
-        return; // Check again in case playback was stopped during the delay
+        console.log('Playback was stopped during transition delay');
+        return;
       }
-
-      // Move to next track in queue
-      this.currentTrackIndex++;
-
-      // If we've played all tracks, restart the cycle with a new shuffle
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
+      try {
+        // Create new play queue and prepare next cycle
         this.createPlayQueue();
-      }
+        await this._prepareCurrentCycleBuffer();
 
-      // Play next track immediately for seamless playback
-      this.playCurrentTrack().then(() => {
-        this.isTransitioning = false;
-      }).catch(error => {
-        console.error('Error playing next track:', error);
-        this.isTransitioning = false;
+        // Start next cycle
+        await this.playCurrentCycle();
+      } catch (error) {
+        console.error('Error starting next cycle:', error);
         this.stop();
-      });
-    }, 100); // 100ms delay to ensure clean transition
+      }
+    }, 100); // Slightly longer delay for cycle preparation
   }
 
   /**
-   * Preload the next track in the queue
+   * Get current track information (first track of current cycle)
+   * @returns {Object|null} Current track object or null
    */
-  preloadNextTrack() {
-    const nextIndex = (this.currentTrackIndex + 1) % this.playQueue.length;
-    const nextQueueIndex = this.playQueue[nextIndex];
+  getCurrentTrack() {
+    if (!this.tracks.length || !this.playQueue.length) {
+      return null;
+    }
+    const firstTrackIndex = this.playQueue[0];
+    return this.tracks[firstTrackIndex];
+  }
 
-    // Preload asynchronously
-    this.preloadTrack(nextQueueIndex).catch(error => {
-      console.warn('Failed to preload next track:', error);
-    });
+  /**
+   * Get current playback status information
+   * @returns {Object} Status information including cycle and track progress
+   */
+  getPlaybackStatus() {
+    return {
+      isPlaying: this.isPlaying,
+      currentPalo: this.currentPalo,
+      currentCycle: this.currentCycle,
+      totalTracksInCycle: this.totalTracksInCycle,
+      currentTrack: this.getCurrentTrack(),
+      cycleDuration: this.currentCycleAudioBuffer ? this.currentCycleAudioBuffer.duration : 0
+    };
   }
 
   /**
@@ -11077,6 +11159,7 @@ class AudioManager {
    * @param {number} tempo - Tempo value (1.0 = normal speed)
    */
   setTempo(tempo) {
+    this.currentTempo = tempo;
     if (this.pitchShifter) {
       this.pitchShifter.tempo = tempo;
       console.log(`Tempo set to: ${tempo}`);
@@ -11088,6 +11171,7 @@ class AudioManager {
    * @param {number} pitch - Pitch value (1.0 = normal pitch)
    */
   setPitch(pitch) {
+    this.currentPitch = pitch;
     if (this.pitchShifter) {
       this.pitchShifter.pitch = pitch;
       console.log(`Pitch set to: ${pitch}`);
@@ -11099,6 +11183,7 @@ class AudioManager {
    * @param {number} semitones - Semitones to shift (-12 to +12)
    */
   setPitchSemitones(semitones) {
+    this.currentPitchSemitones = semitones;
     if (this.pitchShifter) {
       this.pitchShifter.pitchSemitones = semitones;
       console.log(`Pitch set to: ${semitones} semitones`);
@@ -11110,22 +11195,11 @@ class AudioManager {
    * @param {number} volume - Volume level (0.0 to 1.0)
    */
   setVolume(volume) {
+    this.currentVolume = volume;
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
       console.log(`Volume set to: ${volume}`);
     }
-  }
-
-  /**
-   * Get current track information
-   * @returns {Object|null} Current track object or null
-   */
-  getCurrentTrack() {
-    if (!this.tracks.length || this.currentTrackIndex >= this.playQueue.length) {
-      return null;
-    }
-    const currentQueueIndex = this.playQueue[this.currentTrackIndex];
-    return this.tracks[currentQueueIndex];
   }
 
   /**
@@ -11194,8 +11268,14 @@ class AudioManager {
       this.audioContext.close();
     }
     this.audioBuffers.clear();
+    this.currentCycleAudioBuffer = null;
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
+
+    // Reset cycle tracking
+    this.currentCycle = 1;
+    this.totalTracksInCycle = 0;
+    this.trackTimings = [];
     console.log('AudioManager destroyed');
   }
 }
@@ -11281,6 +11361,7 @@ class FlamencoApp {
     // Listen for track changes
     this.audioManager.onTrackChange(track => {
       this.updateTrackInfo(track);
+      this.updatePlaybackStatus();
     });
 
     // Listen for play state changes
@@ -11368,11 +11449,38 @@ class FlamencoApp {
     const titleElement = this.trackInfo.querySelector('.track-title');
     const paloElement = this.trackInfo.querySelector('.track-palo');
     if (track) {
-      titleElement.textContent = track.title;
-      paloElement.textContent = track.palo;
+      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
+      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
     } else {
       titleElement.textContent = this.currentPalo ? 'Listo para reproducir' : 'Selecciona un palo para comenzar';
       paloElement.textContent = this.currentPalo || '';
+    }
+  }
+  updatePlaybackStatus() {
+    if (this.isPlaying) {
+      const status = this.audioManager.getPlaybackStatus();
+      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
+      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
+
+      // Update status in the track info or create a new status element
+      const existingStatus = document.querySelector('.playback-status');
+      if (existingStatus) {
+        existingStatus.textContent = statusText;
+      } else {
+        const statusElement = document.createElement('div');
+        statusElement.className = 'playback-status';
+        statusElement.textContent = statusText;
+        statusElement.style.fontSize = '0.8rem';
+        statusElement.style.color = '#718096';
+        statusElement.style.marginTop = '0.5rem';
+        this.trackInfo.appendChild(statusElement);
+      }
+    } else {
+      // Remove status when not playing
+      const existingStatus = document.querySelector('.playback-status');
+      if (existingStatus) {
+        existingStatus.remove();
+      }
     }
   }
   updatePlayState(isPlaying) {
@@ -11387,6 +11495,9 @@ class FlamencoApp {
     } else {
       this.visualizer.classList.remove('playing');
     }
+
+    // Update playback status
+    this.updatePlaybackStatus();
   }
   showStatus(message, type = '') {
     this.statusMessage.textContent = message;
