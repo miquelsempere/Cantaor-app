@@ -317,7 +317,7 @@ export default class AudioManager {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 4000); // 4 seconds delay between tracks
+    }, 4000000); // 4 seconds delay between tracks
   }
 
   /**
