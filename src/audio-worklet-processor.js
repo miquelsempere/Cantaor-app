@@ -84,13 +84,20 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
    */
   initializeAudioProcessing(data) {
     try {
-      const { audioBuffer } = data;
+      const { channelData, numberOfChannels, sampleRate, length } = data;
       
-      if (!audioBuffer) {
-        throw new Error('No AudioBuffer provided for initialization');
+      if (!channelData || !numberOfChannels || !sampleRate || !length) {
+        throw new Error('Incomplete AudioBuffer data provided for initialization');
       }
       
-      this.audioBuffer = audioBuffer;
+      // Create a worklet-compatible AudioBuffer representation
+      this.audioBuffer = {
+        numberOfChannels: numberOfChannels,
+        sampleRate: sampleRate,
+        length: length,
+        duration: length / sampleRate,
+        channelData: channelData.map(data => new Float32Array(data))
+      };
       
       // Create WebAudioBufferSource equivalent for the worklet
       this.bufferSource = new WorkletAudioBufferSource(audioBuffer);
@@ -241,11 +248,11 @@ class WorkletAudioBufferSource {
   extract(target, numFrames = 0, position = 0) {
     this.position = position;
     
-    // Get channel data from AudioBuffer
-    const left = this.buffer.getChannelData(0);
+    // Get channel data from our worklet AudioBuffer representation
+    const left = this.buffer.channelData[0];
     const right = this.dualChannel ? 
-      this.buffer.getChannelData(1) : 
-      this.buffer.getChannelData(0);
+      this.buffer.channelData[1] : 
+      this.buffer.channelData[0];
     
     let i = 0;
     for (; i < numFrames && (i + position) < left.length; i++) {
