@@ -294,9 +294,11 @@ export default class AudioManager {
 
   setTempo(tempo) {
     this.globalTempo = tempo;
-    // Actualizar el tempo de las fuentes programadas
+    // si hay pitchShifters activos, actualizar (no garantizado que todas las implementaciones lo soporten en caliente)
     for (const entry of this.scheduled.values()) {
-      if (entry.source && entry.source.playbackRate) {
+      if (entry.pitchShifter && typeof entry.pitchShifter.setTempo === 'function') {
+        entry.pitchShifter.setTempo(tempo);
+      } else if (entry.source && entry.source.playbackRate) {
         try { entry.source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime); } catch(e){}
       }
     }
@@ -305,8 +307,11 @@ export default class AudioManager {
 
   setPitchSemitones(semitones) {
     this.globalPitchSemitones = semitones;
-    // Nota: AudioBufferSourceNode no soporta pitch shifting directo
-    // Para pitch shifting real necesitaríamos usar PitchShifter, pero eso complicaría la programación
+    for (const entry of this.scheduled.values()) {
+      if (entry.pitchShifter && typeof entry.pitchShifter.setPitchSemitones === 'function') {
+        entry.pitchShifter.setPitchSemitones(semitones);
+      }
+    }
     console.log('Pitch semitones set to', semitones);
   }
 
