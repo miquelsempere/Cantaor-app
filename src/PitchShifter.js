@@ -45,12 +45,21 @@ const onUpdate = function (sourcePosition) {
 };
 
 export default class PitchShifter {
-  constructor(context, buffer, bufferSize, onEnd = noop) {
+  constructor(context, buffer, bufferSize) {
     this._soundtouch = new SoundTouch();
     const source = new WebAudioBufferSource(buffer);
     this.timePlayed = 0;
     this.sourcePosition = 0;
-    this._filter = new SimpleFilter(source, this._soundtouch, onEnd);
+    this._filter = new SimpleFilter(source, this._soundtouch, () => {
+      // Emit 'end' event when track finishes
+      const endEvent = new CustomEvent('end', {
+        detail: {
+          timePlayed: this.timePlayed,
+          sourcePosition: this.sourcePosition
+        }
+      });
+      this._node.dispatchEvent(endEvent);
+    });
     this._node = getWebAudioNode(
       context,
       this._filter,
