@@ -142,14 +142,16 @@ export default class AudioManager {
     const startTime = this.audioContext.currentTime;
     source.start(startTime);
 
-    // Programar la siguiente canción EXACTAMENTE al acabar
+    // Y programamos la siguiente canción EXACTAMENTE al acabar
     const nextTrackIndex = (this.currentTrackIndex + 1) % this.playQueue.length;
     const nextQueueIndex = this.playQueue[nextTrackIndex];
     const nextTrack = this.tracks[nextQueueIndex];
     
-    // Preload y programar la siguiente pista
+    // Calcular duración con tempo aplicado
+    const adjustedDuration = buffer.duration / this.globalTempo;
+    
     this.preloadTrack(nextQueueIndex).then(() => {
-      if (!this.isPlaying) return; // Check if still playing
+      if (!this.isPlaying) return;
       
       const nextBuffer = this.audioBuffers.get(nextTrack.id);
       if (nextBuffer) {
@@ -157,32 +159,22 @@ export default class AudioManager {
         nextSource.buffer = nextBuffer;
         nextSource.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
         nextSource.connect(this.gainNode);
-        
-        // Calcular duración con tempo aplicado
-        const adjustedDuration = buffer.duration / this.globalTempo;
         nextSource.start(startTime + adjustedDuration); // ← empieza en el mismo timeline
         
-        // Configurar para que programe la siguiente cuando termine
-        nextSource.onended = () => {
-          if (this.isPlaying) {
-            this.currentTrackIndex = nextTrackIndex;
-            this.playCurrentTrack(); // Recursivamente programa la siguiente
-          }
-        };
-        
         this.currentSource = nextSource;
-        
-        // Programar el cambio de pista para cuando empiece la siguiente
-        setTimeout(() => {
-          if (this.isPlaying) {
-            this.currentTrackIndex = nextTrackIndex;
-            this.notifyTrackChange(nextTrack);
-          }
-        }, adjustedDuration * 1000);
+        this.currentTrackIndex = nextTrackIndex;
+        this.notifyTrackChange(nextTrack);
       }
     }).catch(err => {
       console.error('Error preloading next track:', err);
     });
+
+    // Solo configurar onended para continuar la cadena
+    source.onended = () => {
+      if (this.isPlaying) {
+        this.playCurrentTrack(); // Recursivamente continúa la cadena
+      }
+    };
 
     this.currentSource = source;
     this.notifyTrackChange(track);
