@@ -56,8 +56,11 @@ class FlamencoApp {
       this.handlePaloChange(e.target.value);
     });
 
-    // Play/Stop button
-    this.playButton.addEventListener('click', () => {
+    // Play/Stop button - use arrow function to preserve 'this' context
+    this.playButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('=== BUTTON CLICK EVENT FIRED ===');
       this.handlePlayButtonClick();
     });
 
