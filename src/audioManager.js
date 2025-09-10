@@ -108,21 +108,32 @@ export default class AudioManager {
 
     try {
       console.log('Preloading:', track.title || track.id);
+      console.log('Fetching audio from URL:', track.audio_url);
       const response = await fetch(track.audio_url);
-      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      if (!response.ok) {
+        const errorMsg = `Failed to fetch audio file: ${response.status} ${response.statusText} for URL: ${track.audio_url}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      console.log('Successfully fetched audio file, converting to ArrayBuffer...');
       const arrayBuffer = await response.arrayBuffer();
+      console.log('ArrayBuffer created, size:', arrayBuffer.byteLength, 'bytes');
       
       // Check again after async operations in case audioContext was destroyed
       if (!this.audioContext) {
         throw new Error('AudioContext became null during preload operation');
       }
       
+      console.log('Decoding audio data...');
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      console.log('Audio decoded successfully. Duration:', audioBuffer.duration, 'seconds');
       this.audioBuffers.set(track.id, audioBuffer);
       console.log('Preloaded:', track.title || track.id);
       return audioBuffer;
     } catch (err) {
-      console.warn('Error preloading track', track.title, err);
+      console.error('Error preloading track:', track.title || track.id);
+      console.error('Error details:', err.message);
+      console.error('Full error:', err);
       throw err;
     }
   }
