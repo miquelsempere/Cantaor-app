@@ -1,8 +1,8 @@
 /*
- * Audio Manager completo — scheduling preciso y preload del siguiente track
+ * Audio Manager with precise scheduling using AudioBufferSourceNode
+ * Based on the correct approach for seamless audio playback
  */
 
-import { PitchShifter } from './index.js';
 import { canteTracksAPI } from './supabaseClient.js';
 
 export default class AudioManager {
@@ -18,42 +18,30 @@ export default class AudioManager {
     // Pistas y cola
     this.tracks = [];           // array de objetos track { id, title, audio_url, ... }
     this.playQueue = [];        // array de índices dentro de this.tracks (barajada)
-    this.currentQueuePosition = 0; // posición (0..N-1) dentro de playQueue que corresponde a la pista "actual programada"
+    this.currentTrackIndex = 0; // posición dentro de playQueue
 
-    // Caching y scheduling
+    // Caching
     this.audioBuffers = new Map();  // track.id -> AudioBuffer
-    this.scheduled = new Map();     // queuePos -> { startTime, endTime, pitchShifter, source, timers... }
+    this.currentSource = null;
 
-    // Preferencias de timing
-    this.startLatency = 0.05;    // segundos: pequeña latencia inicial para poder programar en el futuro
-    this.preloadLeadTime = 0.6;  // segundos: tiempo mínimo antes del fin del track para asegurarnos de preload+crear siguiente
-
-    // Pitch/tempo global (si usas PitchShifter debes aplicarlo cuando crees la instancia)
+    // Controles de audio
     this.globalTempo = 1.0;
     this.globalPitchSemitones = 0;
+    this.currentVolume = 0.8;
 
     // Listeners
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-
-    // Volumen
-    this.currentVolume = 0.8;
-
-    // Inicializar contexto
-    this.initializeAudioContext();
   }
 
   /* --------------- Inicialización --------------- */
-  initializeAudioContext() {
-    try {
+  async initializeAudioContext() {
+    if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination); // Conectar una sola vez
+      this.gainNode.connect(this.audioContext.destination);
       this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
       console.log('Audio context inicializado');
-    } catch (err) {
-      console.error('No se pudo inicializar AudioContext:', err);
-      throw err;
     }
   }
 
@@ -61,18 +49,15 @@ export default class AudioManager {
   async loadPalo(palo) {
     try {
       console.log(`Loading tracks for palo: ${palo}`);
-      this.tracks = await canteTracksAPI.getTracksByPalo(palo); // espera que devuelva [{id, title, audio_url}, ...]
+      this.tracks = await canteTracksAPI.getTracksByPalo(palo);
       if (!this.tracks || this.tracks.length === 0) {
         throw new Error(`No tracks found for palo: ${palo}`);
       }
       this.currentPalo = palo;
       this.createPlayQueue();
-      this.currentQueuePosition = 0;
-
-      // Preload first two tracks for seguridad
-      await this.preloadTrack(this.playQueue[0]);
-      const second = (this.playQueue.length > 1) ? this.playQueue[1] : this.playQueue[0];
-      this.preloadTrack(second).catch(() => {/* no bloquee si falla aquí */});
+      
+      // Preload first track
+      await this.preloadTrack(this.playQueue[this.currentTrackIndex]);
 
       console.log(`Loaded ${this.tracks.length} tracks for ${palo}`);
       return this.tracks.length;
@@ -83,29 +68,27 @@ export default class AudioManager {
   }
 
   createPlayQueue() {
-    const indices = Array.from({ length: this.tracks.length }, (_, i) => i);
+    const indices = Array.from(this.tracks.keys());
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     this.playQueue = indices;
-    this.currentQueuePosition = 0;
+    this.currentTrackIndex = 0;
     console.log('Play queue creada:', this.playQueue);
   }
 
   /* --------------- Preload / Decodificado --------------- */
   async preloadTrack(trackIndex) {
-    // trackIndex es índice dentro de this.tracks (no queuePos)
     if (trackIndex == null || trackIndex < 0 || trackIndex >= this.tracks.length) return;
     const track = this.tracks[trackIndex];
-    if (!track) return;
-    if (this.audioBuffers.has(track.id)) return; // ya cached
+    if (!track || this.audioBuffers.has(track.id)) return;
 
     try {
       console.log('Preloading:', track.title || track.id);
-      const resp = await fetch(track.audio_url);
-      if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
-      const arrayBuffer = await resp.arrayBuffer();
+      const response = await fetch(track.audio_url);
+      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.audioBuffers.set(track.id, audioBuffer);
       console.log('Preloaded:', track.title || track.id);
@@ -114,31 +97,6 @@ export default class AudioManager {
       console.warn('Error preloading track', track.title, err);
       throw err;
     }
-  }
-
-  preloadNextTrack() {
-    // Intenta precargar la siguiente pista en la cola
-    const nextQueuePos = (this.currentQueuePosition + 1) % this.playQueue.length;
-    const nextTrackIndex = this.playQueue[nextQueuePos];
-    return this.preloadTrack(nextTrackIndex).catch(err => {
-      console.warn('preloadNextTrack failed:', err);
-    });
-  }
-
-  /* --------------- Limpieza de pistas programadas --------------- */
-  clearScheduledTracks() {
-    for (const [qpos, entry] of this.scheduled.entries()) {
-      if (entry.source) {
-        try { entry.source.stop(); } catch (e) {} // Detener cualquier fuente activa
-        try { entry.source.disconnect(); } catch (e) {}
-      }
-      if (entry.pitchShifter) {
-        try { entry.pitchShifter.disconnect(); } catch (e) {}
-      }
-      if (entry._endTimer) clearTimeout(entry._endTimer); // Limpiar timers si existen
-      if (entry._preloadTimeout) clearTimeout(entry._preloadTimeout);
-    }
-    this.scheduled.clear();
   }
 
   /* --------------- Reproducción --------------- */
@@ -151,175 +109,102 @@ export default class AudioManager {
       return;
     }
 
-    // resume context si está suspendido
+    await this.initializeAudioContext();
+
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
 
     this.isPlaying = true;
     this.notifyPlayStateChange(true);
+    this.playCurrentTrack();
+  }
 
-    this.clearScheduledTracks(); // Limpiar cualquier programación anterior
+  playCurrentTrack() {
+    if (!this.isPlaying) return;
 
-    // Conectar el gainNode al destino si no lo está
-    try {
-      this.gainNode.connect(this.audioContext.destination);
-    } catch (e) {
-      // Ya está conectado, ignorar error
+    const queueIndex = this.playQueue[this.currentTrackIndex];
+    const track = this.tracks[queueIndex];
+    const buffer = this.audioBuffers.get(track.id);
+
+    if (!buffer) {
+      console.error('No buffer loaded for', track.title);
+      return;
     }
 
-    // Tiempo de inicio para la primera pista
-    let currentScheduleTime = Math.max(this.audioContext.currentTime + this.startLatency, this.audioContext.currentTime + 0.02);
+    // Crear y configurar la fuente actual
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
+    source.connect(this.gainNode);
 
-    // Programar solo la primera pista - las siguientes se programarán automáticamente
-    await this._scheduleTrackByQueuePos(this.currentQueuePosition, currentScheduleTime);
+    // Programar el inicio justo ahora
+    const startTime = this.audioContext.currentTime;
+    source.start(startTime);
+
+    // Programar la siguiente canción EXACTAMENTE al acabar
+    const nextTrackIndex = (this.currentTrackIndex + 1) % this.playQueue.length;
+    const nextQueueIndex = this.playQueue[nextTrackIndex];
+    const nextTrack = this.tracks[nextQueueIndex];
+    
+    // Preload y programar la siguiente pista
+    this.preloadTrack(nextQueueIndex).then(() => {
+      if (!this.isPlaying) return; // Check if still playing
+      
+      const nextBuffer = this.audioBuffers.get(nextTrack.id);
+      if (nextBuffer) {
+        const nextSource = this.audioContext.createBufferSource();
+        nextSource.buffer = nextBuffer;
+        nextSource.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
+        nextSource.connect(this.gainNode);
+        
+        // Calcular duración con tempo aplicado
+        const adjustedDuration = buffer.duration / this.globalTempo;
+        nextSource.start(startTime + adjustedDuration); // ← empieza en el mismo timeline
+        
+        // Configurar para que programe la siguiente cuando termine
+        nextSource.onended = () => {
+          if (this.isPlaying) {
+            this.currentTrackIndex = nextTrackIndex;
+            this.playCurrentTrack(); // Recursivamente programa la siguiente
+          }
+        };
+        
+        this.currentSource = nextSource;
+        
+        // Programar el cambio de pista para cuando empiece la siguiente
+        setTimeout(() => {
+          if (this.isPlaying) {
+            this.currentTrackIndex = nextTrackIndex;
+            this.notifyTrackChange(nextTrack);
+          }
+        }, adjustedDuration * 1000);
+      }
+    }).catch(err => {
+      console.error('Error preloading next track:', err);
+    });
+
+    this.currentSource = source;
+    this.notifyTrackChange(track);
   }
 
   stop() {
     if (!this.isPlaying) return;
+    
     this.isPlaying = false;
-
-    this.clearScheduledTracks(); // Limpiar todos los elementos programados
-
-    // Desconectar el gainNode principal del destino
-    if (this.gainNode && this.audioContext.destination) {
+    
+    if (this.currentSource) {
       try {
-        this.gainNode.disconnect(this.audioContext.destination);
+        this.currentSource.stop();
+        this.currentSource.disconnect();
       } catch (e) {
-        // Ya está desconectado, ignorar error
+        // Source might already be stopped
       }
+      this.currentSource = null;
     }
 
     this.notifyPlayStateChange(false);
-    console.log('Playback stopped and cleaned scheduled sources');
-  }
-
-  /* --------------- Scheduling interno (solo current + next) --------------- */
-
-  /**
-   * Programa una pista en una posición específica de la cola para comenzar en startTime
-   * Devuelve el endTime de la pista programada
-   */
-  async _scheduleTrackByQueuePos(queuePos, startTime) {
-    if (!this.isPlaying) return; // Detener si la reproducción fue detenida externamente
-
-    // Si ya está programada, devolver su endTime
-    if (this.scheduled.has(queuePos)) {
-      console.warn('Queue position already scheduled:', queuePos);
-      return this.scheduled.get(queuePos).endTime;
-    }
-
-    const trackIndex = this.playQueue[queuePos];
-    const track = this.tracks[trackIndex];
-    if (!track) throw new Error('Track not found for queuePos ' + queuePos);
-
-    // Asegurar que el buffer esté decodificado
-    if (!this.audioBuffers.has(track.id)) {
-      await this.preloadTrack(trackIndex);
-    }
-    const audioBuffer = this.audioBuffers.get(track.id);
-    if (!audioBuffer) throw new Error('No audioBuffer available after preload for ' + track.title);
-
-    // Usar AudioBufferSourceNode directamente para programación precisa
-    const sourceNode = this.audioContext.createBufferSource();
-    sourceNode.buffer = audioBuffer;
-    
-    // Aplicar tempo y pitch usando playbackRate (aproximación simple)
-    sourceNode.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
-    
-    // Conectar directamente al gainNode
-    sourceNode.connect(this.gainNode);
-
-    // Calcular duración con el tempo aplicado
-    const playbackDuration = audioBuffer.duration / Math.max(0.0001, this.globalTempo);
-
-    const endTime = startTime + playbackDuration;
-
-    // Programar inicio y fin exactos
-    try {
-      sourceNode.start(startTime);
-      sourceNode.stop(endTime);
-    } catch (err) {
-      console.error('Error scheduling source start/stop:', err);
-      throw err;
-    }
-
-    // Almacenar información de la pista programada
-    const scheduledEntry = {
-      queuePos,
-      trackIndex,
-      startTime,
-      endTime,
-      source: sourceNode,
-      pitchShifter: null,
-    };
-    this.scheduled.set(queuePos, scheduledEntry);
-
-    // Configurar callback para cuando termine la pista
-    sourceNode.onended = () => {
-      console.log(`Track ${track.title} (queuePos ${queuePos}) ended at ${this.audioContext.currentTime.toFixed(3)}`);
-      // Limpiar recursos para esta pista
-      if (scheduledEntry.pitchShifter) {
-        try { scheduledEntry.pitchShifter.disconnect(); } catch (e) {}
-      }
-      if (scheduledEntry.source) {
-        try { scheduledEntry.source.disconnect(); } catch (e) {}
-      }
-      this.scheduled.delete(queuePos); // Eliminar del mapa de programadas
-
-      // Avanzar currentQueuePosition y notificar cambio de pista
-      // Solo avanzar si esta era la pista que se estaba reproduciendo actualmente
-      if (this.currentQueuePosition === queuePos) {
-        this.currentQueuePosition = (queuePos + 1) % this.playQueue.length;
-        const nextTrackInQueue = this.tracks[this.playQueue[this.currentQueuePosition]];
-        this.notifyTrackChange(nextTrackInQueue);
-      }
-
-      // Disparar la programación de las siguientes pistas si la reproducción sigue activa
-      if (this.isPlaying) {
-        this._scheduleNextTracks();
-      }
-    };
-
-    // Notificar cambio de pista si es la pista actual
-    if (queuePos === this.currentQueuePosition) {
-      this.notifyTrackChange(track);
-    }
-
-    console.log(`Scheduled queuePos ${queuePos} (track: ${track.title}) start:${startTime.toFixed(3)} end:${endTime.toFixed(3)}`);
-    return endTime;
-  }
-
-  /* --------------- Métodos públicos de control --------------- */
-
-  setTempo(tempo) {
-    this.globalTempo = tempo;
-    // si hay pitchShifters activos, actualizar (no garantizado que todas las implementaciones lo soporten en caliente)
-    for (const entry of this.scheduled.values()) {
-      if (entry.pitchShifter && typeof entry.pitchShifter.setTempo === 'function') {
-        entry.pitchShifter.setTempo(tempo);
-      } else if (entry.source && entry.source.playbackRate) {
-        try { entry.source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime); } catch(e){}
-      }
-    }
-    console.log('Tempo set to', tempo);
-  }
-
-  setPitchSemitones(semitones) {
-    this.globalPitchSemitones = semitones;
-    for (const entry of this.scheduled.values()) {
-      if (entry.pitchShifter && typeof entry.pitchShifter.setPitchSemitones === 'function') {
-        entry.pitchShifter.setPitchSemitones(semitones);
-      }
-    }
-    console.log('Pitch semitones set to', semitones);
-  }
-
-  setVolume(volume) {
-    this.currentVolume = Math.max(0, Math.min(1, volume));
-    if (this.gainNode && this.audioContext) {
-      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
-    }
+    console.log('Playback stopped');
   }
 
   pause() {
@@ -338,11 +223,38 @@ export default class AudioManager {
     }
   }
 
+  /* --------------- Controles de audio --------------- */
+  setTempo(tempo) {
+    this.globalTempo = tempo;
+    if (this.currentSource && this.currentSource.playbackRate) {
+      try {
+        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+      } catch (e) {
+        // Source might be stopped
+      }
+    }
+    console.log('Tempo set to', tempo);
+  }
+
+  setPitchSemitones(semitones) {
+    this.globalPitchSemitones = semitones;
+    // Note: AudioBufferSourceNode doesn't support pitch shifting without tempo change
+    // For real pitch shifting, we'd need to use a more complex approach
+    console.log('Pitch semitones set to', semitones, '(tempo-based approximation)');
+  }
+
+  setVolume(volume) {
+    this.currentVolume = Math.max(0, Math.min(1, volume));
+    if (this.gainNode && this.audioContext) {
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+    }
+  }
+
+  /* --------------- Getters --------------- */
   getCurrentTrack() {
     if (!this.tracks.length) return null;
-    const qpos = this.currentQueuePosition % this.playQueue.length;
-    const trackIndex = this.playQueue[qpos];
-    return this.tracks[trackIndex] || null;
+    const queueIndex = this.playQueue[this.currentTrackIndex];
+    return this.tracks[queueIndex] || null;
   }
 
   async getAvailablePalos() {
@@ -354,21 +266,39 @@ export default class AudioManager {
     }
   }
 
-  // listeners
-  onTrackChange(cb) { this.onTrackChangeListeners.push(cb); }
-  onPlayStateChange(cb) { this.onPlayStateChangeListeners.push(cb); }
-  notifyTrackChange(track) {
-    this.onTrackChangeListeners.forEach(cb => { try { cb(track); } catch(e){} });
+  /* --------------- Event listeners --------------- */
+  onTrackChange(cb) { 
+    this.onTrackChangeListeners.push(cb); 
   }
+  
+  onPlayStateChange(cb) { 
+    this.onPlayStateChangeListeners.push(cb); 
+  }
+  
+  notifyTrackChange(track) {
+    console.log(`Now playing: ${track.title}`);
+    this.onTrackChangeListeners.forEach(cb => { 
+      try { cb(track); } catch(e) { console.error('Track change listener error:', e); } 
+    });
+  }
+  
   notifyPlayStateChange(isPlaying) {
-    this.onPlayStateChangeListeners.forEach(cb => { try { cb(isPlaying); } catch(e){} });
+    this.onPlayStateChangeListeners.forEach(cb => { 
+      try { cb(isPlaying); } catch(e) { console.error('Play state listener error:', e); } 
+    });
   }
 
+  /* --------------- Cleanup --------------- */
   destroy() {
     this.stop();
     if (this.audioContext) {
-      try { this.audioContext.close(); } catch (e) {}
+      try { 
+        this.audioContext.close(); 
+      } catch (e) {
+        console.warn('Error closing audio context:', e);
+      }
       this.audioContext = null;
+      this.gainNode = null;
     }
     this.audioBuffers.clear();
     this.onTrackChangeListeners = [];
