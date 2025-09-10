@@ -117,14 +117,14 @@ export default class AudioManager {
 
     this.isPlaying = true;
     this.notifyPlayStateChange(true);
-    this.playCurrentTrack();
+    this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
   }
 
-  playCurrentTrack() {
+  scheduleTrack(trackIndex, startTime) {
     if (!this.isPlaying) return;
 
-    const queueIndex = this.playQueue[this.currentTrackIndex];
-    const track = this.tracks[queueIndex];
+    const trackId = this.playQueue[trackIndex];
+    const track = this.tracks[trackId];
     const buffer = this.audioBuffers.get(track.id);
 
     if (!buffer) {
@@ -132,52 +132,30 @@ export default class AudioManager {
       return;
     }
 
-    // Crear y configurar la fuente actual
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
     source.connect(this.gainNode);
-
-    // Programar el inicio justo ahora
-    const startTime = this.audioContext.currentTime;
     source.start(startTime);
 
-    // Y programamos la siguiente canción EXACTAMENTE al acabar
-    const nextTrackIndex = (this.currentTrackIndex + 1) % this.playQueue.length;
-    const nextQueueIndex = this.playQueue[nextTrackIndex];
-    const nextTrack = this.tracks[nextQueueIndex];
-    
-    // Calcular duración con tempo aplicado
+    this.currentSource = source;
+    this.notifyTrackChange(track);
+
+    // programamos la siguiente pista
+    const nextIndex = (trackIndex + 1) % this.playQueue.length;
     const adjustedDuration = buffer.duration / this.globalTempo;
-    
-    this.preloadTrack(nextQueueIndex).then(() => {
-      if (!this.isPlaying) return;
-      
-      const nextBuffer = this.audioBuffers.get(nextTrack.id);
-      if (nextBuffer) {
-        const nextSource = this.audioContext.createBufferSource();
-        nextSource.buffer = nextBuffer;
-        nextSource.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
-        nextSource.connect(this.gainNode);
-        nextSource.start(startTime + adjustedDuration); // ← empieza en el mismo timeline
-        
-        this.currentSource = nextSource;
-        this.currentTrackIndex = nextTrackIndex;
-        this.notifyTrackChange(nextTrack);
+    const nextStart = startTime + adjustedDuration;
+
+    this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      if (this.isPlaying) {
+        this.scheduleTrack(nextIndex, nextStart);
       }
     }).catch(err => {
       console.error('Error preloading next track:', err);
     });
 
-    // Solo configurar onended para continuar la cadena
-    source.onended = () => {
-      if (this.isPlaying) {
-        this.playCurrentTrack(); // Recursivamente continúa la cadena
-      }
-    };
-
-    this.currentSource = source;
-    this.notifyTrackChange(track);
+    // avanzamos el índice
+    this.currentTrackIndex = nextIndex;
   }
 
   stop() {
