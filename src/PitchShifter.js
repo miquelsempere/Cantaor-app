@@ -20,12 +20,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-import WebAudioBufferSource from './WebAudioBufferSource';
-import getWebAudioNode from './getWebAudioNode';
-import SoundTouch from './SoundTouch';
-import SimpleFilter from './SimpleFilter';
-import minsSecs from './minsSecs';
-import noop from './noop';
+import WebAudioBufferSource from './WebAudioBufferSource.js';
+import getWebAudioNode from './getWebAudioNode.js';
+import SoundTouch from './SoundTouch.js';
+import SimpleFilter from './SimpleFilter.js';
+import minsSecs from './minsSecs.js';
+import noop from './noop.js';
 
 const onUpdate = function (sourcePosition) {
   const currentTimePlayed = this.timePlayed;
