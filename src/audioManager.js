@@ -324,20 +324,20 @@ export default class AudioManager {
     }
     
     // 1 second delay between tracks for clean transition
-    console.log('Waiting 1 second before next track...');
+    console.log('Waiting 4 seconds before next track...');
     setTimeout(() => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during transition delay');
+        console.log('Playback was stopped during 4-second transition delay');
         return;
       }
       
-      console.log('Starting next track after 1 second delay');
+      console.log('Starting next track after 4-second delay');
       // Play next track
       this.playCurrentTrack().catch(error => {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 1000); // 1 second delay between tracks
+    }, 4000); // 4 seconds delay between tracks
   }
 
   /**
