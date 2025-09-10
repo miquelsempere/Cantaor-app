@@ -254,31 +254,11 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    // Immediate cleanup - if no pitchShifter exists, this call is redundant
-    if (!this.pitchShifter) {
-      return;
-    }
-    
-    // Immediately disconnect and nullify the current pitchShifter to prevent further events
-    this.pitchShifter.disconnect();
-    this.pitchShifter = null;
-    
-    // Immediately mute the gain node to silence any residual audio
-    this.gainNode.gain.value = 0;
-    
-    // Prevent multiple simultaneous transitions
-    if (this.isTransitioning) {
-      return;
-    }
-    
     console.log('Track ended, moving to next');
     
     if (!this.isPlaying) {
-      this.isTransitioning = false;
       return;
     }
-    
-    this.isTransitioning = true;
     
     // Move to next track in queue
     this.currentTrackIndex++;
@@ -289,24 +269,13 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // Small delay to allow browser to complete audio cleanup before starting next track
-    setTimeout(() => {
-      if (this.isPlaying) {
-        this.playCurrentTrack()
-          .then(() => {
-            // Restore volume after new track is connected
-            this.setVolume(this.currentVolume);
-            this.isTransitioning = false;
-          })
-          .catch(error => {
-            console.error('Error playing next track:', error);
-            // Restore volume even if there's an error
-            this.setVolume(this.currentVolume);
-            this.isTransitioning = false;
-            this.stop();
-          });
-      }
-    }, 50);
+    // Play next track immediately
+    if (this.isPlaying) {
+      this.playCurrentTrack().catch(error => {
+        console.error('Error playing next track:', error);
+        this.stop();
+      });
+    }
   }
 
   /**
