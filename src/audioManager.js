@@ -208,12 +208,6 @@ export default class AudioManager {
     
     console.log(`Playing track: ${currentTrack.title}`);
     
-    // Disconnect any existing PitchShifter to ensure clean transition
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
-    }
-    
     // Use preloaded buffer or load on demand
     let audioBuffer = this.nextTrackBuffer;
     if (!audioBuffer) {
@@ -253,27 +247,20 @@ export default class AudioManager {
       return;
     }
     
-    // Add a small delay to ensure clean transition
-    setTimeout(() => {
-      if (!this.isPlaying) {
-        return; // Check again in case playback was stopped during the delay
-      }
-      
-      // Move to next track in queue
-      this.currentTrackIndex++;
-      
-      // If we've played all tracks, restart the cycle with a new shuffle
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
-        this.createPlayQueue();
-      }
-      
-      // Play next track immediately for seamless playback
-      this.playCurrentTrack().catch(error => {
-        console.error('Error playing next track:', error);
-        this.stop();
-      });
-    }, 100); // 100ms delay to ensure clean transition
+    // Move to next track in queue
+    this.currentTrackIndex++;
+    
+    // If we've played all tracks, restart the cycle with a new shuffle
+    if (this.currentTrackIndex >= this.playQueue.length) {
+      console.log('All tracks played, reshuffling queue');
+      this.createPlayQueue();
+    }
+    
+    // Play next track immediately for seamless playback
+    this.playCurrentTrack().catch(error => {
+      console.error('Error playing next track:', error);
+      this.stop();
+    });
   }
 
   /**
