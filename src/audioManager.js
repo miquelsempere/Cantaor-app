@@ -283,16 +283,20 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // Play next track immediately for seamless playback
-    this.playCurrentTrack()
-      .then(() => {
-        this.isTransitioning = false;
-      })
-      .catch(error => {
-        console.error('Error playing next track:', error);
-        this.isTransitioning = false;
-        this.stop();
-      });
+    // Small delay to allow browser to complete audio cleanup before starting next track
+    setTimeout(() => {
+      if (this.isPlaying) {
+        this.playCurrentTrack()
+          .then(() => {
+            this.isTransitioning = false;
+          })
+          .catch(error => {
+            console.error('Error playing next track:', error);
+            this.isTransitioning = false;
+            this.stop();
+          });
+      }
+    }, 10);
   }
 
   /**
