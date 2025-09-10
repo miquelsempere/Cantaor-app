@@ -37,11 +37,23 @@ export default class AudioManager {
   /* --------------- Inicialización --------------- */
   async initializeAudioContext() {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
-      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
-      console.log('Audio context inicializado');
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        if (!this.audioContext) {
+          throw new Error('Failed to create AudioContext - returned null');
+        }
+        
+        this.gainNode = this.audioContext.createGain();
+        this.gainNode.connect(this.audioContext.destination);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+        console.log('Audio context inicializado');
+      } catch (error) {
+        console.error('Error initializing AudioContext:', error);
+        this.audioContext = null;
+        this.gainNode = null;
+        throw error;
+      }
     }
   }
 
