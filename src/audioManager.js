@@ -254,6 +254,9 @@ export default class AudioManager {
       pitchShifter: null,
     };
     this.scheduled.set(queuePos, scheduledEntry);
+
+    // Configurar callback para cuando termine la pista
+    sourceNode.onended = () => {
       console.log(`Track ${track.title} (queuePos ${queuePos}) ended at ${this.audioContext.currentTime.toFixed(3)}`);
       // Limpiar recursos para esta pista
       if (scheduledEntry.pitchShifter) {
