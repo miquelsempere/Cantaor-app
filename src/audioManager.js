@@ -48,6 +48,7 @@ export default class AudioManager {
   /* --------------- Carga de pistas --------------- */
   async loadPalo(palo) {
     try {
+      await this.initializeAudioContext();
       console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
       if (!this.tracks || this.tracks.length === 0) {
