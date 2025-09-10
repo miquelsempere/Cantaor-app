@@ -243,7 +243,7 @@ export default class AudioManager {
     // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
     
-    // Restaurar el volumen
+    // Restore volume directly (no fade-in)
     this.setVolume(this.currentVolume);
     
     // Notify track change
@@ -257,36 +257,37 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    // Silenciar inmediatamente para evitar solapamiento
-    if (this.gainNode) {
-      this.gainNode.gain.value = 0;
-    }
-    
     console.log('Track ended, moving to next');
     
     if (!this.isPlaying) {
       return;
     }
     
-    // Introducir un pequeño retraso para permitir que el pipeline de audio se vacíe
+    // Disconnect the previous PitchShifter immediately
+    if (this.pitchShifter) {
+      this.pitchShifter.disconnect();
+      this.pitchShifter = null;
+    }
+    
+    // Introduce a small silence pause to ensure previous audio has cleared
     setTimeout(() => {
-      // Move to next track in queue
+      // Move to next track in the queue
       this.currentTrackIndex++;
       
-      // If we've played all tracks, restart the cycle with a new shuffle
+      // If we've played all tracks, reshuffle the queue
       if (this.currentTrackIndex >= this.playQueue.length) {
         console.log('All tracks played, reshuffling queue');
         this.createPlayQueue();
       }
       
-      // Play next track immediately
+      // Play the next track if still in playback mode
       if (this.isPlaying) {
         this.playCurrentTrack().catch(error => {
           console.error('Error playing next track:', error);
           this.stop();
         });
       }
-    }, 20); // Retraso de 20ms
+    }, 50); // 50ms silence pause to ensure clean transition
   }
 
   /**
