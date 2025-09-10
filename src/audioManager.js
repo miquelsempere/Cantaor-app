@@ -31,6 +31,9 @@ export default class AudioManager {
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     
+    // Volume management
+    this.currentVolume = 0.8; // Default volume
+    
     this.initializeAudioContext();
   }
 
@@ -260,6 +263,9 @@ export default class AudioManager {
     this.pitchShifter.disconnect();
     this.pitchShifter = null;
     
+    // Immediately mute the gain node to silence any residual audio
+    this.gainNode.gain.value = 0;
+    
     // Prevent multiple simultaneous transitions
     if (this.isTransitioning) {
       return;
@@ -288,10 +294,14 @@ export default class AudioManager {
       if (this.isPlaying) {
         this.playCurrentTrack()
           .then(() => {
+            // Restore volume after new track is connected
+            this.setVolume(this.currentVolume);
             this.isTransitioning = false;
           })
           .catch(error => {
             console.error('Error playing next track:', error);
+            // Restore volume even if there's an error
+            this.setVolume(this.currentVolume);
             this.isTransitioning = false;
             this.stop();
           });
@@ -352,6 +362,7 @@ export default class AudioManager {
   setVolume(volume) {
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+      this.currentVolume = volume;
       console.log(`Volume set to: ${volume}`);
     }
   }
