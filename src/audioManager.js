@@ -208,6 +208,12 @@ export default class AudioManager {
     
     console.log(`Playing track: ${currentTrack.title}`);
     
+    // Disconnect any existing PitchShifter to ensure clean transition
+    if (this.pitchShifter) {
+      this.pitchShifter.disconnect();
+      this.pitchShifter = null;
+    }
+    
     // Use preloaded buffer or load on demand
     let audioBuffer = this.nextTrackBuffer;
     if (!audioBuffer) {
