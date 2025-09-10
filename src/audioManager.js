@@ -14,7 +14,6 @@ export default class AudioManager {
     
     // Playback state
     this.isPlaying = false;
-    this.isTransitioning = false;
     this.currentPalo = null;
     this.currentTrackIndex = 0;
     
@@ -26,6 +25,11 @@ export default class AudioManager {
     // Preloading
     this.nextTrackBuffer = null;
     this.isPreloading = false;
+    
+    // Continuous playback state
+    this.currentCycle = 1;
+    this.totalTracksInCycle = 0;
+    this.tracksPlayedInCycle = 0;
     
     // Event listeners
     this.onTrackChangeListeners = [];
@@ -97,8 +101,10 @@ export default class AudioManager {
     
     this.playQueue = indices;
     this.currentTrackIndex = 0;
+    this.totalTracksInCycle = this.tracks.length;
+    this.tracksPlayedInCycle = 0;
     
-    console.log('Play queue created:', this.playQueue);
+    console.log(`Play queue created for cycle ${this.currentCycle}:`, this.playQueue);
   }
 
   /**
@@ -172,7 +178,7 @@ export default class AudioManager {
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
       
-      console.log('Playback started');
+      console.log(`Playback started - Cycle ${this.currentCycle}, Track ${this.tracksPlayedInCycle + 1}/${this.totalTracksInCycle}`);
       
     } catch (error) {
       console.error('Error starting playback:', error);
@@ -188,9 +194,6 @@ export default class AudioManager {
       return;
     }
     
-    // Reset transition flag when stopping
-    this.isTransitioning = false;
-    
     // Disconnect PitchShifter to stop audio
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
@@ -200,7 +203,7 @@ export default class AudioManager {
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
     
-    console.log('Playback stopped');
+    console.log(`Playback stopped - Was in cycle ${this.currentCycle}, track ${this.tracksPlayedInCycle}/${this.totalTracksInCycle}`);
   }
 
   /**
@@ -210,7 +213,7 @@ export default class AudioManager {
     const currentQueueIndex = this.playQueue[this.currentTrackIndex];
     const currentTrack = this.tracks[currentQueueIndex];
     
-    console.log(`Playing track: ${currentTrack.title}`);
+    console.log(`Playing track: ${currentTrack.title} (${this.tracksPlayedInCycle + 1}/${this.totalTracksInCycle} in cycle ${this.currentCycle})`);
     
     // Disconnect any existing PitchShifter to ensure clean transition
     if (this.pitchShifter) {
@@ -237,6 +240,15 @@ export default class AudioManager {
       () => this.onTrackEnd() // Callback when track ends
     );
     
+    // Apply current audio settings to the new PitchShifter
+    // These values are maintained by the UI controls
+    if (this.currentTempo !== undefined) {
+      this.pitchShifter.tempo = this.currentTempo;
+    }
+    if (this.currentPitchSemitones !== undefined) {
+      this.pitchShifter.pitchSemitones = this.currentPitchSemitones;
+    }
+    
     // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
     
@@ -245,53 +257,45 @@ export default class AudioManager {
     
     // Preload next track
     this.preloadNextTrack();
+    
+    // Update cycle tracking
+    this.tracksPlayedInCycle++;
   }
 
   /**
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    // Prevent multiple simultaneous transitions
-    if (this.isTransitioning) {
-      return;
-    }
-    
-    console.log('Track ended, moving to next');
+    console.log(`Track ended - ${this.tracksPlayedInCycle}/${this.totalTracksInCycle} completed in cycle ${this.currentCycle}`);
     
     if (!this.isPlaying) {
-      this.isTransitioning = false;
+      console.log('Playback stopped, not advancing to next track');
       return;
     }
     
-    this.isTransitioning = true;
+    // Move to next track in queue
+    this.currentTrackIndex++;
     
-    // Add a small delay to ensure clean transition
+    // If we've played all tracks, restart the cycle with a new shuffle
+    if (this.currentTrackIndex >= this.playQueue.length) {
+      console.log(`Cycle ${this.currentCycle} completed! Starting new cycle...`);
+      this.currentCycle++;
+      this.createPlayQueue();
+    }
+    
+    // Small delay to ensure clean audio transition
     setTimeout(() => {
       if (!this.isPlaying) {
-        this.isTransitioning = false;
-        return; // Check again in case playback was stopped during the delay
+        console.log('Playback was stopped during transition delay');
+        return;
       }
       
-      // Move to next track in queue
-      this.currentTrackIndex++;
-      
-      // If we've played all tracks, restart the cycle with a new shuffle
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
-        this.createPlayQueue();
-      }
-      
-      // Play next track immediately for seamless playback
-      this.playCurrentTrack()
-        .then(() => {
-          this.isTransitioning = false;
-        })
-        .catch(error => {
-          console.error('Error playing next track:', error);
-          this.isTransitioning = false;
-          this.stop();
-        });
-    }, 100); // 100ms delay to ensure clean transition
+      // Play next track
+      this.playCurrentTrack().catch(error => {
+        console.error('Error playing next track:', error);
+        this.stop();
+      });
+    }, 50); // Reduced delay for faster transitions
   }
 
   /**
@@ -312,6 +316,7 @@ export default class AudioManager {
    * @param {number} tempo - Tempo value (1.0 = normal speed)
    */
   setTempo(tempo) {
+    this.currentTempo = tempo;
     if (this.pitchShifter) {
       this.pitchShifter.tempo = tempo;
       console.log(`Tempo set to: ${tempo}`);
@@ -323,6 +328,7 @@ export default class AudioManager {
    * @param {number} pitch - Pitch value (1.0 = normal pitch)
    */
   setPitch(pitch) {
+    this.currentPitch = pitch;
     if (this.pitchShifter) {
       this.pitchShifter.pitch = pitch;
       console.log(`Pitch set to: ${pitch}`);
@@ -334,6 +340,7 @@ export default class AudioManager {
    * @param {number} semitones - Semitones to shift (-12 to +12)
    */
   setPitchSemitones(semitones) {
+    this.currentPitchSemitones = semitones;
     if (this.pitchShifter) {
       this.pitchShifter.pitchSemitones = semitones;
       console.log(`Pitch set to: ${semitones} semitones`);
@@ -345,6 +352,7 @@ export default class AudioManager {
    * @param {number} volume - Volume level (0.0 to 1.0)
    */
   setVolume(volume) {
+    this.currentVolume = volume;
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
       console.log(`Volume set to: ${volume}`);
@@ -362,6 +370,22 @@ export default class AudioManager {
     
     const currentQueueIndex = this.playQueue[this.currentTrackIndex];
     return this.tracks[currentQueueIndex];
+  }
+
+  /**
+   * Get current playback status information
+   * @returns {Object} Status information including cycle and track progress
+   */
+  getPlaybackStatus() {
+    return {
+      isPlaying: this.isPlaying,
+      currentPalo: this.currentPalo,
+      currentCycle: this.currentCycle,
+      tracksPlayedInCycle: this.tracksPlayedInCycle,
+      totalTracksInCycle: this.totalTracksInCycle,
+      currentTrack: this.getCurrentTrack(),
+      queueLength: this.playQueue.length - this.currentTrackIndex
+    };
   }
 
   /**
@@ -434,6 +458,11 @@ export default class AudioManager {
     this.audioBuffers.clear();
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
+    
+    // Reset cycle tracking
+    this.currentCycle = 1;
+    this.totalTracksInCycle = 0;
+    this.tracksPlayedInCycle = 0;
     
     console.log('AudioManager destroyed');
   }
