@@ -11,29 +11,28 @@ export default class AudioManager {
     this.audioContext = null;
     this.pitchShifter = null;
     this.gainNode = null;
-    
+
     // Playback state
     this.isPlaying = false;
-    this.isTransitioning = false;
     this.currentPalo = null;
     this.currentTrackIndex = 0;
-    
+
     // Track management
     this.tracks = [];
     this.playQueue = [];
     this.audioBuffers = new Map(); // Cache for decoded audio buffers
-    
+
     // Preloading
     this.nextTrackBuffer = null;
     this.isPreloading = false;
-    
+
     // Event listeners
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    
+
     // Volume management
     this.currentVolume = 0.8; // Default volume
-    
+
     this.initializeAudioContext();
   }
 
@@ -59,26 +58,25 @@ export default class AudioManager {
   async loadPalo(palo) {
     try {
       console.log(`Loading tracks for palo: ${palo}`);
-      
-      // Fetch tracks from Supabase
+
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
-      
+
       if (this.tracks.length === 0) {
         throw new Error(`No tracks found for palo: ${palo}`);
       }
-      
+
       this.currentPalo = palo;
       this.currentTrackIndex = 0;
-      
+
       // Create shuffled play queue
       this.createPlayQueue();
-      
+
       // Preload first track
       await this.preloadTrack(this.playQueue[0]);
-      
+
       console.log(`Loaded ${this.tracks.length} tracks for ${palo}`);
       return this.tracks.length;
-      
+
     } catch (error) {
       console.error('Error loading palo:', error);
       throw error;
@@ -89,18 +87,16 @@ export default class AudioManager {
    * Create a shuffled play queue without repeats
    */
   createPlayQueue() {
-    // Create array of indices
     const indices = Array.from({ length: this.tracks.length }, (_, i) => i);
-    
-    // Shuffle using Fisher-Yates algorithm
+
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
-    
+
     this.playQueue = indices;
     this.currentTrackIndex = 0;
-    
+
     console.log('Play queue created:', this.playQueue);
   }
 
@@ -112,36 +108,30 @@ export default class AudioManager {
     if (this.isPreloading || trackIndex >= this.tracks.length) {
       return;
     }
-    
+
     const track = this.tracks[trackIndex];
-    
-    // Check if already cached
+
     if (this.audioBuffers.has(track.id)) {
       this.nextTrackBuffer = this.audioBuffers.get(track.id);
       return;
     }
-    
+
     try {
       this.isPreloading = true;
       console.log(`Preloading track: ${track.title}`);
-      
-      // Fetch audio file
+
       const response = await fetch(track.audio_url);
       if (!response.ok) {
         throw new Error(`Failed to fetch audio: ${response.statusText}`);
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
-      
-      // Decode audio data
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-      
-      // Cache the buffer
+
       this.audioBuffers.set(track.id, audioBuffer);
       this.nextTrackBuffer = audioBuffer;
-      
+
       console.log(`Successfully preloaded: ${track.title}`);
-      
     } catch (error) {
       console.error(`Error preloading track ${track.title}:`, error);
       throw error;
@@ -157,26 +147,23 @@ export default class AudioManager {
     if (!this.currentPalo || this.tracks.length === 0) {
       throw new Error('No palo loaded. Call loadPalo() first.');
     }
-    
+
     if (this.isPlaying) {
       console.log('Already playing');
       return;
     }
-    
+
     try {
-      // Resume audio context if suspended (required by some browsers)
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
-      
-      // Start playing current track
+
       await this.playCurrentTrack();
-      
+
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
-      
+
       console.log('Playback started');
-      
     } catch (error) {
       console.error('Error starting playback:', error);
       throw error;
@@ -190,19 +177,15 @@ export default class AudioManager {
     if (!this.isPlaying) {
       return;
     }
-    
-    // Reset transition flag when stopping
-    this.isTransitioning = false;
-    
-    // Disconnect PitchShifter to stop audio
+
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
       this.pitchShifter = null;
     }
-    
+
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
-    
+
     console.log('Playback stopped');
   }
 
@@ -212,45 +195,45 @@ export default class AudioManager {
   async playCurrentTrack() {
     const currentQueueIndex = this.playQueue[this.currentTrackIndex];
     const currentTrack = this.tracks[currentQueueIndex];
-    
+
     console.log(`Playing track: ${currentTrack.title}`);
-    
-    // Disconnect any existing PitchShifter to ensure clean transition
+
+    let audioBuffer = this.audioBuffers.get(currentTrack.id);
+    if (!audioBuffer) {
+      await this.preloadTrack(currentQueueIndex);
+      audioBuffer = this.audioBuffers.get(currentTrack.id);
+    }
+    if (!audioBuffer) {
+      throw new Error('Failed to load audio buffer');
+    }
+
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
       this.pitchShifter = null;
     }
-    
-    // Use preloaded buffer or load on demand
-    let audioBuffer = this.nextTrackBuffer;
-    if (!audioBuffer) {
-      await this.preloadTrack(currentQueueIndex);
-      audioBuffer = this.nextTrackBuffer;
-    }
-    
-    if (!audioBuffer) {
-      throw new Error('Failed to load audio buffer');
-    }
-    
-    // Create new PitchShifter instance
+
     this.pitchShifter = new PitchShifter(
       this.audioContext,
       audioBuffer,
-      4096,
-      () => this.onTrackEnd() // Callback when track ends
+      4096
     );
-    
-    // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
-    
-    // Restore volume directly (no fade-in)
+
     this.setVolume(this.currentVolume);
-    
-    // Notify track change
     this.notifyTrackChange(currentTrack);
-    
-    // Preload next track
+
+    // Preload siguiente
     this.preloadNextTrack();
+
+    // Encadenar siguiente track cuando acabe este
+    this.pitchShifter.source.onended = () => {
+      if (this.isPlaying) {
+        this.onTrackEnd();
+      }
+    };
+
+    // Iniciar inmediatamente
+    this.pitchShifter.source.start();
   }
 
   /**
@@ -258,36 +241,19 @@ export default class AudioManager {
    */
   onTrackEnd() {
     console.log('Track ended, moving to next');
-    
-    if (!this.isPlaying) {
-      return;
+
+    this.currentTrackIndex++;
+    if (this.currentTrackIndex >= this.playQueue.length) {
+      console.log('All tracks played, reshuffling queue');
+      this.createPlayQueue();
     }
-    
-    // Disconnect the previous PitchShifter immediately
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
+
+    if (this.isPlaying) {
+      this.playCurrentTrack().catch(error => {
+        console.error('Error playing next track:', error);
+        this.stop();
+      });
     }
-    
-    // Introduce a small silence pause to ensure previous audio has cleared
-    setTimeout(() => {
-      // Move to next track in the queue
-      this.currentTrackIndex++;
-      
-      // If we've played all tracks, reshuffle the queue
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
-        this.createPlayQueue();
-      }
-      
-      // Play the next track if still in playback mode
-      if (this.isPlaying) {
-        this.playCurrentTrack().catch(error => {
-          console.error('Error playing next track:', error);
-          this.stop();
-        });
-      }
-    }, 5000000000); // 50ms silence pause to ensure clean transition
   }
 
   /**
@@ -296,17 +262,12 @@ export default class AudioManager {
   preloadNextTrack() {
     const nextIndex = (this.currentTrackIndex + 1) % this.playQueue.length;
     const nextQueueIndex = this.playQueue[nextIndex];
-    
-    // Preload asynchronously
+
     this.preloadTrack(nextQueueIndex).catch(error => {
       console.warn('Failed to preload next track:', error);
     });
   }
 
-  /**
-   * Set playback tempo
-   * @param {number} tempo - Tempo value (1.0 = normal speed)
-   */
   setTempo(tempo) {
     if (this.pitchShifter) {
       this.pitchShifter.tempo = tempo;
@@ -314,10 +275,6 @@ export default class AudioManager {
     }
   }
 
-  /**
-   * Set pitch
-   * @param {number} pitch - Pitch value (1.0 = normal pitch)
-   */
   setPitch(pitch) {
     if (this.pitchShifter) {
       this.pitchShifter.pitch = pitch;
@@ -325,10 +282,6 @@ export default class AudioManager {
     }
   }
 
-  /**
-   * Set pitch in semitones
-   * @param {number} semitones - Semitones to shift (-12 to +12)
-   */
   setPitchSemitones(semitones) {
     if (this.pitchShifter) {
       this.pitchShifter.pitchSemitones = semitones;
@@ -336,10 +289,6 @@ export default class AudioManager {
     }
   }
 
-  /**
-   * Set volume
-   * @param {number} volume - Volume level (0.0 to 1.0)
-   */
   setVolume(volume) {
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
@@ -348,23 +297,14 @@ export default class AudioManager {
     }
   }
 
-  /**
-   * Get current track information
-   * @returns {Object|null} Current track object or null
-   */
   getCurrentTrack() {
     if (!this.tracks.length || this.currentTrackIndex >= this.playQueue.length) {
       return null;
     }
-    
     const currentQueueIndex = this.playQueue[this.currentTrackIndex];
     return this.tracks[currentQueueIndex];
   }
 
-  /**
-   * Get available palos from Supabase
-   * @returns {Promise<Array>} Array of available palo names
-   */
   async getAvailablePalos() {
     try {
       return await canteTracksAPI.getAvailablePalos();
@@ -374,26 +314,14 @@ export default class AudioManager {
     }
   }
 
-  /**
-   * Add listener for track changes
-   * @param {Function} callback - Callback function to call when track changes
-   */
   onTrackChange(callback) {
     this.onTrackChangeListeners.push(callback);
   }
 
-  /**
-   * Add listener for play state changes
-   * @param {Function} callback - Callback function to call when play state changes
-   */
   onPlayStateChange(callback) {
     this.onPlayStateChangeListeners.push(callback);
   }
 
-  /**
-   * Notify all track change listeners
-   * @param {Object} track - Current track object
-   */
   notifyTrackChange(track) {
     this.onTrackChangeListeners.forEach(callback => {
       try {
@@ -404,10 +332,6 @@ export default class AudioManager {
     });
   }
 
-  /**
-   * Notify all play state change listeners
-   * @param {boolean} isPlaying - Current play state
-   */
   notifyPlayStateChange(isPlaying) {
     this.onPlayStateChangeListeners.forEach(callback => {
       try {
@@ -418,20 +342,17 @@ export default class AudioManager {
     });
   }
 
-  /**
-   * Clean up resources
-   */
   destroy() {
     this.stop();
-    
+
     if (this.audioContext) {
       this.audioContext.close();
     }
-    
+
     this.audioBuffers.clear();
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    
+
     console.log('AudioManager destroyed');
   }
 }
