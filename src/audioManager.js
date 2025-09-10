@@ -97,6 +97,10 @@ export default class AudioManager {
     const track = this.tracks[trackIndex];
     if (!track || this.audioBuffers.has(track.id)) return;
 
+    if (!this.audioContext) {
+      throw new Error('AudioContext not initialized. Cannot decode audio data.');
+    }
+
     try {
       console.log('Preloading:', track.title || track.id);
       const response = await fetch(track.audio_url);
