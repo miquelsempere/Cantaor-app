@@ -61,6 +61,11 @@ export default class AudioManager {
   async loadPalo(palo) {
     try {
       await this.initializeAudioContext();
+      
+      if (!this.audioContext) {
+        throw new Error('Failed to initialize AudioContext');
+      }
+      
       console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
       if (!this.tracks || this.tracks.length === 0) {
