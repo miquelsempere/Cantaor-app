@@ -22,7 +22,7 @@ export default class AudioManager {
 
     // Caching
     this.audioBuffers = new Map();  // track.id -> AudioBuffer
-    this.currentSource = null;
+    this.activeSources = new Set();
 
     // Controles de audio
     this.globalTempo = 1.0;
@@ -180,7 +180,10 @@ export default class AudioManager {
     source.connect(this.gainNode);
     source.start(startTime);
 
-    this.currentSource = source;
+    this.activeSources.add(source);
+    source.onended = () => {
+      this.activeSources.delete(source);
+    };
     this.notifyTrackChange(track);
 
     // programamos la siguiente pista
@@ -205,15 +208,17 @@ export default class AudioManager {
     
     this.isPlaying = false;
     
-    if (this.currentSource) {
+    // Detener todas las fuentes de audio activas
+    this.activeSources.forEach(source => {
       try {
-        this.currentSource.stop();
-        this.currentSource.disconnect();
+        source.stop();
+        source.disconnect();
       } catch (e) {
-        // Source might already be stopped
+        // La fuente podría ya estar detenida o desconectada
+        console.warn('Error al detener la fuente:', e);
       }
-      this.currentSource = null;
-    }
+    });
+    this.activeSources.clear(); // Limpiar el conjunto después de detener todas las fuentes
 
     this.notifyPlayStateChange(false);
     console.log('Playback stopped');
@@ -238,13 +243,17 @@ export default class AudioManager {
   /* --------------- Controles de audio --------------- */
   setTempo(tempo) {
     this.globalTempo = tempo;
-    if (this.currentSource && this.currentSource.playbackRate) {
-      try {
-        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
-      } catch (e) {
-        // Source might be stopped
+    // Aplicar el tempo a todas las fuentes activas
+    this.activeSources.forEach(source => {
+      if (source.playbackRate) {
+        try {
+          source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+        } catch (e) {
+          // La fuente podría estar detenida
+          console.warn('Error al cambiar el tempo:', e);
+        }
       }
-    }
+    });
     console.log('Tempo set to', tempo);
   }
 
@@ -313,6 +322,7 @@ export default class AudioManager {
       this.gainNode = null;
     }
     this.audioBuffers.clear();
+    this.activeSources.clear();
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     console.log('AudioManager destroyed');
