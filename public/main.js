@@ -56,11 +56,8 @@ class FlamencoApp {
       this.handlePaloChange(e.target.value);
     });
 
-    // Play/Stop button - use arrow function to preserve 'this' context
-    this.playButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('=== BUTTON CLICK EVENT FIRED ===');
+    // Play/Stop button
+    this.playButton.addEventListener('click', () => {
       this.handlePlayButtonClick();
     });
 
@@ -162,11 +159,6 @@ class FlamencoApp {
   }
 
   async handlePlayButtonClick() {
-    console.log('=== PLAY BUTTON CLICKED ===');
-    console.log('Current this.isPlaying state:', this.isPlaying);
-    console.log('Current this.currentPalo:', this.currentPalo);
-    console.log('Play button text:', this.playButton.textContent);
-    
     if (!this.currentPalo) {
       this.showStatus('Selecciona un palo primero', 'error');
       return;
@@ -175,26 +167,18 @@ class FlamencoApp {
     try {
       if (this.isPlaying) {
         // Stop playback
-        console.log('=== STOPPING PLAYBACK ===');
-        console.log('About to call audioManager.stop()');
         this.audioManager.stop();
-        console.log('audioManager.stop() call completed');
         this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
-        console.log('=== STARTING PLAYBACK ===');
         this.showStatus('Iniciando reproducción...', 'loading');
-        console.log('About to call audioManager.play()');
         await this.audioManager.play();
-        console.log('audioManager.play() call completed');
         this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
       }
     } catch (error) {
       console.error('Error with playback:', error);
       this.showStatus('Error en la reproducción', 'error');
     }
-    
-    console.log('=== END PLAY BUTTON CLICK ===');
   }
 
   updateTrackInfo(track) {
@@ -213,26 +197,17 @@ class FlamencoApp {
   }
 
   updatePlayState(isPlaying) {
-    console.log('=== UPDATE PLAY STATE ===');
-    console.log('New isPlaying value:', isPlaying);
-    console.log('Previous this.isPlaying:', this.isPlaying);
     this.isPlaying = isPlaying;
-    console.log('Updated this.isPlaying to:', this.isPlaying);
     
     // Update play button
-    const newButtonText = isPlaying ? '⏸️' : '▶️';
-    console.log('Changing button text to:', newButtonText);
-    this.playButton.textContent = newButtonText;
+    this.playButton.textContent = isPlaying ? '⏸️' : '▶️';
     
     // Update visualizer
     if (isPlaying) {
-      console.log('Adding "playing" class to visualizer');
       this.visualizer.classList.add('playing');
     } else {
-      console.log('Removing "playing" class from visualizer');
       this.visualizer.classList.remove('playing');
     }
-    console.log('=== END UPDATE PLAY STATE ===');
   }
 
   showStatus(message, type = '') {
