@@ -46,16 +46,6 @@ export default class AudioManager {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
-      
-      // Register AudioWorklet processor
-      this.audioContext.audioWorklet.addModule('./audio-worklet-processor.js')
-        .then(() => {
-          console.log('AudioWorklet processor registered successfully');
-        })
-        .catch(error => {
-          console.error('Failed to register AudioWorklet processor:', error);
-        });
-      
       console.log('Audio context initialized successfully');
     } catch (error) {
       console.error('Failed to initialize audio context:', error);
@@ -242,22 +232,13 @@ export default class AudioManager {
       throw new Error('Failed to load audio buffer');
     }
     
-    // Create new PitchShifter instance (now asynchronous)
+    // Create new PitchShifter instance
     this.pitchShifter = new PitchShifter(
       this.audioContext,
       audioBuffer,
-      1024 // bufferSize for compatibility
+      4096,
+      () => this.onTrackEnd() // Callback when track ends
     );
-    
-    // Set up event listeners for the new PitchShifter
-    this.pitchShifter.on('play', (detail) => {
-      // Handle play events if needed
-      // This replaces the old onUpdate callback mechanism
-    });
-    
-    this.pitchShifter.on('end', () => {
-      this.onTrackEnd();
-    });
     
     // Apply current audio settings to the new PitchShifter
     // These values are maintained by the UI controls
@@ -285,7 +266,6 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    console.log('[AudioManager] onTrackEnd() called - processing track end');
     console.log(`Track ended - ${this.tracksPlayedInCycle}/${this.totalTracksInCycle} completed in cycle ${this.currentCycle}`);
     
     if (!this.isPlaying) {
@@ -303,21 +283,19 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // 1 second delay between tracks for clean transition
-    console.log('Waiting 4 seconds before next track...');
+    // Small delay to ensure clean audio transition
     setTimeout(() => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during 4-second transition delay');
+        console.log('Playback was stopped during transition delay');
         return;
       }
       
-      console.log('Starting next track after 4-second delay');
       // Play next track
       this.playCurrentTrack().catch(error => {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 4000000); // 4 seconds delay between tracks
+    }, 50); // Reduced delay for faster transitions
   }
 
   /**

@@ -21,6 +21,7 @@
  */
 
 import WebAudioBufferSource from './WebAudioBufferSource.js';
+import getWebAudioNode from './getWebAudioNode.js';
 import SoundTouch from './SoundTouch.js';
 import SimpleFilter from './SimpleFilter.js';
 import minsSecs from './minsSecs.js';
@@ -44,103 +45,23 @@ const onUpdate = function (sourcePosition) {
 };
 
 export default class PitchShifter {
-  constructor(context, buffer, bufferSize) {
-    this.context = context;
-    this.buffer = buffer;
+  constructor(context, buffer, bufferSize, onEnd = noop) {
+    this._soundtouch = new SoundTouch();
+    const source = new WebAudioBufferSource(buffer);
     this.timePlayed = 0;
     this.sourcePosition = 0;
-    
-    // Create AudioWorkletNode
-    this._node = new AudioWorkletNode(context, 'soundtouch-processor');
-    
-    // Set up communication with the worklet
-    this._node.port.onmessage = (event) => {
-      this.handleWorkletMessage(event.data);
-    };
-    
-    // Initialize the worklet with audio buffer data
-    this.initializeWorklet();
-    
+    this._filter = new SimpleFilter(source, this._soundtouch, onEnd);
+    this._node = getWebAudioNode(
+      context,
+      this._filter,
+      (sourcePostion) => onUpdate.call(this, sourcePostion),
+      bufferSize
+    );
     this.tempo = 1;
     this.rate = 1;
     this.duration = buffer.duration;
     this.sampleRate = context.sampleRate;
     this.listeners = [];
-  }
-
-  /**
-   * Initialize the AudioWorklet with buffer data
-   */
-  initializeWorklet() {
-    // Transfer AudioBuffer data to the worklet
-    const channelData = [];
-    for (let i = 0; i < this.buffer.numberOfChannels; i++) {
-      const channel = this.buffer.getChannelData(i);
-      // Transfer the ArrayBuffer to avoid copying
-      channelData.push(channel.buffer.slice());
-    }
-    
-    this._node.port.postMessage({
-      type: 'initialize',
-      data: {
-        channelData: channelData,
-        numberOfChannels: this.buffer.numberOfChannels,
-        sampleRate: this.buffer.sampleRate,
-        length: this.buffer.length
-      }
-    });
-  }
-
-  /**
-   * Handle messages from the AudioWorklet
-   */
-  handleWorkletMessage(message) {
-    const { type, data } = message;
-    
-    switch (type) {
-      case 'processor-ready':
-        console.log('[PitchShifter] AudioWorklet processor is ready');
-        break;
-        
-      case 'initialized':
-        console.log('[PitchShifter] AudioWorklet initialized successfully');
-        break;
-        
-      case 'track-ended':
-        console.log('[PitchShifter] Track finished - dispatching end event');
-        const endEvent = new CustomEvent('end', {
-          detail: {
-            timePlayed: this.timePlayed,
-            sourcePosition: this.sourcePosition
-          }
-        });
-        this._node.dispatchEvent(endEvent);
-        break;
-        
-      case 'source-position-update':
-        this.sourcePosition = data.sourcePosition;
-        const currentTimePlayed = this.timePlayed;
-        this.timePlayed = this.sourcePosition / this.sampleRate;
-        
-        if (currentTimePlayed !== this.timePlayed) {
-          const playEvent = new CustomEvent('play', {
-            detail: {
-              timePlayed: this.timePlayed,
-              formattedTimePlayed: this.formattedTimePlayed,
-              percentagePlayed: this.percentagePlayed,
-            },
-          });
-          this._node.dispatchEvent(playEvent);
-        }
-        break;
-        
-      case 'error':
-        console.error('[PitchShifter] AudioWorklet error:', data.message);
-        break;
-        
-      default:
-        console.warn('[PitchShifter] Unknown message from worklet:', type);
-    }
   }
 
   get formattedDuration() {
@@ -152,19 +73,17 @@ export default class PitchShifter {
   }
 
   get percentagePlayed() {
-    return (100 * this.sourcePosition) / (this.duration * this.sampleRate);
+    return (
+      (100 * this._filter.sourcePosition) / (this.duration * this.sampleRate)
+    );
   }
 
   set percentagePlayed(perc) {
-    const newPosition = parseInt(perc * this.duration * this.sampleRate);
-    this.sourcePosition = newPosition;
+    this._filter.sourcePosition = parseInt(
+      perc * this.duration * this.sampleRate
+    );
+    this.sourcePosition = this._filter.sourcePosition;
     this.timePlayed = this.sourcePosition / this.sampleRate;
-    
-    // Send reset message to worklet with new position
-    this._node.port.postMessage({
-      type: 'reset',
-      data: { sourcePosition: newPosition }
-    });
   }
 
   get node() {
@@ -172,31 +91,19 @@ export default class PitchShifter {
   }
 
   set pitch(pitch) {
-    this._node.port.postMessage({
-      type: 'set-pitch',
-      data: { pitch: pitch }
-    });
+    this._soundtouch.pitch = pitch;
   }
 
   set pitchSemitones(semitone) {
-    this._node.port.postMessage({
-      type: 'set-pitch-semitones',
-      data: { semitones: semitone }
-    });
+    this._soundtouch.pitchSemitones = semitone;
   }
 
   set rate(rate) {
-    this._node.port.postMessage({
-      type: 'set-rate',
-      data: { rate: rate }
-    });
+    this._soundtouch.rate = rate;
   }
 
   set tempo(tempo) {
-    this._node.port.postMessage({
-      type: 'set-tempo',
-      data: { tempo: tempo }
-    });
+    this._soundtouch.tempo = tempo;
   }
 
   connect(toNode) {

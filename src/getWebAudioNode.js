@@ -33,12 +33,10 @@ const getWebAudioNode = function (
     let left = event.outputBuffer.getChannelData(0);
     let right = event.outputBuffer.getChannelData(1);
     let framesExtracted = filter.extract(samples, bufferSize);
-    console.log(`[getWebAudioNode] Frames extracted: ${framesExtracted}`);
     sourcePositionCallback(filter.sourcePosition);
     
     if (framesExtracted === 0) {
       if (!hasEnded) {
-        console.log('[getWebAudioNode] Track ended - calling filter.onEnd()');
         hasEnded = true;
         filter.onEnd();
         // Disconnect the node to stop further processing
