@@ -14,6 +14,7 @@ export default class AudioManager {
     
     // Playback state
     this.isPlaying = false;
+    this.isTransitioning = false;
     this.currentPalo = null;
     this.currentTrackIndex = 0;
     
@@ -187,6 +188,9 @@ export default class AudioManager {
       return;
     }
     
+    // Reset transition flag when stopping
+    this.isTransitioning = false;
+    
     // Disconnect PitchShifter to stop audio
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
@@ -247,15 +251,24 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
+    // Prevent multiple simultaneous transitions
+    if (this.isTransitioning) {
+      return;
+    }
+    
     console.log('Track ended, moving to next');
     
     if (!this.isPlaying) {
+      this.isTransitioning = false;
       return;
     }
+    
+    this.isTransitioning = true;
     
     // Add a small delay to ensure clean transition
     setTimeout(() => {
       if (!this.isPlaying) {
+        this.isTransitioning = false;
         return; // Check again in case playback was stopped during the delay
       }
       
@@ -269,10 +282,15 @@ export default class AudioManager {
       }
       
       // Play next track immediately for seamless playback
-      this.playCurrentTrack().catch(error => {
-        console.error('Error playing next track:', error);
-        this.stop();
-      });
+      this.playCurrentTrack()
+        .then(() => {
+          this.isTransitioning = false;
+        })
+        .catch(error => {
+          console.error('Error playing next track:', error);
+          this.isTransitioning = false;
+          this.stop();
+        });
     }, 100); // 100ms delay to ensure clean transition
   }
 
