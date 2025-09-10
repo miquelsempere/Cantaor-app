@@ -48,7 +48,7 @@ export default class AudioManager {
     try {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
+      this.gainNode.connect(this.audioContext.destination); // Conectar una sola vez
       this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
       console.log('Audio context inicializado');
     } catch (err) {
@@ -125,6 +125,22 @@ export default class AudioManager {
     });
   }
 
+  /* --------------- Limpieza de pistas programadas --------------- */
+  clearScheduledTracks() {
+    for (const [qpos, entry] of this.scheduled.entries()) {
+      if (entry.source) {
+        try { entry.source.stop(); } catch (e) {} // Detener cualquier fuente activa
+        try { entry.source.disconnect(); } catch (e) {}
+      }
+      if (entry.pitchShifter) {
+        try { entry.pitchShifter.disconnect(); } catch (e) {}
+      }
+      if (entry._endTimer) clearTimeout(entry._endTimer); // Limpiar timers si existen
+      if (entry._preloadTimeout) clearTimeout(entry._preloadTimeout);
+    }
+    this.scheduled.clear();
+  }
+
   /* --------------- Reproducción --------------- */
   async play() {
     if (!this.currentPalo || !this.tracks.length) {
@@ -143,44 +159,39 @@ export default class AudioManager {
     this.isPlaying = true;
     this.notifyPlayStateChange(true);
 
-    // timelineCursor: momento del audioContext en que programaremos el primer track
-    const timelineStart = Math.max(this.audioContext.currentTime + this.startLatency, this.audioContext.currentTime + 0.02);
-    // programar actual (currentQueuePosition)
+    this.clearScheduledTracks(); // Limpiar cualquier programación anterior
+
+    // Conectar el gainNode al destino si no lo está
     try {
-      await this._scheduleTrackByQueuePos(this.currentQueuePosition, timelineStart);
-    } catch (err) {
-      console.error('Error scheduling first track:', err);
-      this.stop();
+      this.gainNode.connect(this.audioContext.destination);
+    } catch (e) {
+      // Ya está conectado, ignorar error
     }
+
+    // Tiempo de inicio para la primera pista
+    let currentScheduleTime = Math.max(this.audioContext.currentTime + this.startLatency, this.audioContext.currentTime + 0.02);
+
+    // Programar la primera pista
+    await this._scheduleTrackByQueuePos(this.currentQueuePosition, currentScheduleTime);
+
+    // Iniciar el bucle de programación continua
+    this._scheduleNextTracks();
   }
 
   stop() {
     if (!this.isPlaying) return;
     this.isPlaying = false;
 
-    // Parar y limpiar todas las fuentes programadas
-    for (const [qpos, entry] of this.scheduled.entries()) {
+    this.clearScheduledTracks(); // Limpiar todos los elementos programados
+
+    // Desconectar el gainNode principal del destino
+    if (this.gainNode && this.audioContext.destination) {
       try {
-        if (entry.source && typeof entry.source.stop === 'function') {
-          // solo intentar stop si está antes de endTime y la fuente existe
-          try { entry.source.stop(); } catch (e) { /* puede lanzar si ya terminó */ }
-        }
-      } catch (err) {
-        // ignore
-      }
-      // clear timers
-      if (entry._startTimer) clearTimeout(entry._startTimer);
-      if (entry._endTimer) clearTimeout(entry._endTimer);
-      if (entry._preloadTimeout) clearTimeout(entry._preloadTimeout);
-      // desconectar pitchShifter si tiene disconnect
-      if (entry.pitchShifter && typeof entry.pitchShifter.disconnect === 'function') {
-        try { entry.pitchShifter.disconnect(); } catch (e) {}
+        this.gainNode.disconnect(this.audioContext.destination);
+      } catch (e) {
+        // Ya está desconectado, ignorar error
       }
     }
-    this.scheduled.clear();
-
-    // don't close audioContext (we keep it) — if quieres cerrarlo, descomenta la siguiente linea:
-    // this.audioContext.close();
 
     this.notifyPlayStateChange(false);
     console.log('Playback stopped and cleaned scheduled sources');
@@ -189,73 +200,57 @@ export default class AudioManager {
   /* --------------- Scheduling interno (solo current + next) --------------- */
 
   /**
-   * schedule a track given its queue position to start at startTime (audioContext time)
-   * This function ensures the buffer is loaded, creates a PitchShifter (or BufferSource),
-   * schedules start(end) exactly, and tries to prepare the next track so it can be scheduled
-   * to start exactly at endTime (no milis anticipados).
+   * Programa una pista en una posición específica de la cola para comenzar en startTime
+   * Devuelve el endTime de la pista programada
    */
   async _scheduleTrackByQueuePos(queuePos, startTime) {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying) return; // Detener si la reproducción fue detenida externamente
 
-    // si ya está scheduled (por si se llamó dos veces), no re-schedule
+    // Si ya está programada, devolver su endTime
     if (this.scheduled.has(queuePos)) {
       console.warn('Queue position already scheduled:', queuePos);
-      return;
+      return this.scheduled.get(queuePos).endTime;
     }
 
-    // Obtener track real
     const trackIndex = this.playQueue[queuePos];
     const track = this.tracks[trackIndex];
     if (!track) throw new Error('Track not found for queuePos ' + queuePos);
 
     // Asegurar que el buffer esté decodificado
     if (!this.audioBuffers.has(track.id)) {
-      // Si el startTime está muy cerca, esto podría no terminar a tiempo; aún así intentamos
       await this.preloadTrack(trackIndex);
     }
     const audioBuffer = this.audioBuffers.get(track.id);
     if (!audioBuffer) throw new Error('No audioBuffer available after preload for ' + track.title);
 
-    // Crear PitchShifter (o BufferSource) — adapta si tu PitchShifter tiene otra API
-    // Se espera que PitchShifter cree internamente `source` (AudioBufferSourceNode) que soporta start(when)
     let pitchShifterInstance = null;
+    let sourceNode = null;
+
     try {
-      // Si tu PitchShifter constructor admite callback cuando termina, no lo usamos para timing primario
       pitchShifterInstance = new PitchShifter(this.audioContext, audioBuffer, 4096);
-      // aplicar ajustes globales (si aplica a tu clase)
       if (typeof pitchShifterInstance.setTempo === 'function') pitchShifterInstance.setTempo(this.globalTempo);
       if (typeof pitchShifterInstance.setPitchSemitones === 'function') pitchShifterInstance.setPitchSemitones(this.globalPitchSemitones);
-      // conectar a la ganancia principal
+      
+      // Conectar pitchShifter al gainNode
       if (typeof pitchShifterInstance.connect === 'function') {
         pitchShifterInstance.connect(this.gainNode);
-      } else if (pitchShifterInstance.source) {
-        pitchShifterInstance.source.connect(this.gainNode);
+      } else if (pitchShifterInstance.node) {
+        pitchShifterInstance.node.connect(this.gainNode);
       }
+      sourceNode = pitchShifterInstance.node || pitchShifterInstance._node;
     } catch (err) {
       console.warn('PitchShifter creation failed, falling back to plain BufferSource:', err);
       pitchShifterInstance = null;
-    }
-
-    // Si no tenemos una instancia de pitchShifter que nos exponga `.source`, creamos manualmente un bufferSource
-    let sourceNode = null;
-    if (pitchShifterInstance && pitchShifterInstance.source) {
-      sourceNode = pitchShifterInstance.source;
-    } else {
       sourceNode = this.audioContext.createBufferSource();
       sourceNode.buffer = audioBuffer;
       sourceNode.connect(this.gainNode);
-      // si hay ajuste de tempo/pitch simple: sourceNode.playbackRate.value = this.globalTempo;  // opcional
-      try { sourceNode.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime); } catch(e) {}
+      sourceNode.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
     }
 
-    // Calcular duración de reproducción (si PitchShifter modifica la duración debes obtenerlo de ahí)
-    let playbackDuration = audioBuffer.duration;
-    // intentar inferir tempo de pitchShifterInstance
+    let playbackDuration = audioBuffer.duration / Math.max(0.0001, this.globalTempo);
+    // Si PitchShifter modifica la duración, recalcularla en base al tempo
     if (pitchShifterInstance && typeof pitchShifterInstance.tempo === 'number' && pitchShifterInstance.tempo > 0) {
       playbackDuration = audioBuffer.duration / pitchShifterInstance.tempo;
-    } else {
-      // fallback: considerar globalTempo
-      playbackDuration = audioBuffer.duration / Math.max(0.0001, this.globalTempo);
     }
 
     const endTime = startTime + playbackDuration;
@@ -263,106 +258,108 @@ export default class AudioManager {
     // Programar inicio y fin exactos
     try {
       sourceNode.start(startTime);
-      if (typeof sourceNode.stop === 'function') {
-        sourceNode.stop(endTime);
-      }
+      sourceNode.stop(endTime);
     } catch (err) {
       console.error('Error scheduling source start/stop:', err);
       throw err;
     }
 
-    // Bookkeeping: timers para notificaciones de start/end (no controlan el audio, solo UI)
-    const now = this.audioContext.currentTime;
-    const startDelayMs = Math.max(0, (startTime - now) * 1000);
-    const endDelayMs = Math.max(0, (endTime - now) * 1000);
-
-    const startTimer = setTimeout(() => {
-      // marcar como "esta empezando" -> actualizar currentQueuePosition y notificar cambio
-      this.currentQueuePosition = queuePos;
-      this.notifyTrackChange(track);
-    }, startDelayMs);
-
-    const endTimer = setTimeout(() => {
-      // limpiar entrada scheduled y programar siguiente en su momento
-      const entry = this.scheduled.get(queuePos);
-      if (entry) {
-        // desconectar/limpiar pitchShifter
-        try {
-          if (entry.pitchShifter && typeof entry.pitchShifter.disconnect === 'function') {
-            entry.pitchShifter.disconnect();
-          } else if (entry.source) {
-            try { entry.source.disconnect(); } catch (e) {}
-          }
-        } catch (e) {}
-        // quitar del map
-        this.scheduled.delete(queuePos);
-      }
-      // Cuando termina, planificamos el siguiente (pero lo hacemos usando el endTime calculado para evitar adelantos)
-      if (this.isPlaying) {
-        const nextQueuePos = (queuePos + 1) % this.playQueue.length;
-        // Intentamos programar el siguiente ahora mismo si ya está precargado
-        const nextTrackIndex = this.playQueue[nextQueuePos];
-        const nextTrack = this.tracks[nextTrackIndex];
-        const nextAudioBuffer = nextTrack && this.audioBuffers.get(nextTrack.id);
-        if (nextAudioBuffer) {
-          // Si ya está listo, lo programamos exactamente para endTime
-          this._scheduleTrackByQueuePos(nextQueuePos, endTime).catch(err => {
-            console.error('Error scheduling next track (already cached):', err);
-          });
-        } else {
-          // Si no está listo aún, intentamos pre-cargar con timeout (esperamos hasta preloadLeadTime antes de endTime)
-          const timeLeftMs = Math.max(0, (endTime - this.audioContext.currentTime) * 1000 - 120);
-          // race preload with timeout
-          const preloadPromise = this.preloadTrack(nextTrackIndex).then(buf => buf).catch(() => null);
-          const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), timeLeftMs));
-          Promise.race([preloadPromise, timeoutPromise]).then(buf => {
-            if (buf) {
-              // buffer listo antes de deadline -> schedule at endTime
-              this._scheduleTrackByQueuePos(nextQueuePos, endTime).catch(err => {
-                console.error('Error scheduling next after preload:', err);
-              });
-            } else {
-              // no pudimos pre-cargar a tiempo -> fallback: programar "on demand" para que empiece inmediatamente después
-              // (esto puede introducir un pequeño gap si el buffer aún no está listo)
-              console.warn('Next track was not ready in time; will attempt on-demand playback at endTime');
-              // Intentamos programar en cuanto tengamos buffer (sin garantizar start exacto)
-              this.preloadTrack(nextTrackIndex).then(() => {
-                // schedule with startTime = Math.max(endTime, audioContext.currentTime + small offset)
-                const now2 = this.audioContext.currentTime;
-                const fallbackStart = Math.max(endTime, now2 + 0.02);
-                this._scheduleTrackByQueuePos(nextQueuePos, fallbackStart).catch(err => {
-                  console.error('Fallback scheduling failed:', err);
-                });
-              }).catch(err => {
-                console.error('Fallback preload failed:', err);
-              });
-            }
-          });
-        }
-      }
-    }, endDelayMs);
-
-    // Guardar en scheduled
-    this.scheduled.set(queuePos, {
+    // Almacenar información de la pista programada
+    const scheduledEntry = {
       queuePos,
       trackIndex,
       startTime,
       endTime,
       source: sourceNode,
       pitchShifter: pitchShifterInstance,
-      _startTimer: startTimer,
-      _endTimer: endTimer
-    });
+    };
+    this.scheduled.set(queuePos, scheduledEntry);
 
-    // asegurar precarga del siguiente lo antes posible (optimización)
-    try {
-      const nextQueuePos = (queuePos + 1) % this.playQueue.length;
-      const nextTrackIndex = this.playQueue[nextQueuePos];
-      // start preload async, no await acá (se maneja arriba)
-      this.preloadTrack(nextTrackIndex).catch(() => {});
-    } catch (e) {}
+    // Configurar callback onended para limpieza y actualización de estado
+    sourceNode.onended = () => {
+      console.log(`Track ${track.title} (queuePos ${queuePos}) ended at ${this.audioContext.currentTime.toFixed(3)}`);
+      // Limpiar recursos para esta pista
+      if (scheduledEntry.pitchShifter) {
+        try { scheduledEntry.pitchShifter.disconnect(); } catch (e) {}
+      }
+      if (scheduledEntry.source) {
+        try { scheduledEntry.source.disconnect(); } catch (e) {}
+      }
+      this.scheduled.delete(queuePos); // Eliminar del mapa de programadas
+
+      // Avanzar currentQueuePosition y notificar cambio de pista
+      // Solo avanzar si esta era la pista que se estaba reproduciendo actualmente
+      if (this.currentQueuePosition === queuePos) {
+        this.currentQueuePosition = (queuePos + 1) % this.playQueue.length;
+        const nextTrackInQueue = this.tracks[this.playQueue[this.currentQueuePosition]];
+        this.notifyTrackChange(nextTrackInQueue);
+      }
+
+      // Disparar la programación de las siguientes pistas si la reproducción sigue activa
+      if (this.isPlaying) {
+        this._scheduleNextTracks();
+      }
+    };
+
+    // Notificar cambio de pista si es la pista actual
+    if (queuePos === this.currentQueuePosition) {
+      this.notifyTrackChange(track);
+    }
 
     console.log(`Scheduled queuePos ${queuePos} (track: ${track.title}) start:${startTime.toFixed(3)} end:${endTime.toFixed(3)}`);
+    return endTime;
+  }
+
+  /* --------------- Programación continua --------------- */
+  _scheduleNextTracks() {
+    if (!this.isPlaying) return;
+
+    // Encontrar el tiempo de finalización de la última pista programada
+    let lastScheduledEndTime = this.audioContext.currentTime;
+    let lastScheduledQueuePos = -1;
+
+    // Iterar sobre el mapa de programadas para encontrar la pista más tardía
+    for (const [qpos, entry] of this.scheduled.entries()) {
+      if (entry.endTime > lastScheduledEndTime) {
+        lastScheduledEndTime = entry.endTime;
+        lastScheduledQueuePos = qpos;
+      }
+    }
+
+    // Determinar la siguiente posición en la cola a programar
+    let nextQueuePosToSchedule;
+    if (lastScheduledQueuePos === -1) {
+      // No hay pistas programadas, empezar desde la posición actual
+      nextQueuePosToSchedule = this.currentQueuePosition;
+    } else {
+      nextQueuePosToSchedule = (lastScheduledQueuePos + 1) % this.playQueue.length;
+    }
+
+    // Programar un número de pistas por adelantado
+    const numTracksToScheduleAhead = 2;
+    for (let i = 0; i < numTracksToScheduleAhead; i++) {
+      const currentTrackIndexInQueue = (nextQueuePosToSchedule + i) % this.playQueue.length;
+      // Comprobar si esta pista ya está programada
+      if (!this.scheduled.has(currentTrackIndexInQueue)) {
+        // Precargar la pista primero (no bloqueante)
+        const trackIndex = this.playQueue[currentTrackIndexInQueue];
+        this.preloadTrack(trackIndex).then(() => {
+          // Solo programar si la reproducción sigue activa y no ha sido ya programada
+          if (this.isPlaying && !this.scheduled.has(currentTrackIndexInQueue)) {
+            // Programarla usando el tiempo de finalización de la pista anterior
+            this._scheduleTrackByQueuePos(currentTrackIndexInQueue, lastScheduledEndTime)
+              .then(newEndTime => {
+                lastScheduledEndTime = newEndTime; // Actualizar para la siguiente iteración
+              })
+              .catch(err => {
+                console.error('Error scheduling track in _scheduleNextTracks:', err);
+              });
+          }
+        }).catch(err => {
+          console.warn('Preload failed for track in _scheduleNextTracks:', err);
+        });
+      }
+    }
   }
 
   /* --------------- Métodos públicos de control --------------- */
