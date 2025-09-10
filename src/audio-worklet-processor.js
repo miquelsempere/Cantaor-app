@@ -373,6 +373,7 @@ class WorkletSimpleFilter {
     if (this.pipe) {
       this.pipe.clear();
     }
+  }
 
   fillInputBuffer(numFrames = 0) {
     // TODO: Implement input buffer filling for SoundTouch processing
