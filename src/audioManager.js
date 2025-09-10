@@ -337,27 +337,40 @@ export default class AudioManager {
 
     // Programar un número de pistas por adelantado
     const numTracksToScheduleAhead = 2;
-    for (let i = 0; i < numTracksToScheduleAhead; i++) {
-      const currentTrackIndexInQueue = (nextQueuePosToSchedule + i) % this.playQueue.length;
+    
+    // Programar pistas secuencialmente
+    this._scheduleTracksSequentially(nextQueuePosToSchedule, lastScheduledEndTime, numTracksToScheduleAhead);
+  }
+
+  async _scheduleTracksSequentially(startQueuePos, startTime, numTracks) {
+    let currentScheduleTime = startTime;
+    
+    for (let i = 0; i < numTracks; i++) {
+      const currentTrackIndexInQueue = (startQueuePos + i) % this.playQueue.length;
+      
       // Comprobar si esta pista ya está programada
-      if (!this.scheduled.has(currentTrackIndexInQueue)) {
-        // Precargar la pista primero (no bloqueante)
+      if (this.scheduled.has(currentTrackIndexInQueue)) {
+        continue;
+      }
+      
+      if (!this.isPlaying) {
+        break;
+      }
+      
+      try {
+        // Precargar la pista primero
         const trackIndex = this.playQueue[currentTrackIndexInQueue];
-        this.preloadTrack(trackIndex).then(() => {
-          // Solo programar si la reproducción sigue activa y no ha sido ya programada
-          if (this.isPlaying && !this.scheduled.has(currentTrackIndexInQueue)) {
-            // Programarla usando el tiempo de finalización de la pista anterior
-            this._scheduleTrackByQueuePos(currentTrackIndexInQueue, lastScheduledEndTime)
-              .then(newEndTime => {
-                lastScheduledEndTime = newEndTime; // Actualizar para la siguiente iteración
-              })
-              .catch(err => {
-                console.error('Error scheduling track in _scheduleNextTracks:', err);
-              });
-          }
-        }).catch(err => {
-          console.warn('Preload failed for track in _scheduleNextTracks:', err);
-        });
+        await this.preloadTrack(trackIndex);
+        
+        // Programar la pista para que empiece cuando la anterior termine
+        const endTime = await this._scheduleTrackByQueuePos(currentTrackIndexInQueue, currentScheduleTime);
+        
+        // La siguiente pista empezará cuando esta termine
+        currentScheduleTime = endTime;
+        
+      } catch (err) {
+        console.error('Error scheduling track sequentially:', err);
+        break;
       }
     }
   }
