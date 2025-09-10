@@ -9,8 +9,15 @@
  * version 2.1 of the License, or (at your option) any later version.
  */
 
-// Import SoundTouch classes - these need to be available in the AudioWorklet scope
-// Note: We'll need to ensure these are properly imported or bundled for the worklet
+// Import SoundTouch classes for audio processing
+import SoundTouch from './SoundTouch.js';
+import SimpleFilter from './SimpleFilter.js';
+import WebAudioBufferSource from './WebAudioBufferSource.js';
+import FifoSampleBuffer from './FifoSampleBuffer.js';
+import RateTransposer from './RateTransposer.js';
+import Stretch from './Stretch.js';
+import testFloatEqual from './testFloatEqual.js';
+import minsSecs from './minsSecs.js';
 
 class SoundTouchProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -66,11 +73,18 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
         }
         break;
         
+      case 'set-rate':
+        if (this.soundTouch) {
+          this.soundTouch.rate = data.rate;
+        }
+        break;
+        
       case 'reset':
         this.hasEnded = false;
-        this.sourcePosition = 0;
+        this.sourcePosition = data.sourcePosition || 0;
         if (this.filter) {
           this.filter.clear();
+          this.filter.sourcePosition = this.sourcePosition;
         }
         break;
         
@@ -110,14 +124,14 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
         channelData: processedChannelData
       };
       
-      // Create WebAudioBufferSource equivalent for the worklet
-      this.bufferSource = new WorkletAudioBufferSource(this.audioBuffer);
+      // Create WebAudioBufferSource for the worklet
+      this.bufferSource = new WebAudioBufferSource(this.audioBuffer);
       
-      // Create SoundTouch instance
-      this.soundTouch = new WorkletSoundTouch();
+      // Create SoundTouch instance  
+      this.soundTouch = new SoundTouch();
       
-      // Create SimpleFilter equivalent
-      this.filter = new WorkletSimpleFilter(this.bufferSource, this.soundTouch, () => {
+      // Create SimpleFilter
+      this.filter = new SimpleFilter(this.bufferSource, this.soundTouch, () => {
         // onEnd callback
         this.hasEnded = true;
         this.port.postMessage({
@@ -180,13 +194,15 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
         framesExtracted = this.filter.extract(this.samples, frameCount);
         
         // Update source position
-        this.sourcePosition = this.filter.sourcePosition || 0;
+        if (this.filter.sourcePosition !== this.sourcePosition) {
+          this.sourcePosition = this.filter.sourcePosition || 0;
         
-        // Send source position update to main thread
-        this.port.postMessage({
-          type: 'source-position-update',
-          data: { sourcePosition: this.sourcePosition }
-        });
+          // Send source position update to main thread
+          this.port.postMessage({
+            type: 'source-position-update',
+            data: { sourcePosition: this.sourcePosition }
+          });
+        }
       }
 
       if (framesExtracted === 0) {
@@ -232,173 +248,6 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
     }
 
     return true; // Keep processor alive
-  }
-}
-
-/**
- * Worklet-compatible version of WebAudioBufferSource
- */
-class WorkletAudioBufferSource {
-  constructor(buffer) {
-    this.buffer = buffer;
-    this._position = 0;
-  }
-
-  get dualChannel() {
-    return this.buffer.numberOfChannels > 1;
-  }
-
-  get position() {
-    return this._position;
-  }
-
-  set position(value) {
-    this._position = value;
-  }
-
-  extract(target, numFrames = 0, position = 0) {
-    this.position = position;
-    
-    // Get channel data from our worklet AudioBuffer representation
-    const left = this.buffer.channelData[0];
-    const right = this.dualChannel ? 
-      this.buffer.channelData[1] : 
-      this.buffer.channelData[0];
-    
-    let i = 0;
-    for (; i < numFrames && (i + position) < left.length; i++) {
-      target[i * 2] = left[i + position];
-      target[i * 2 + 1] = right[i + position];
-    }
-    
-    return Math.min(numFrames, left.length - position);
-  }
-}
-
-/**
- * Worklet-compatible version of SoundTouch
- * This is a simplified version that would need the full SoundTouch implementation
- */
-class WorkletSoundTouch {
-  constructor() {
-    // Initialize SoundTouch components
-    // This would need the actual SoundTouch, RateTransposer, Stretch classes
-    // For now, we'll create a placeholder that passes audio through
-    this._tempo = 1.0;
-    this._pitch = 1.0;
-    this._rate = 1.0;
-    
-    // TODO: Initialize actual SoundTouch components
-    // this.transposer = new RateTransposer(false);
-    // this.stretch = new Stretch(false);
-    // etc.
-  }
-
-  get tempo() {
-    return this._tempo;
-  }
-
-  set tempo(tempo) {
-    this._tempo = tempo;
-    // TODO: Apply to actual SoundTouch components
-  }
-
-  get pitch() {
-    return this._pitch;
-  }
-
-  set pitch(pitch) {
-    this._pitch = pitch;
-    // TODO: Apply to actual SoundTouch components
-  }
-
-  set pitchSemitones(semitones) {
-    this.pitch = Math.pow(2, semitones / 12);
-  }
-
-  get inputBuffer() {
-    // TODO: Return actual input buffer
-    return null;
-  }
-
-  get outputBuffer() {
-    // TODO: Return actual output buffer
-    return null;
-  }
-
-  process() {
-    // TODO: Implement actual SoundTouch processing
-  }
-
-  clear() {
-    // TODO: Clear SoundTouch buffers
-  }
-}
-
-/**
- * Worklet-compatible version of SimpleFilter
- */
-class WorkletSimpleFilter {
-  constructor(sourceSound, pipe, callback) {
-    this.sourceSound = sourceSound;
-    this.pipe = pipe;
-    this.callback = callback;
-    this.historyBufferSize = 22050;
-    this._sourcePosition = 0;
-    this.outputBufferPosition = 0;
-    this._position = 0;
-  }
-
-  get sourcePosition() {
-    return this._sourcePosition;
-  }
-
-  set sourcePosition(sourcePosition) {
-    this.clear();
-    this._sourcePosition = sourcePosition;
-  }
-
-  onEnd() {
-    if (this.callback) {
-      this.callback();
-    }
-  }
-
-  extract(target, numFrames = 0) {
-    // For now, we'll pass through the audio without SoundTouch processing
-    // This is a placeholder until we implement the full SoundTouch chain in the worklet
-    
-    const numFramesExtracted = this.sourceSound.extract(
-      target,
-      numFrames,
-      this._sourcePosition
-    );
-    
-    this._sourcePosition += numFramesExtracted;
-    this._position += numFramesExtracted;
-    
-    // Check if we've reached the end
-    if (numFramesExtracted === 0 || this._sourcePosition >= this.sourceSound.buffer.length) {
-      this.onEnd();
-    }
-    
-    return numFramesExtracted;
-  }
-
-  clear() {
-    // TODO: Clear filter state
-    this.outputBufferPosition = 0;
-    if (this.pipe) {
-      this.pipe.clear();
-    }
-  }
-
-  fillInputBuffer(numFrames = 0) {
-    // TODO: Implement input buffer filling for SoundTouch processing
-  }
-
-  fillOutputBuffer(numFrames = 0) {
-    // TODO: Implement output buffer filling for SoundTouch processing
   }
 }
 

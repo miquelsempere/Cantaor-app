@@ -46,6 +46,16 @@ export default class AudioManager {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
+      
+      // Register AudioWorklet processor
+      this.audioContext.audioWorklet.addModule('./src/audio-worklet-processor.js')
+        .then(() => {
+          console.log('AudioWorklet processor registered successfully');
+        })
+        .catch(error => {
+          console.error('Failed to register AudioWorklet processor:', error);
+        });
+      
       console.log('Audio context initialized successfully');
     } catch (error) {
       console.error('Failed to initialize audio context:', error);
@@ -235,7 +245,8 @@ export default class AudioManager {
     // Create new PitchShifter instance (now asynchronous)
     this.pitchShifter = new PitchShifter(
       this.audioContext,
-      audioBuffer
+      audioBuffer,
+      1024 // bufferSize for compatibility
     );
     
     // Set up event listeners for the new PitchShifter
@@ -247,10 +258,6 @@ export default class AudioManager {
     this.pitchShifter.on('end', () => {
       this.onTrackEnd();
     });
-    
-    // Wait for PitchShifter to be fully initialized
-    // Since PitchShifter initialization is now asynchronous, we need to wait
-    await this.waitForPitchShifterReady();
     
     // Apply current audio settings to the new PitchShifter
     // These values are maintained by the UI controls
@@ -272,34 +279,6 @@ export default class AudioManager {
     
     // Update cycle tracking
     this.tracksPlayedInCycle++;
-  }
-
-  /**
-   * Wait for PitchShifter to be fully initialized
-   * This is needed because AudioWorkletNode initialization is asynchronous
-   */
-  async waitForPitchShifterReady() {
-    if (!this.pitchShifter) {
-      throw new Error('PitchShifter not created');
-    }
-    
-    // Wait for the AudioWorkletNode to be ready
-    // We'll check if the node exists and is properly initialized
-    let attempts = 0;
-    const maxAttempts = 50; // 5 seconds maximum wait time
-    
-    while (attempts < maxAttempts) {
-      if (this.pitchShifter.node && this.pitchShifter.port) {
-        console.log('PitchShifter is ready');
-        return;
-      }
-      
-      // Wait 100ms before checking again
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
-    }
-    
-    throw new Error('PitchShifter failed to initialize within timeout period');
   }
 
   /**

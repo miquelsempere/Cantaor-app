@@ -40,10 +40,25 @@ export default class WebAudioBufferSource {
 
   extract(target, numFrames = 0, position = 0) {
     this.position = position;
-    let left = this.buffer.getChannelData(0);
-    let right = this.dualChannel
-      ? this.buffer.getChannelData(1)
-      : this.buffer.getChannelData(0);
+    
+    // Handle both regular AudioBuffer and worklet buffer representation
+    let left, right;
+    if (this.buffer.getChannelData) {
+      // Regular AudioBuffer
+      left = this.buffer.getChannelData(0);
+      right = this.dualChannel
+        ? this.buffer.getChannelData(1)
+        : this.buffer.getChannelData(0);
+    } else if (this.buffer.channelData) {
+      // Worklet buffer representation
+      left = this.buffer.channelData[0];
+      right = this.dualChannel
+        ? this.buffer.channelData[1]
+        : this.buffer.channelData[0];
+    } else {
+      throw new Error('Invalid buffer format');
+    }
+    
     let i = 0;
     for (; i < numFrames; i++) {
       target[i * 2] = left[i + position];
