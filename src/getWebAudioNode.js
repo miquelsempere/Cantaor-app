@@ -38,9 +38,9 @@ const getWebAudioNode = function (
     if (framesExtracted === 0) {
       if (!hasEnded) {
         hasEnded = true;
-        filter.onEnd();
         // Disconnect the node to stop further processing
         node.disconnect();
+        filter.onEnd();
       }
     }
     
