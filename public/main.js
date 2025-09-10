@@ -3,7 +3,7 @@
  * Connects the UI with the AudioManager
  */
 
-import AudioManager from '/src/audioManager.js';
+import AudioManager from '/audioManager.js';
 
 class FlamencoApp {
   constructor() {
