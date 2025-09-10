@@ -287,7 +287,7 @@ export default class AudioManager {
           this.stop();
         });
       }
-    }, 50); // 50ms silence pause to ensure clean transition
+    }, 500); // 50ms silence pause to ensure clean transition
   }
 
   /**
