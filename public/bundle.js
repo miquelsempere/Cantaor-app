@@ -9646,17 +9646,31 @@ class AudioManager {
   /* --------------- Inicialización --------------- */
   async initializeAudioContext() {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
-      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
-      console.log('Audio context inicializado');
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this.audioContext) {
+          throw new Error('Failed to create AudioContext - returned null');
+        }
+        this.gainNode = this.audioContext.createGain();
+        this.gainNode.connect(this.audioContext.destination);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+        console.log('Audio context inicializado');
+      } catch (error) {
+        console.error('Error initializing AudioContext:', error);
+        this.audioContext = null;
+        this.gainNode = null;
+        throw error;
+      }
     }
   }
 
   /* --------------- Carga de pistas --------------- */
   async loadPalo(palo) {
     try {
+      await this.initializeAudioContext();
+      if (!this.audioContext) {
+        throw new Error('Failed to initialize AudioContext');
+      }
       console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
       if (!this.tracks || this.tracks.length === 0) {
@@ -9690,17 +9704,38 @@ class AudioManager {
     if (trackIndex == null || trackIndex < 0 || trackIndex >= this.tracks.length) return;
     const track = this.tracks[trackIndex];
     if (!track || this.audioBuffers.has(track.id)) return;
+    if (!this.audioContext) {
+      throw new Error('AudioContext not initialized. Cannot decode audio data.');
+    }
     try {
       console.log('Preloading:', track.title || track.id);
+      console.log('Fetching audio from URL:', track.audio_url);
       const response = await fetch(track.audio_url);
-      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      if (!response.ok) {
+        const errorMsg = `Failed to fetch audio file: ${response.status} ${response.statusText} for URL: ${track.audio_url}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      console.log('Successfully fetched audio file, converting to ArrayBuffer...');
       const arrayBuffer = await response.arrayBuffer();
+      console.log('ArrayBuffer created, size:', arrayBuffer.byteLength, 'bytes');
+
+      // Check again after async operations in case audioContext was destroyed
+      if (!this.audioContext) {
+        throw new Error('AudioContext became null during preload operation');
+      }
+      console.log('About to decode audio data. AudioContext:', this.audioContext);
+      console.log('AudioContext state:', this.audioContext ? this.audioContext.state : 'null');
+      console.log('Decoding audio data...');
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      console.log('Audio decoded successfully. Duration:', audioBuffer.duration, 'seconds');
       this.audioBuffers.set(track.id, audioBuffer);
       console.log('Preloaded:', track.title || track.id);
       return audioBuffer;
     } catch (err) {
-      console.warn('Error preloading track', track.title, err);
+      console.error('Error preloading track:', track.title || track.id);
+      console.error('Error details:', err.message);
+      console.error('Full error:', err);
       throw err;
     }
   }
