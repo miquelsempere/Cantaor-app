@@ -274,33 +274,25 @@ export default class AudioManager {
     
     this.isTransitioning = true;
     
-    // Add a small delay to ensure clean transition
-    setTimeout(() => {
-      if (!this.isPlaying) {
+    // Move to next track in queue
+    this.currentTrackIndex++;
+    
+    // If we've played all tracks, restart the cycle with a new shuffle
+    if (this.currentTrackIndex >= this.playQueue.length) {
+      console.log('All tracks played, reshuffling queue');
+      this.createPlayQueue();
+    }
+    
+    // Play next track immediately for seamless playback
+    this.playCurrentTrack()
+      .then(() => {
         this.isTransitioning = false;
-        return; // Check again in case playback was stopped during the delay
-      }
-      
-      // Move to next track in queue
-      this.currentTrackIndex++;
-      
-      // If we've played all tracks, restart the cycle with a new shuffle
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
-        this.createPlayQueue();
-      }
-      
-      // Play next track immediately for seamless playback
-      this.playCurrentTrack()
-        .then(() => {
-          this.isTransitioning = false;
-        })
-        .catch(error => {
-          console.error('Error playing next track:', error);
-          this.isTransitioning = false;
-          this.stop();
-        });
-    }, 100); // 100ms delay to ensure clean transition
+      })
+      .catch(error => {
+        console.error('Error playing next track:', error);
+        this.isTransitioning = false;
+        this.stop();
+      });
   }
 
   /**
