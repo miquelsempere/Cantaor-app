@@ -243,6 +243,9 @@ export default class AudioManager {
     // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
     
+    // Restaurar el volumen
+    this.setVolume(this.currentVolume);
+    
     // Notify track change
     this.notifyTrackChange(currentTrack);
     
@@ -254,28 +257,36 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
+    // Silenciar inmediatamente para evitar solapamiento
+    if (this.gainNode) {
+      this.gainNode.gain.value = 0;
+    }
+    
     console.log('Track ended, moving to next');
     
     if (!this.isPlaying) {
       return;
     }
     
-    // Move to next track in queue
-    this.currentTrackIndex++;
-    
-    // If we've played all tracks, restart the cycle with a new shuffle
-    if (this.currentTrackIndex >= this.playQueue.length) {
-      console.log('All tracks played, reshuffling queue');
-      this.createPlayQueue();
-    }
-    
-    // Play next track immediately
-    if (this.isPlaying) {
-      this.playCurrentTrack().catch(error => {
-        console.error('Error playing next track:', error);
-        this.stop();
-      });
-    }
+    // Introducir un pequeño retraso para permitir que el pipeline de audio se vacíe
+    setTimeout(() => {
+      // Move to next track in queue
+      this.currentTrackIndex++;
+      
+      // If we've played all tracks, restart the cycle with a new shuffle
+      if (this.currentTrackIndex >= this.playQueue.length) {
+        console.log('All tracks played, reshuffling queue');
+        this.createPlayQueue();
+      }
+      
+      // Play next track immediately
+      if (this.isPlaying) {
+        this.playCurrentTrack().catch(error => {
+          console.error('Error playing next track:', error);
+          this.stop();
+        });
+      }
+    }, 20); // Retraso de 20ms
   }
 
   /**
