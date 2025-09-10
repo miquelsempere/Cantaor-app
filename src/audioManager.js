@@ -296,7 +296,7 @@ export default class AudioManager {
             this.stop();
           });
       }
-    }, 10);
+    }, 50);
   }
 
   /**
