@@ -323,19 +323,21 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // Small delay to ensure clean audio transition
+    // 1 second delay between tracks for clean transition
+    console.log('Waiting 1 second before next track...');
     setTimeout(() => {
       if (!this.isPlaying) {
         console.log('Playback was stopped during transition delay');
         return;
       }
       
+      console.log('Starting next track after 1 second delay');
       // Play next track
       this.playCurrentTrack().catch(error => {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 100); // Slightly increased delay to account for AudioWorklet initialization
+    }, 1000); // 1 second delay between tracks
   }
 
   /**
