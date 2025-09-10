@@ -10077,11 +10077,13 @@ class FlamencoApp {
     try {
       if (this.isPlaying) {
         // Stop playback
+        console.log('FlamencoApp.handlePlayButtonClick() - calling audioManager.stop()');
         this.audioManager.stop();
         this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
         this.showStatus('Iniciando reproducción...', 'loading');
+        console.log('FlamencoApp.handlePlayButtonClick() - calling audioManager.play()');
         await this.audioManager.play();
         this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
       }
