@@ -220,35 +220,18 @@ export default class AudioManager {
     const audioBuffer = this.audioBuffers.get(track.id);
     if (!audioBuffer) throw new Error('No audioBuffer available after preload for ' + track.title);
 
-    let pitchShifterInstance = null;
-    let sourceNode = null;
+    // Usar AudioBufferSourceNode directamente para programación precisa
+    const sourceNode = this.audioContext.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    
+    // Aplicar tempo y pitch usando playbackRate (aproximación simple)
+    sourceNode.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
+    
+    // Conectar directamente al gainNode
+    sourceNode.connect(this.gainNode);
 
-    try {
-      pitchShifterInstance = new PitchShifter(this.audioContext, audioBuffer, 4096);
-      if (typeof pitchShifterInstance.setTempo === 'function') pitchShifterInstance.setTempo(this.globalTempo);
-      if (typeof pitchShifterInstance.setPitchSemitones === 'function') pitchShifterInstance.setPitchSemitones(this.globalPitchSemitones);
-      
-      // Conectar pitchShifter al gainNode
-      if (typeof pitchShifterInstance.connect === 'function') {
-        pitchShifterInstance.connect(this.gainNode);
-      } else if (pitchShifterInstance.node) {
-        pitchShifterInstance.node.connect(this.gainNode);
-      }
-      sourceNode = pitchShifterInstance.node || pitchShifterInstance._node;
-    } catch (err) {
-      console.warn('PitchShifter creation failed, falling back to plain BufferSource:', err);
-      pitchShifterInstance = null;
-      sourceNode = this.audioContext.createBufferSource();
-      sourceNode.buffer = audioBuffer;
-      sourceNode.connect(this.gainNode);
-      sourceNode.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
-    }
-
-    let playbackDuration = audioBuffer.duration / Math.max(0.0001, this.globalTempo);
-    // Si PitchShifter modifica la duración, recalcularla en base al tempo
-    if (pitchShifterInstance && typeof pitchShifterInstance.tempo === 'number' && pitchShifterInstance.tempo > 0) {
-      playbackDuration = audioBuffer.duration / pitchShifterInstance.tempo;
-    }
+    // Calcular duración con el tempo aplicado
+    const playbackDuration = audioBuffer.duration / Math.max(0.0001, this.globalTempo);
 
     const endTime = startTime + playbackDuration;
 
@@ -268,12 +251,9 @@ export default class AudioManager {
       startTime,
       endTime,
       source: sourceNode,
-      pitchShifter: pitchShifterInstance,
+      pitchShifter: null,
     };
     this.scheduled.set(queuePos, scheduledEntry);
-
-    // Configurar callback onended para limpieza y actualización de estado
-    sourceNode.onended = () => {
       console.log(`Track ${track.title} (queuePos ${queuePos}) ended at ${this.audioContext.currentTime.toFixed(3)}`);
       // Limpiar recursos para esta pista
       if (scheduledEntry.pitchShifter) {
@@ -311,11 +291,9 @@ export default class AudioManager {
 
   setTempo(tempo) {
     this.globalTempo = tempo;
-    // si hay pitchShifters activos, actualizar (no garantizado que todas las implementaciones lo soporten en caliente)
+    // Actualizar el tempo de las fuentes programadas
     for (const entry of this.scheduled.values()) {
-      if (entry.pitchShifter && typeof entry.pitchShifter.setTempo === 'function') {
-        entry.pitchShifter.setTempo(tempo);
-      } else if (entry.source && entry.source.playbackRate) {
+      if (entry.source && entry.source.playbackRate) {
         try { entry.source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime); } catch(e){}
       }
     }
@@ -324,11 +302,8 @@ export default class AudioManager {
 
   setPitchSemitones(semitones) {
     this.globalPitchSemitones = semitones;
-    for (const entry of this.scheduled.values()) {
-      if (entry.pitchShifter && typeof entry.pitchShifter.setPitchSemitones === 'function') {
-        entry.pitchShifter.setPitchSemitones(semitones);
-      }
-    }
+    // Nota: AudioBufferSourceNode no soporta pitch shifting directo
+    // Para pitch shifting real necesitaríamos usar PitchShifter, pero eso complicaría la programación
     console.log('Pitch semitones set to', semitones);
   }
 
