@@ -106,6 +106,12 @@ export default class AudioManager {
       const response = await fetch(track.audio_url);
       if (!response.ok) throw new Error('fetch failed: ' + response.status);
       const arrayBuffer = await response.arrayBuffer();
+      
+      // Check again after async operations in case audioContext was destroyed
+      if (!this.audioContext) {
+        throw new Error('AudioContext became null during preload operation');
+      }
+      
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.audioBuffers.set(track.id, audioBuffer);
       console.log('Preloaded:', track.title || track.id);
