@@ -171,11 +171,8 @@ export default class AudioManager {
     // Tiempo de inicio para la primera pista
     let currentScheduleTime = Math.max(this.audioContext.currentTime + this.startLatency, this.audioContext.currentTime + 0.02);
 
-    // Programar la primera pista
+    // Programar solo la primera pista - las siguientes se programarán automáticamente
     await this._scheduleTrackByQueuePos(this.currentQueuePosition, currentScheduleTime);
-
-    // Iniciar el bucle de programación continua
-    this._scheduleNextTracks();
   }
 
   stop() {
