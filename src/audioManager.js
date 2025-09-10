@@ -232,13 +232,25 @@ export default class AudioManager {
       throw new Error('Failed to load audio buffer');
     }
     
-    // Create new PitchShifter instance
+    // Create new PitchShifter instance (now asynchronous)
     this.pitchShifter = new PitchShifter(
       this.audioContext,
-      audioBuffer,
-      4096,
-      () => this.onTrackEnd() // Callback when track ends
+      audioBuffer
     );
+    
+    // Set up event listeners for the new PitchShifter
+    this.pitchShifter.on('play', (detail) => {
+      // Handle play events if needed
+      // This replaces the old onUpdate callback mechanism
+    });
+    
+    this.pitchShifter.on('end', () => {
+      this.onTrackEnd();
+    });
+    
+    // Wait for PitchShifter to be fully initialized
+    // Since PitchShifter initialization is now asynchronous, we need to wait
+    await this.waitForPitchShifterReady();
     
     // Apply current audio settings to the new PitchShifter
     // These values are maintained by the UI controls
@@ -260,6 +272,34 @@ export default class AudioManager {
     
     // Update cycle tracking
     this.tracksPlayedInCycle++;
+  }
+
+  /**
+   * Wait for PitchShifter to be fully initialized
+   * This is needed because AudioWorkletNode initialization is asynchronous
+   */
+  async waitForPitchShifterReady() {
+    if (!this.pitchShifter) {
+      throw new Error('PitchShifter not created');
+    }
+    
+    // Wait for the AudioWorkletNode to be ready
+    // We'll check if the node exists and is properly initialized
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds maximum wait time
+    
+    while (attempts < maxAttempts) {
+      if (this.pitchShifter.node && this.pitchShifter.port) {
+        console.log('PitchShifter is ready');
+        return;
+      }
+      
+      // Wait 100ms before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    throw new Error('PitchShifter failed to initialize within timeout period');
   }
 
   /**
@@ -295,7 +335,7 @@ export default class AudioManager {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 50); // Reduced delay for faster transitions
+    }, 100); // Slightly increased delay to account for AudioWorklet initialization
   }
 
   /**
