@@ -143,6 +143,7 @@ export default class AudioManager {
 
   /* --------------- Reproducción --------------- */
   async play() {
+    console.log('AudioManager.play() called');
     if (!this.currentPalo || !this.tracks.length) {
       throw new Error('No palo loaded. Call loadPalo() first.');
     }
@@ -158,11 +159,13 @@ export default class AudioManager {
     }
 
     this.isPlaying = true;
+    console.log('AudioManager.play() - isPlaying set to true');
     this.notifyPlayStateChange(true);
     this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
   }
 
   scheduleTrack(trackIndex, startTime) {
+    console.log('AudioManager.scheduleTrack() called for track:', this.tracks[this.playQueue[trackIndex]].title, 'at time:', startTime);
     if (!this.isPlaying) return;
 
     const trackId = this.playQueue[trackIndex];
@@ -192,7 +195,9 @@ export default class AudioManager {
     const nextStart = startTime + adjustedDuration;
 
     this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - checking isPlaying:', this.isPlaying);
       if (this.isPlaying) {
+        console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - isPlaying is true, scheduling next track');
         this.scheduleTrack(nextIndex, nextStart);
       }
     }).catch(err => {
@@ -201,16 +206,20 @@ export default class AudioManager {
 
     // avanzamos el índice
     this.currentTrackIndex = nextIndex;
+    console.log('AudioManager.scheduleTrack() - currentTrackIndex updated to:', this.currentTrackIndex);
   }
 
   stop() {
+    console.log('AudioManager.stop() called');
     if (!this.isPlaying) return;
     
     this.isPlaying = false;
+    console.log('AudioManager.stop() - isPlaying set to false');
     
     // Detener todas las fuentes de audio activas
     this.activeSources.forEach(source => {
       try {
+        console.log('AudioManager.stop() - stopping source:', source);
         source.stop();
         source.disconnect();
       } catch (e) {
@@ -219,6 +228,7 @@ export default class AudioManager {
       }
     });
     this.activeSources.clear(); // Limpiar el conjunto después de detener todas las fuentes
+    console.log('AudioManager.stop() - activeSources cleared');
 
     this.notifyPlayStateChange(false);
     console.log('Playback stopped');
