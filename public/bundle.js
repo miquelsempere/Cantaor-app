@@ -9862,7 +9862,7 @@ class AudioManager {
       this.gainNode.connect(this.audioContext.destination);
 
       // Register AudioWorklet processor
-      this.audioContext.audioWorklet.addModule('./src/audio-worklet-processor.js').then(() => {
+      this.audioContext.audioWorklet.addModule('./audio-worklet-processor.js').then(() => {
         console.log('AudioWorklet processor registered successfully');
       }).catch(error => {
         console.error('Failed to register AudioWorklet processor:', error);
