@@ -9,10 +9,14 @@ import AudioManager from '../src/audioManager.js';
 import OnboardingScreen from '../src/components/OnboardingScreen.js';
 import LoginScreen from '../src/components/LoginScreen.js';
 import DashboardScreen from '../src/components/DashboardScreen.js';
+import PaloDetailScreen from '../src/components/PaloDetailScreen.js';
+import ProfileSettingsScreen from '../src/components/ProfileSettingsScreen.js';
+import ProgressDetailScreen from '../src/components/ProgressDetailScreen.js';
 
 class AppRouter {
   constructor() {
     this.currentScreen = null;
+    this.screenHistory = [];
     this.init();
   }
 
@@ -49,9 +53,54 @@ class AppRouter {
     this.currentScreen = 'dashboard';
     const dashboard = new DashboardScreen();
     document.body.innerHTML = dashboard.render();
+    
+    // Setup dashboard navigation
+    this.setupDashboardNavigation();
+  }
+
+  setupDashboardNavigation() {
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-action="new-practice"]')) {
+        this.showMainApp();
+      } else if (e.target.closest('#explorePalos')) {
+        this.showPaloExplorer();
+      } else if (e.target.closest('#myProgress')) {
+        this.showProgressDetail();
+      } else if (e.target.closest('#settings')) {
+        this.showProfileSettings();
+      }
+    });
+  }
+
+  showPaloDetail(paloName) {
+    this.screenHistory.push(this.currentScreen);
+    this.currentScreen = 'palo-detail';
+    const audioManager = new AudioManager();
+    const paloDetail = new PaloDetailScreen(paloName, audioManager);
+    document.body.innerHTML = paloDetail.render();
+  }
+
+  showProfileSettings() {
+    this.screenHistory.push(this.currentScreen);
+    this.currentScreen = 'profile-settings';
+    const profileSettings = new ProfileSettingsScreen();
+    document.body.innerHTML = profileSettings.render();
+  }
+
+  showProgressDetail() {
+    this.screenHistory.push(this.currentScreen);
+    this.currentScreen = 'progress-detail';
+    const progressDetail = new ProgressDetailScreen();
+    document.body.innerHTML = progressDetail.render();
+  }
+
+  showPaloExplorer() {
+    // Por ahora, mostrar la aplicación principal
+    this.showMainApp();
   }
 
   showMainApp() {
+    this.screenHistory.push(this.currentScreen);
     this.currentScreen = 'main';
     // Mostrar la aplicación principal original
     this.initMainApp();
@@ -127,7 +176,28 @@ class AppRouter {
     // Inicializar la aplicación principal original
     new FlamencoApp();
   }
+
+  goBack() {
+    if (this.screenHistory.length > 0) {
+      const previousScreen = this.screenHistory.pop();
+      switch (previousScreen) {
+        case 'dashboard':
+          this.showDashboard();
+          break;
+        case 'main':
+          this.showMainApp();
+          break;
+        default:
+          this.showDashboard();
+      }
+    } else {
+      this.showDashboard();
+    }
+  }
 }
+
+// Global router instance
+window.appRouter = null;
 
 class FlamencoApp {
   constructor() {
@@ -384,5 +454,12 @@ class FlamencoApp {
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
   // Inicializar el router en lugar de la aplicación directamente
-  new AppRouter();
+  window.appRouter = new AppRouter();
+});
+
+// Global navigation handler
+window.addEventListener('popstate', () => {
+  if (window.appRouter) {
+    window.appRouter.goBack();
+  }
 });
