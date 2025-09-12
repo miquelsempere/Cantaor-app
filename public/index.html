@@ -4,206 +4,213 @@
     <title>Práctica de Cante Flamenco</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Fuentes Google Fonts para el Sistema de Diseño Flamenco -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Sistema de Diseño Flamenco -->
-    <link rel="stylesheet" href="../src/styles/flamenco-design-system.css">
-    
     <style type="text/css">
-        /* Estilos específicos de la aplicación que complementan el sistema de diseño */
-        .app-container {
-            background: var(--flamenco-ivory);
-            border-radius: var(--radius-2xl);
-            padding: var(--space-8);
-            box-shadow: var(--shadow-xl);
-            max-width: 400px;
-            width: 90%;
-            margin: var(--space-6) auto;
-            text-align: center;
-            position: relative;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            background: linear-gradient(135deg, var(--flamenco-red) 0%, var(--flamenco-black) 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: var(--space-4);
+            color: #333;
+        }
+
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
         }
 
         .app-title {
-            background: linear-gradient(135deg, var(--flamenco-red), var(--flamenco-gold));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: var(--space-2);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+
+        .app-subtitle {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 2rem;
         }
 
         .palo-selector {
-            margin-bottom: var(--space-8);
+            margin-bottom: 2rem;
+        }
+
+        .palo-selector label {
+            display: block;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+
+        .palo-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .palo-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .player-section {
-            margin-bottom: var(--space-8);
+            margin-bottom: 2rem;
         }
 
         .play-button {
             width: 80px;
             height: 80px;
-            border-radius: var(--radius-full);
-            background: linear-gradient(135deg, var(--flamenco-red) 0%, var(--flamenco-gold) 100%);
-            color: var(--flamenco-ivory);
-            font-size: var(--text-3xl);
-            margin-bottom: var(--space-4);
-            box-shadow: var(--shadow-flamenco);
-            position: relative;
-            overflow: hidden;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            margin-bottom: 1rem;
         }
 
         .play-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(220, 20, 60, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
         }
 
-        .play-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s;
+        .play-button:active {
+            transform: translateY(0);
         }
 
-        .play-button:hover::before {
-            left: 100%;
+        .play-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .track-info {
-            background: rgba(245, 194, 199, 0.3);
-            border: 1px solid rgba(220, 20, 60, 0.1);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            margin-bottom: var(--space-4);
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
             min-height: 60px;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            backdrop-filter: blur(10px);
         }
 
         .track-title {
-            font-family: var(--font-ui);
-            font-weight: var(--font-semibold);
-            color: var(--text-primary);
-            margin-bottom: var(--space-1);
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
         }
 
         .track-palo {
-            font-size: var(--text-sm);
-            color: var(--text-secondary);
+            font-size: 0.85rem;
+            color: #718096;
         }
 
         .controls-section {
             display: grid;
-            gap: var(--space-6);
+            gap: 1.5rem;
         }
 
         .control-group {
             display: flex;
             flex-direction: column;
-            gap: var(--space-2);
+            gap: 0.5rem;
         }
 
         .control-label {
-            font-family: var(--font-ui);
-            font-weight: var(--font-medium);
-            color: var(--text-primary);
-            font-size: var(--text-sm);
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
         }
 
         .control-slider {
             width: 100%;
-            height: 8px;
-            border-radius: var(--radius-sm);
-            background: rgba(28, 28, 28, 0.1);
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
             outline: none;
             -webkit-appearance: none;
             appearance: none;
-            transition: all var(--transition-normal);
         }
 
         .control-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 24px;
-            height: 24px;
-            border-radius: var(--radius-full);
-            background: linear-gradient(135deg, var(--flamenco-red) 0%, var(--flamenco-gold) 100%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             cursor: pointer;
-            box-shadow: var(--shadow-md);
-            transition: all var(--transition-normal);
-        }
-
-        .control-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
         }
 
         .control-slider::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            border-radius: var(--radius-full);
-            background: linear-gradient(135deg, var(--flamenco-red) 0%, var(--flamenco-gold) 100%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             cursor: pointer;
             border: none;
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
         }
 
         .control-value {
-            font-weight: var(--font-semibold);
-            color: var(--flamenco-red);
-            font-size: var(--text-sm);
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.9rem;
         }
 
         .visualizer {
             width: 100%;
             height: 60px;
-            background: rgba(245, 194, 199, 0.2);
-            border: 1px solid rgba(220, 20, 60, 0.1);
-            border-radius: var(--radius-xl);
-            margin: var(--space-4) 0;
+            background: #f7fafc;
+            border-radius: 10px;
+            margin: 1rem 0;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
             position: relative;
-            backdrop-filter: blur(5px);
         }
 
         .visualizer-bars {
             display: flex;
             align-items: center;
-            gap: var(--space-1);
+            gap: 3px;
             height: 40px;
         }
 
         .visualizer-bar {
-            width: 6px;
-            background: linear-gradient(to top, var(--flamenco-red), var(--flamenco-gold));
-            border-radius: var(--radius-sm);
-            transition: height var(--transition-slow);
+            width: 4px;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: height 0.3s ease;
             opacity: 0.3;
         }
 
         .visualizer.playing .visualizer-bar {
-            animation: flamenco-pulse 1.5s ease-in-out infinite;
+            animation: pulse 1.5s ease-in-out infinite;
         }
 
         .visualizer.playing .visualizer-bar:nth-child(2n) {
@@ -218,7 +225,7 @@
             animation-delay: 0.6s;
         }
 
-        @keyframes flamenco-pulse {
+        @keyframes pulse {
             0%, 100% {
                 height: 10px;
                 opacity: 0.3;
@@ -230,64 +237,43 @@
         }
 
         .status-message {
-            font-size: var(--text-sm);
-            color: var(--text-secondary);
-            margin-top: var(--space-4);
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 1rem;
             min-height: 20px;
-            font-family: var(--font-ui);
         }
 
-        .status-message.loading {
-            color: var(--flamenco-gold);
-            font-weight: var(--font-medium);
+        .loading {
+            color: #667eea;
         }
 
-        .status-message.error {
-            color: var(--error);
-            font-weight: var(--font-medium);
+        .error {
+            color: #e53e3e;
         }
 
-        .status-message.success {
-            color: var(--success);
-            font-weight: var(--font-medium);
-        }
-
-        /* Efectos especiales flamencos */
-        .flamenco-accent {
-            position: relative;
-        }
-
-        .flamenco-accent::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 30px;
-            height: 2px;
-            background: linear-gradient(90deg, var(--flamenco-red), var(--flamenco-gold));
-            border-radius: var(--radius-full);
+        .success {
+            color: #38a169;
         }
     </style>
 </head>
 <body>
     <div class="app-container">
-        <h1 class="app-title heading-1 flamenco-accent">Cante Flamenco</h1>
-        <p class="body-small mb-6">Práctica de guitarra con pistas de cante</p>
+        <h1 class="app-title">Cante Flamenco</h1>
+        <p class="app-subtitle">Práctica de guitarra con pistas de cante</p>
         
         <div class="palo-selector">
-            <label for="paloSelect" class="input-label">Selecciona el Palo:</label>
-            <select id="paloSelect" class="input-field">
+            <label for="paloSelect">Selecciona el Palo:</label>
+            <select id="paloSelect" class="palo-select">
                 <option value="">Cargando palos...</option>
             </select>
         </div>
 
         <div class="player-section">
-            <button id="playButton" class="play-button btn" disabled>
+            <button id="playButton" class="play-button" disabled>
                 ▶️
             </button>
             
-            <div class="track-info card" id="trackInfo">
+            <div class="track-info" id="trackInfo">
                 <div class="track-title">Selecciona un palo para comenzar</div>
                 <div class="track-palo"></div>
             </div>
@@ -313,21 +299,21 @@
                 <label class="control-label">Tempo</label>
                 <input type="range" id="tempoSlider" class="control-slider" 
                        min="0.5" max="2.0" step="0.05" value="1.0">
-                <div class="control-value caption" id="tempoValue">1.00x</div>
+                <div class="control-value" id="tempoValue">1.00x</div>
             </div>
 
             <div class="control-group">
                 <label class="control-label">Tono (Semitonos)</label>
                 <input type="range" id="pitchSlider" class="control-slider" 
                        min="-12" max="12" step="1" value="0">
-                <div class="control-value caption" id="pitchValue">0</div>
+                <div class="control-value" id="pitchValue">0</div>
             </div>
 
             <div class="control-group">
                 <label class="control-label">Volumen</label>
                 <input type="range" id="volumeSlider" class="control-slider" 
                        min="0" max="1" step="0.05" value="0.8">
-                <div class="control-value caption" id="volumeValue">80%</div>
+                <div class="control-value" id="volumeValue">80%</div>
             </div>
         </div>
 
