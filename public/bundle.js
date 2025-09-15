@@ -11420,7 +11420,7 @@ class FlamencoApp {
     }
   }
   updateTrackInfo(track) {
-    // No mostrar información de pista
+    // Esta función ya no se usa
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
