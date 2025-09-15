@@ -83,11 +83,13 @@
             border-radius: 50%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            font-size: 2rem;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
             margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .play-button:hover {
@@ -103,6 +105,35 @@
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .play-icon,
+        .pause-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .play-icon svg,
+        .pause-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: white;
+        }
+
+        .play-icon {
+            display: block;
+        }
+
+        .pause-icon {
+            display: none;
+        }
+
+        .play-button.is-playing .play-icon {
+            display: none;
+        }
+
+        .play-button.is-playing .pause-icon {
+            display: block;
         }
 
         .track-info {
@@ -270,7 +301,16 @@
 
         <div class="player-section">
             <button id="playButton" class="play-button" disabled>
-                ▶️
+                <span class="play-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </span>
+                <span class="pause-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                </span>
             </button>
             
             <div class="track-info" id="trackInfo">
