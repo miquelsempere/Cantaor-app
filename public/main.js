@@ -5,6 +5,130 @@
 
 import AudioManager from '../src/audioManager.js';
 
+// Importar las nuevas pantallas
+import OnboardingScreen from '../src/components/OnboardingScreen.js';
+import LoginScreen from '../src/components/LoginScreen.js';
+import DashboardScreen from '../src/components/DashboardScreen.js';
+
+class AppRouter {
+  constructor() {
+    this.currentScreen = null;
+    this.init();
+  }
+
+  init() {
+    this.determineInitialScreen();
+  }
+
+  determineInitialScreen() {
+    const hasCompletedOnboarding = localStorage.getItem('onboarding_completed');
+    const isAuthenticated = localStorage.getItem('user_authenticated');
+
+    if (!hasCompletedOnboarding) {
+      this.showOnboarding();
+    } else if (!isAuthenticated) {
+      this.showLogin();
+    } else {
+      this.showDashboard();
+    }
+  }
+
+  showOnboarding() {
+    this.currentScreen = 'onboarding';
+    const onboarding = new OnboardingScreen();
+    document.body.innerHTML = onboarding.render();
+  }
+
+  showLogin() {
+    this.currentScreen = 'login';
+    const login = new LoginScreen();
+    document.body.innerHTML = login.render();
+  }
+
+  showDashboard() {
+    this.currentScreen = 'dashboard';
+    const dashboard = new DashboardScreen();
+    document.body.innerHTML = dashboard.render();
+  }
+
+  showMainApp() {
+    this.currentScreen = 'main';
+    // Mostrar la aplicación principal original
+    this.initMainApp();
+  }
+
+  initMainApp() {
+    // Código original de la aplicación principal
+    document.body.innerHTML = `
+      <div class="app-container">
+        <h1 class="app-title heading-1 flamenco-accent">Cante Flamenco</h1>
+        <p class="body-small mb-6">Práctica de guitarra con pistas de cante</p>
+        
+        <div class="palo-selector">
+            <label for="paloSelect" class="input-label">Selecciona el Palo:</label>
+            <select id="paloSelect" class="input-field">
+                <option value="">Cargando palos...</option>
+            </select>
+        </div>
+
+        <div class="player-section">
+            <button id="playButton" class="play-button btn" disabled>
+                ▶️
+            </button>
+            
+            <div class="track-info card" id="trackInfo">
+                <div class="track-title">Selecciona un palo para comenzar</div>
+                <div class="track-palo"></div>
+            </div>
+
+            <div class="visualizer" id="visualizer">
+                <div class="visualizer-bars">
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="control-group">
+                <label class="control-label">Tempo</label>
+                <input type="range" id="tempoSlider" class="control-slider" 
+                       min="0.5" max="2.0" step="0.05" value="1.0">
+                <div class="control-value caption" id="tempoValue">1.00x</div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">Tono (Semitonos)</label>
+                <input type="range" id="pitchSlider" class="control-slider" 
+                       min="-12" max="12" step="1" value="0">
+                <div class="control-value caption" id="pitchValue">0</div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">Volumen</label>
+                <input type="range" id="volumeSlider" class="control-slider" 
+                       min="0" max="1" step="0.05" value="0.8">
+                <div class="control-value caption" id="volumeValue">80%</div>
+            </div>
+        </div>
+
+        <div class="status-message" id="statusMessage"></div>
+      </div>
+    `;
+    
+    // Inicializar la aplicación principal original
+    new FlamencoApp();
+  }
+}
+
 class FlamencoApp {
   constructor() {
     this.audioManager = new AudioManager();
@@ -187,8 +311,8 @@ class FlamencoApp {
     const paloElement = this.trackInfo.querySelector('.track-palo');
     
     if (track) {
-      titleElement.textContent = track.title;
-      paloElement.textContent = track.palo;
+      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
+      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
     } else {
       titleElement.textContent = this.currentPalo ? 
         'Listo para reproducir' : 
@@ -200,7 +324,8 @@ class FlamencoApp {
   updatePlaybackStatus() {
     if (this.isPlaying) {
       const status = this.audioManager.getPlaybackStatus();
-      const statusText = `Ciclo ${status.currentCycle} - ${status.tracksPlayedInCycle}/${status.totalTracksInCycle} pistas`;
+      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
+      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
       
       // Update status in the track info or create a new status element
       const existingStatus = document.querySelector('.playback-status');
@@ -258,5 +383,6 @@ class FlamencoApp {
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-  new FlamencoApp();
+  // Inicializar el router en lugar de la aplicación directamente
+  new AppRouter();
 });
