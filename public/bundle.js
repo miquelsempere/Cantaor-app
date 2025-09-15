@@ -11287,6 +11287,20 @@ class AudioManager {
 
 class FlamencoApp {
   constructor() {
+    // Constante para el contenido SVG del botón de reproducción
+    this.PLAY_BUTTON_SVG_CONTENT = `
+                <div class="play-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                    </svg>
+                </div>
+                <div class="pause-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"></path>
+                    </svg>
+                </div>
+            `;
+    console.log('PLAY_BUTTON_SVG_CONTENT:', this.PLAY_BUTTON_SVG_CONTENT);
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
@@ -11429,13 +11443,16 @@ class FlamencoApp {
       this.showStatus('Selecciona un palo primero', 'error');
       return;
     }
+    console.log('Play button clicked, current state:', this.isPlaying);
     try {
       if (this.isPlaying) {
         // Stop playback
+        console.log('Stopping playback...');
         this.audioManager.stop();
         this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
+        console.log('Starting playback...');
         this.showStatus('Iniciando reproducción...', 'loading');
         await this.audioManager.play();
         this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
@@ -11485,9 +11502,22 @@ class FlamencoApp {
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
+    console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
+    console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
 
-    // Update play button
-    this.playButton.textContent = isPlaying ? '⏸️' : '▶️';
+    // Asegurar que el contenido SVG esté siempre presente
+    this.playButton.innerHTML = this.PLAY_BUTTON_SVG_CONTENT;
+    console.log('updatePlayState: Después de asignar innerHTML. Contenido actual:', this.playButton.innerHTML);
+
+    // Update play button state - simply toggle the is-playing class
+    if (isPlaying) {
+      this.playButton.classList.add('is-playing');
+      console.log('Play button: switched to pause icon');
+    } else {
+      this.playButton.classList.remove('is-playing');
+      console.log('Play button: switched to play icon');
+    }
+    console.log('updatePlayState: Clases del botón después de toggle:', this.playButton.classList.value);
 
     // Update visualizer
     if (isPlaying) {
