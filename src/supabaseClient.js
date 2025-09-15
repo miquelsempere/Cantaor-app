@@ -8,8 +8,10 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'https://your-project-id.supabase.co' || supabaseAnonKey === 'your-anon-key-here') {
+  console.error('Supabase not configured. Please set up your Supabase project and update the .env file with your actual values.');
+  console.error('Visit https://supabase.com to create a project and get your URL and API key.');
+  throw new Error('Supabase configuration required. Please check your .env file and set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values.');
 }
 
 // Create and export the Supabase client
