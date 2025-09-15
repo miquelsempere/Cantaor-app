@@ -118,11 +118,12 @@
             border-style: solid;
             border-width: 10px 0 10px 16px;
             border-color: transparent transparent transparent white;
-            visibility: visible;
+            opacity: 1;
+            transition: opacity 0.2s ease-in-out;
         }
 
         .play-button.is-playing::before {
-            visibility: hidden;
+            opacity: 0;
         }
 
         .play-button::after {
@@ -136,11 +137,12 @@
             height: 20px;
             background: white;
             box-shadow: 8px 0 0 white;
-            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
         }
 
         .play-button.is-playing::after {
-            visibility: visible;
+            opacity: 1;
         }
 
         .track-info {
