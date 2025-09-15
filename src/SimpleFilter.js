@@ -64,7 +64,6 @@ export default class SimpleFilter extends FilterSupport {
   }
 
   onEnd() {
-    console.log('[SimpleFilter] onEnd() called - executing callback');
     this.callback();
   }
 
