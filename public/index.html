@@ -160,6 +160,22 @@
             background-color: #A02020;
         }
 
+        /* Disabled state styles */
+        .custom-select-wrapper.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .custom-select-wrapper.disabled .custom-select-display {
+            background-color: #F5F5F5;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .custom-select-wrapper.disabled .custom-select-arrow {
+            color: #999;
+        }
+
         .palo-select-hidden {
             position: absolute;
             top: 0;
