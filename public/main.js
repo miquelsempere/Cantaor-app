@@ -94,7 +94,6 @@ class FlamencoApp {
     // Listen for track changes
     this.audioManager.onTrackChange((track) => {
       this.updateTrackInfo(track);
-      this.updatePlaybackStatus();
     });
 
     // Listen for play state changes
@@ -198,8 +197,8 @@ class FlamencoApp {
     const paloElement = this.trackInfo.querySelector('.track-palo');
     
     if (track) {
-      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
-      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
+      titleElement.textContent = track.title;
+      paloElement.textContent = `${track.palo} (reproducción aleatoria)`;
     } else {
       titleElement.textContent = this.currentPalo ? 
         'Listo para reproducir' : 
@@ -208,33 +207,7 @@ class FlamencoApp {
     }
   }
 
-  updatePlaybackStatus() {
-    if (this.isPlaying) {
-      const status = this.audioManager.getPlaybackStatus();
-      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
-      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
-      
-      // Update status in the track info or create a new status element
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.textContent = statusText;
-      } else {
-        const statusElement = document.createElement('div');
-        statusElement.className = 'playback-status';
-        statusElement.textContent = statusText;
-        statusElement.style.fontSize = '0.8rem';
-        statusElement.style.color = '#718096';
-        statusElement.style.marginTop = '0.5rem';
-        this.trackInfo.appendChild(statusElement);
-      }
-    } else {
-      // Remove status when not playing
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.remove();
-      }
-    }
-  }
+
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
     
@@ -263,9 +236,6 @@ class FlamencoApp {
     } else {
       this.visualizer.classList.remove('playing');
     }
-    
-    // Update playback status
-    this.updatePlaybackStatus();
   }
 
   showStatus(message, type = '') {

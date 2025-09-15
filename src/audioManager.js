@@ -123,7 +123,7 @@ export default class AudioManager {
       throw new Error('No play queue available for cycle preparation');
     }
 
-    console.log(`Preparing cycle ${this.currentCycle} buffer...`);
+    console.log('Preparando buffer de reproducción...');
 
     // Get buffers in playQueue order
     const orderedBuffers = this.playQueue.map(trackIndex => {
@@ -138,7 +138,7 @@ export default class AudioManager {
     // Concatenate all buffers
     this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
     
-    console.log(`Cycle ${this.currentCycle} buffer ready: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
+    console.log(`Buffer listo: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
   }
 
   /**
@@ -147,7 +147,7 @@ export default class AudioManager {
    */
   async loadPalo(palo) {
     try {
-      console.log(`Loading tracks for palo: ${palo}`);
+      console.log(`Cargando pistas para el palo: ${palo}`);
       
       // Fetch tracks from Supabase
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
@@ -159,14 +159,14 @@ export default class AudioManager {
       this.currentPalo = palo;
       
       // Decode all audio buffers
-      console.log('Decoding all audio buffers...');
+      console.log('Decodificando archivos de audio...');
       await this._decodeAllTracks();
       
       // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
       await this._prepareCurrentCycleBuffer();
       
-      console.log(`Loaded ${this.tracks.length} tracks for ${palo}, first cycle ready`);
+      console.log(`Cargadas ${this.tracks.length} pistas para ${palo}`);
       return this.tracks.length;
       
     } catch (error) {
@@ -225,7 +225,7 @@ export default class AudioManager {
     this.playQueue = indices;
     this.totalTracksInCycle = this.tracks.length;
     
-    console.log(`Play queue created for cycle ${this.currentCycle}:`, this.playQueue);
+    console.log('Lista de reproducción creada:', this.playQueue);
   }
 
   /**
@@ -253,7 +253,7 @@ export default class AudioManager {
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
       
-      console.log(`Playback started - Cycle ${this.currentCycle}`);
+      console.log('Reproducción iniciada');
       
     } catch (error) {
       console.error('Error starting playback:', error);
@@ -278,7 +278,7 @@ export default class AudioManager {
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
     
-    console.log(`Playback stopped - Was in cycle ${this.currentCycle}`);
+    console.log('Reproducción detenida');
   }
 
   /**
@@ -289,7 +289,7 @@ export default class AudioManager {
       throw new Error('No cycle buffer available');
     }
     
-    console.log(`Playing cycle ${this.currentCycle} (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
+    console.log(`Reproduciendo (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
     
     // Disconnect any existing PitchShifter to ensure clean transition
     if (this.pitchShifter) {
@@ -326,20 +326,17 @@ export default class AudioManager {
    * Handle cycle end - prepare and start next cycle
    */
   onCycleEnd() {
-    console.log(`Cycle ${this.currentCycle} completed!`);
+    console.log('Reproducción completada, iniciando siguiente ciclo...');
     
     if (!this.isPlaying) {
-      console.log('Playback stopped, not starting next cycle');
+      console.log('Reproducción detenida');
       return;
     }
-    
-    // Increment cycle counter
-    this.currentCycle++;
     
     // Small delay to ensure clean audio transition
     setTimeout(async () => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during transition delay');
+        console.log('Reproducción detenida durante la transición');
         return;
       }
       
@@ -352,7 +349,7 @@ export default class AudioManager {
         await this.playCurrentCycle();
         
       } catch (error) {
-        console.error('Error starting next cycle:', error);
+        console.error('Error iniciando siguiente ciclo:', error);
         this.stop();
       }
     }, 100); // Slightly longer delay for cycle preparation
@@ -371,20 +368,6 @@ export default class AudioManager {
     return this.tracks[firstTrackIndex];
   }
 
-  /**
-   * Get current playback status information
-   * @returns {Object} Status information including cycle and track progress
-   */
-  getPlaybackStatus() {
-    return {
-      isPlaying: this.isPlaying,
-      currentPalo: this.currentPalo,
-      currentCycle: this.currentCycle,
-      totalTracksInCycle: this.totalTracksInCycle,
-      currentTrack: this.getCurrentTrack(),
-      cycleDuration: this.currentCycleAudioBuffer ? this.currentCycleAudioBuffer.duration : 0
-    };
-  }
 
   /**
    * Set playback tempo
@@ -505,9 +488,6 @@ export default class AudioManager {
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     
-    // Reset cycle tracking
-    this.currentCycle = 1;
-    this.totalTracksInCycle = 0;
     this.trackTimings = [];
     
     console.log('AudioManager destroyed');

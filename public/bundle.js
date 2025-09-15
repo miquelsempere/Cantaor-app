@@ -10916,7 +10916,7 @@ class AudioManager {
     if (this.playQueue.length === 0) {
       throw new Error('No play queue available for cycle preparation');
     }
-    console.log(`Preparing cycle ${this.currentCycle} buffer...`);
+    console.log('Preparando buffer de reproducción...');
 
     // Get buffers in playQueue order
     const orderedBuffers = this.playQueue.map(trackIndex => {
@@ -10930,7 +10930,7 @@ class AudioManager {
 
     // Concatenate all buffers
     this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
-    console.log(`Cycle ${this.currentCycle} buffer ready: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
+    console.log(`Buffer listo: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
   }
 
   /**
@@ -10939,7 +10939,7 @@ class AudioManager {
    */
   async loadPalo(palo) {
     try {
-      console.log(`Loading tracks for palo: ${palo}`);
+      console.log(`Cargando pistas para el palo: ${palo}`);
 
       // Fetch tracks from Supabase
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
@@ -10949,13 +10949,13 @@ class AudioManager {
       this.currentPalo = palo;
 
       // Decode all audio buffers
-      console.log('Decoding all audio buffers...');
+      console.log('Decodificando archivos de audio...');
       await this._decodeAllTracks();
 
       // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
       await this._prepareCurrentCycleBuffer();
-      console.log(`Loaded ${this.tracks.length} tracks for ${palo}, first cycle ready`);
+      console.log(`Cargadas ${this.tracks.length} pistas para ${palo}`);
       return this.tracks.length;
     } catch (error) {
       console.error('Error loading palo:', error);
@@ -11009,7 +11009,7 @@ class AudioManager {
     }
     this.playQueue = indices;
     this.totalTracksInCycle = this.tracks.length;
-    console.log(`Play queue created for cycle ${this.currentCycle}:`, this.playQueue);
+    console.log('Lista de reproducción creada:', this.playQueue);
   }
 
   /**
@@ -11033,7 +11033,7 @@ class AudioManager {
       await this.playCurrentCycle();
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
-      console.log(`Playback started - Cycle ${this.currentCycle}`);
+      console.log('Reproducción iniciada');
     } catch (error) {
       console.error('Error starting playback:', error);
       throw error;
@@ -11055,7 +11055,7 @@ class AudioManager {
     }
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
-    console.log(`Playback stopped - Was in cycle ${this.currentCycle}`);
+    console.log('Reproducción detenida');
   }
 
   /**
@@ -11065,7 +11065,7 @@ class AudioManager {
     if (!this.currentCycleAudioBuffer) {
       throw new Error('No cycle buffer available');
     }
-    console.log(`Playing cycle ${this.currentCycle} (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
+    console.log(`Reproduciendo (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
 
     // Disconnect any existing PitchShifter to ensure clean transition
     if (this.pitchShifter) {
@@ -11098,19 +11098,16 @@ class AudioManager {
    * Handle cycle end - prepare and start next cycle
    */
   onCycleEnd() {
-    console.log(`Cycle ${this.currentCycle} completed!`);
+    console.log('Reproducción completada, iniciando siguiente ciclo...');
     if (!this.isPlaying) {
-      console.log('Playback stopped, not starting next cycle');
+      console.log('Reproducción detenida');
       return;
     }
-
-    // Increment cycle counter
-    this.currentCycle++;
 
     // Small delay to ensure clean audio transition
     setTimeout(async () => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during transition delay');
+        console.log('Reproducción detenida durante la transición');
         return;
       }
       try {
@@ -11121,7 +11118,7 @@ class AudioManager {
         // Start next cycle
         await this.playCurrentCycle();
       } catch (error) {
-        console.error('Error starting next cycle:', error);
+        console.error('Error iniciando siguiente ciclo:', error);
         this.stop();
       }
     }, 100); // Slightly longer delay for cycle preparation
@@ -11137,21 +11134,6 @@ class AudioManager {
     }
     const firstTrackIndex = this.playQueue[0];
     return this.tracks[firstTrackIndex];
-  }
-
-  /**
-   * Get current playback status information
-   * @returns {Object} Status information including cycle and track progress
-   */
-  getPlaybackStatus() {
-    return {
-      isPlaying: this.isPlaying,
-      currentPalo: this.currentPalo,
-      currentCycle: this.currentCycle,
-      totalTracksInCycle: this.totalTracksInCycle,
-      currentTrack: this.getCurrentTrack(),
-      cycleDuration: this.currentCycleAudioBuffer ? this.currentCycleAudioBuffer.duration : 0
-    };
   }
 
   /**
@@ -11270,10 +11252,6 @@ class AudioManager {
     this.currentCycleAudioBuffer = null;
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-
-    // Reset cycle tracking
-    this.currentCycle = 1;
-    this.totalTracksInCycle = 0;
     this.trackTimings = [];
     console.log('AudioManager destroyed');
   }
@@ -11365,7 +11343,6 @@ class FlamencoApp {
     // Listen for track changes
     this.audioManager.onTrackChange(track => {
       this.updateTrackInfo(track);
-      this.updatePlaybackStatus();
     });
 
     // Listen for play state changes
@@ -11456,38 +11433,11 @@ class FlamencoApp {
     const titleElement = this.trackInfo.querySelector('.track-title');
     const paloElement = this.trackInfo.querySelector('.track-palo');
     if (track) {
-      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
-      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
+      titleElement.textContent = track.title;
+      paloElement.textContent = `${track.palo} (reproducción aleatoria)`;
     } else {
       titleElement.textContent = this.currentPalo ? 'Listo para reproducir' : 'Selecciona un palo para comenzar';
       paloElement.textContent = this.currentPalo || '';
-    }
-  }
-  updatePlaybackStatus() {
-    if (this.isPlaying) {
-      const status = this.audioManager.getPlaybackStatus();
-      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
-      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
-
-      // Update status in the track info or create a new status element
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.textContent = statusText;
-      } else {
-        const statusElement = document.createElement('div');
-        statusElement.className = 'playback-status';
-        statusElement.textContent = statusText;
-        statusElement.style.fontSize = '0.8rem';
-        statusElement.style.color = '#718096';
-        statusElement.style.marginTop = '0.5rem';
-        this.trackInfo.appendChild(statusElement);
-      }
-    } else {
-      // Remove status when not playing
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.remove();
-      }
     }
   }
   updatePlayState(isPlaying) {
@@ -11515,9 +11465,6 @@ class FlamencoApp {
     } else {
       this.visualizer.classList.remove('playing');
     }
-
-    // Update playback status
-    this.updatePlaybackStatus();
   }
   showStatus(message, type = '') {
     this.statusMessage.textContent = message;
