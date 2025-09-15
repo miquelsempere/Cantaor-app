@@ -10715,8 +10715,13 @@ if (shouldShowDeprecationWarning()) {
 
 
 // These environment variables should be set in your .env file
-const supabaseUrl = "https://bkfzecsjpcvntyvldiii.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZnplY3NqcGN2bnR5dmxkaWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTc0NDAsImV4cCI6MjA3MzA3MzQ0MH0.z7aJ6pbS-2p_psa69iA-71VuVsYwF0y8gP3EYob5Ci0";
+const supabaseUrl = "https://your-project-id.supabase.co";
+const supabaseAnonKey = "your-anon-key-here";
+{
+  console.error('Supabase not configured. Please set up your Supabase project and update the .env file with your actual values.');
+  console.error('Visit https://supabase.com to create a project and get your URL and API key.');
+  throw new Error('Supabase configuration required. Please check your .env file and set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values.');
+}
 
 // Create and export the Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -11424,6 +11429,13 @@ class FlamencoApp {
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
+    console.log('DEBUG: updatePlayState - isPlaying:', isPlaying);
+    console.log('DEBUG: updatePlayState - paloSelect antes de deshabilitar:', this.paloSelect.disabled);
+
+    // Disable/enable palo selector during playback
+    this.paloSelect.disabled = isPlaying;
+    console.log('DEBUG: updatePlayState - paloSelect después de deshabilitar:', this.paloSelect.disabled);
+    console.log('DEBUG: updatePlayState - Elemento paloSelect:', this.paloSelect);
     console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
     console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
 
