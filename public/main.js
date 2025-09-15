@@ -197,7 +197,6 @@ class FlamencoApp {
   }
 
   updatePlayState(isPlaying) {
-    console.log('FlamencoApp.updatePlayState() called with:', isPlaying, 'App isPlaying state:', this.isPlaying);
     this.isPlaying = isPlaying;
     
     // Update play button
