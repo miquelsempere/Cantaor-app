@@ -4,7 +4,7 @@
  */
 
 // This is pulling SoundTouchJS from the local file system. See the README for proper usage.
-import { PitchShifter } from './soundtouch.js';
+import { PitchShifter } from '/soundtouch.js';
 
 const playBtn = document.getElementById('play');
 const stopBtn = document.getElementById('stop');
