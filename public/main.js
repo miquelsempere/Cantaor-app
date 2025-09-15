@@ -100,7 +100,7 @@ class FlamencoApp {
       const palos = await this.audioManager.getAvailablePalos();
       
       // Clear existing options
-      this.paloSelect.innerHTML = '<option value="">Selecciona un palo</option>';
+      this.paloSelect.innerHTML = '';
       
       // Add palo options
       palos.forEach(palo => {
@@ -109,6 +109,12 @@ class FlamencoApp {
         option.textContent = palo;
         this.paloSelect.appendChild(option);
       });
+      
+      // Set Tangos as default if available
+      if (palos.includes('Tangos')) {
+        this.paloSelect.value = 'Tangos';
+        await this.handlePaloChange('Tangos');
+      }
       
       console.log(`Loaded ${palos.length} palos:`, palos);
       
