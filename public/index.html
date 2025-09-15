@@ -118,17 +118,29 @@
             border-style: solid;
             border-width: 10px 0 10px 16px;
             border-color: transparent transparent transparent white;
+            visibility: visible;
         }
 
         .play-button.is-playing::before {
-            border-width: 0;
-            border-style: none;
+            visibility: hidden;
+        }
+
+        .play-button::after {
+            content: '';
+            display: inline-block;
+            position: absolute;
+            top: 50%;
+            left: calc(50% - 9px);
+            margin-top: -10px;
             width: 5px;
             height: 20px;
             background: white;
             box-shadow: 8px 0 0 white;
-            left: calc(50% - 9px);
-            margin-top: -10px;
+            visibility: hidden;
+        }
+
+        .play-button.is-playing::after {
+            visibility: visible;
         }
 
         .track-info {
