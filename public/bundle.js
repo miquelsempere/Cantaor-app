@@ -11195,7 +11195,6 @@ class AudioManager {
    * @param {number} volume - Volume level (0.0 to 1.0)
    */
   setVolume(volume) {
-    this.currentVolume = volume;
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
       console.log(`Volume set to: ${volume}`);
@@ -11317,8 +11316,6 @@ class FlamencoApp {
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
-    this.volumeSlider = document.getElementById('volumeSlider');
-    this.volumeValue = document.getElementById('volumeValue');
     this.init();
   }
   async init() {
@@ -11362,13 +11359,6 @@ class FlamencoApp {
       const semitones = parseInt(e.target.value);
       this.audioManager.setPitchSemitones(semitones);
       this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
-    });
-
-    // Volume control
-    this.volumeSlider.addEventListener('input', e => {
-      const volume = parseFloat(e.target.value);
-      this.audioManager.setVolume(volume);
-      this.volumeValue.textContent = `${Math.round(volume * 100)}%`;
     });
   }
   setupAudioManagerListeners() {
