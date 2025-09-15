@@ -14,6 +14,7 @@ export default class AudioManager {
     
     // Playback state
     this.isPlaying = false;
+    this.isTransitioning = false;
     this.currentPalo = null;
     this.currentTrackIndex = 0;
     
@@ -187,6 +188,9 @@ export default class AudioManager {
       return;
     }
     
+    // Reset transition flag when stopping
+    this.isTransitioning = false;
+    
     // Disconnect PitchShifter to stop audio
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
@@ -247,33 +251,48 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    console.log('Track ended, moving to next');
-    
-    if (!this.isPlaying) {
+    // Immediate cleanup - if no pitchShifter exists, this call is redundant
+    if (!this.pitchShifter) {
       return;
     }
     
-    // Add a small delay to ensure clean transition
-    setTimeout(() => {
-      if (!this.isPlaying) {
-        return; // Check again in case playback was stopped during the delay
-      }
-      
-      // Move to next track in queue
-      this.currentTrackIndex++;
-      
-      // If we've played all tracks, restart the cycle with a new shuffle
-      if (this.currentTrackIndex >= this.playQueue.length) {
-        console.log('All tracks played, reshuffling queue');
-        this.createPlayQueue();
-      }
-      
-      // Play next track immediately for seamless playback
-      this.playCurrentTrack().catch(error => {
+    // Immediately disconnect and nullify the current pitchShifter to prevent further events
+    this.pitchShifter.disconnect();
+    this.pitchShifter = null;
+    
+    // Prevent multiple simultaneous transitions
+    if (this.isTransitioning) {
+      return;
+    }
+    
+    console.log('Track ended, moving to next');
+    
+    if (!this.isPlaying) {
+      this.isTransitioning = false;
+      return;
+    }
+    
+    this.isTransitioning = true;
+    
+    // Move to next track in queue
+    this.currentTrackIndex++;
+    
+    // If we've played all tracks, restart the cycle with a new shuffle
+    if (this.currentTrackIndex >= this.playQueue.length) {
+      console.log('All tracks played, reshuffling queue');
+      this.createPlayQueue();
+    }
+    
+    // Play next track immediately for seamless playback
+    this.playCurrentTrack()
+      .then(() => {
+        this.isTransitioning = false;
+      })
+      .catch(error => {
         console.error('Error playing next track:', error);
+        this.isTransitioning = false;
         this.stop();
       });
-    }, 100); // 100ms delay to ensure clean transition
   }
 
   /**

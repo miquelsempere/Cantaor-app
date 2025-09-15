@@ -1030,18 +1030,38 @@ class WebAudioBufferSource {
 const getWebAudioNode = function (context, filter, sourcePositionCallback = noop$2, bufferSize = 4096) {
   const node = context.createScriptProcessor(bufferSize, 2, 2);
   const samples = new Float32Array(bufferSize * 2);
+  let hasEnded = false;
   node.onaudioprocess = event => {
+    // If the track has already ended, fill with silence and return
+    if (hasEnded) {
+      let left = event.outputBuffer.getChannelData(0);
+      let right = event.outputBuffer.getChannelData(1);
+      left.fill(0);
+      right.fill(0);
+      return;
+    }
     let left = event.outputBuffer.getChannelData(0);
     let right = event.outputBuffer.getChannelData(1);
     let framesExtracted = filter.extract(samples, bufferSize);
     sourcePositionCallback(filter.sourcePosition);
     if (framesExtracted === 0) {
-      filter.onEnd();
+      if (!hasEnded) {
+        hasEnded = true;
+        filter.onEnd();
+        // Disconnect the node to stop further processing
+        node.disconnect();
+      }
     }
     let i = 0;
     for (; i < framesExtracted; i++) {
       left[i] = samples[i * 2];
       right[i] = samples[i * 2 + 1];
+    }
+
+    // Fill remaining buffer with silence if we extracted fewer frames than buffer size
+    for (; i < bufferSize; i++) {
+      left[i] = 0;
+      right[i] = 0;
     }
   };
   return node;
@@ -10787,6 +10807,7 @@ class AudioManager {
 
     // Playback state
     this.isPlaying = false;
+    this.isTransitioning = false;
     this.currentPalo = null;
     this.currentTrackIndex = 0;
 
@@ -10945,6 +10966,9 @@ class AudioManager {
       return;
     }
 
+    // Reset transition flag when stopping
+    this.isTransitioning = false;
+
     // Disconnect PitchShifter to stop audio
     if (this.pitchShifter) {
       this.pitchShifter.disconnect();
@@ -10962,6 +10986,12 @@ class AudioManager {
     const currentQueueIndex = this.playQueue[this.currentTrackIndex];
     const currentTrack = this.tracks[currentQueueIndex];
     console.log(`Playing track: ${currentTrack.title}`);
+
+    // Disconnect any existing PitchShifter to ensure clean transition
+    if (this.pitchShifter) {
+      this.pitchShifter.disconnect();
+      this.pitchShifter = null;
+    }
 
     // Use preloaded buffer or load on demand
     let audioBuffer = this.nextTrackBuffer;
@@ -10991,25 +11021,42 @@ class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    console.log('Track ended, moving to next');
-    if (!this.isPlaying) {
+    // Prevent multiple simultaneous transitions
+    if (this.isTransitioning) {
       return;
     }
-
-    // Move to next track in queue
-    this.currentTrackIndex++;
-
-    // If we've played all tracks, restart the cycle with a new shuffle
-    if (this.currentTrackIndex >= this.playQueue.length) {
-      console.log('All tracks played, reshuffling queue');
-      this.createPlayQueue();
+    console.log('Track ended, moving to next');
+    if (!this.isPlaying) {
+      this.isTransitioning = false;
+      return;
     }
+    this.isTransitioning = true;
 
-    // Play next track immediately for seamless playback
-    this.playCurrentTrack().catch(error => {
-      console.error('Error playing next track:', error);
-      this.stop();
-    });
+    // Add a small delay to ensure clean transition
+    setTimeout(() => {
+      if (!this.isPlaying) {
+        this.isTransitioning = false;
+        return; // Check again in case playback was stopped during the delay
+      }
+
+      // Move to next track in queue
+      this.currentTrackIndex++;
+
+      // If we've played all tracks, restart the cycle with a new shuffle
+      if (this.currentTrackIndex >= this.playQueue.length) {
+        console.log('All tracks played, reshuffling queue');
+        this.createPlayQueue();
+      }
+
+      // Play next track immediately for seamless playback
+      this.playCurrentTrack().then(() => {
+        this.isTransitioning = false;
+      }).catch(error => {
+        console.error('Error playing next track:', error);
+        this.isTransitioning = false;
+        this.stop();
+      });
+    }, 100); // 100ms delay to ensure clean transition
   }
 
   /**
