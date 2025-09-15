@@ -10715,8 +10715,13 @@ if (shouldShowDeprecationWarning()) {
 
 
 // These environment variables should be set in your .env file
-const supabaseUrl = "your_supabase_project_url_here";
-const supabaseAnonKey = "your_supabase_anon_key_here";
+const supabaseUrl = "https://your-project-id.supabase.co";
+const supabaseAnonKey = "your-anon-key-here";
+{
+  console.error('Supabase not configured. Please set up your Supabase project and update the .env file with your actual values.');
+  console.error('Visit https://supabase.com to create a project and get your URL and API key.');
+  throw new Error('Supabase configuration required. Please check your .env file and set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values.');
+}
 
 // Create and export the Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
