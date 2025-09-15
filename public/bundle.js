@@ -11424,6 +11424,12 @@ class FlamencoApp {
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
+
+    // Deshabilitar el menú desplegable durante la reproducción
+    this.paloSelect.disabled = isPlaying;
+
+    // Deshabilitar el menú desplegable durante la reproducción
+    this.paloSelect.disabled = isPlaying;
     console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
     console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
 
