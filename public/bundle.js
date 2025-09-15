@@ -10715,8 +10715,8 @@ if (shouldShowDeprecationWarning()) {
 
 
 // These environment variables should be set in your .env file
-const supabaseUrl = "https://your-project-id.supabase.co";
-const supabaseAnonKey = "your-anon-key-here";
+const supabaseUrl = "https://bkfzecsjpcvntyvldiii.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZnplY3NqcGN2bnR5dmxkaWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTc0NDAsImV4cCI6MjA3MzA3MzQ0MH0.z7aJ6pbS-2p_psa69iA-71VuVsYwF0y8gP3EYob5Ci0";
 
 // Create and export the Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
