@@ -31,6 +31,9 @@ export default class AudioManager {
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     
+    // Volume management
+    this.currentVolume = 0.8; // Default volume
+    
     this.initializeAudioContext();
   }
 
@@ -251,28 +254,11 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
-    // Immediate cleanup - if no pitchShifter exists, this call is redundant
-    if (!this.pitchShifter) {
-      return;
-    }
-    
-    // Immediately disconnect and nullify the current pitchShifter to prevent further events
-    this.pitchShifter.disconnect();
-    this.pitchShifter = null;
-    
-    // Prevent multiple simultaneous transitions
-    if (this.isTransitioning) {
-      return;
-    }
-    
     console.log('Track ended, moving to next');
     
     if (!this.isPlaying) {
-      this.isTransitioning = false;
       return;
     }
-    
-    this.isTransitioning = true;
     
     // Move to next track in queue
     this.currentTrackIndex++;
@@ -283,16 +269,13 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // Play next track immediately for seamless playback
-    this.playCurrentTrack()
-      .then(() => {
-        this.isTransitioning = false;
-      })
-      .catch(error => {
+    // Play next track immediately
+    if (this.isPlaying) {
+      this.playCurrentTrack().catch(error => {
         console.error('Error playing next track:', error);
-        this.isTransitioning = false;
         this.stop();
       });
+    }
   }
 
   /**
@@ -348,6 +331,7 @@ export default class AudioManager {
   setVolume(volume) {
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+      this.currentVolume = volume;
       console.log(`Volume set to: ${volume}`);
     }
   }
