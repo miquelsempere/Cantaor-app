@@ -9631,7 +9631,7 @@ class AudioManager {
 
     // Caching
     this.audioBuffers = new Map(); // track.id -> AudioBuffer
-    this.currentSource = null;
+    this.activeSources = new Set();
 
     // Controles de audio
     this.globalTempo = 1.0;
@@ -9646,17 +9646,31 @@ class AudioManager {
   /* --------------- Inicialización --------------- */
   async initializeAudioContext() {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
-      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
-      console.log('Audio context inicializado');
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this.audioContext) {
+          throw new Error('Failed to create AudioContext - returned null');
+        }
+        this.gainNode = this.audioContext.createGain();
+        this.gainNode.connect(this.audioContext.destination);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+        console.log('Audio context inicializado');
+      } catch (error) {
+        console.error('Error initializing AudioContext:', error);
+        this.audioContext = null;
+        this.gainNode = null;
+        throw error;
+      }
     }
   }
 
   /* --------------- Carga de pistas --------------- */
   async loadPalo(palo) {
     try {
+      await this.initializeAudioContext();
+      if (!this.audioContext) {
+        throw new Error('Failed to initialize AudioContext');
+      }
       console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
       if (!this.tracks || this.tracks.length === 0) {
@@ -9690,23 +9704,45 @@ class AudioManager {
     if (trackIndex == null || trackIndex < 0 || trackIndex >= this.tracks.length) return;
     const track = this.tracks[trackIndex];
     if (!track || this.audioBuffers.has(track.id)) return;
+    if (!this.audioContext) {
+      throw new Error('AudioContext not initialized. Cannot decode audio data.');
+    }
     try {
       console.log('Preloading:', track.title || track.id);
+      console.log('Fetching audio from URL:', track.audio_url);
       const response = await fetch(track.audio_url);
-      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      if (!response.ok) {
+        const errorMsg = `Failed to fetch audio file: ${response.status} ${response.statusText} for URL: ${track.audio_url}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      console.log('Successfully fetched audio file, converting to ArrayBuffer...');
       const arrayBuffer = await response.arrayBuffer();
+      console.log('ArrayBuffer created, size:', arrayBuffer.byteLength, 'bytes');
+
+      // Check again after async operations in case audioContext was destroyed
+      if (!this.audioContext) {
+        throw new Error('AudioContext became null during preload operation');
+      }
+      console.log('About to decode audio data. AudioContext:', this.audioContext);
+      console.log('AudioContext state:', this.audioContext ? this.audioContext.state : 'null');
+      console.log('Decoding audio data...');
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      console.log('Audio decoded successfully. Duration:', audioBuffer.duration, 'seconds');
       this.audioBuffers.set(track.id, audioBuffer);
       console.log('Preloaded:', track.title || track.id);
       return audioBuffer;
     } catch (err) {
-      console.warn('Error preloading track', track.title, err);
+      console.error('Error preloading track:', track.title || track.id);
+      console.error('Error details:', err.message);
+      console.error('Full error:', err);
       throw err;
     }
   }
 
   /* --------------- Reproducción --------------- */
   async play() {
+    console.log('AudioManager.play() called');
     if (!this.currentPalo || !this.tracks.length) {
       throw new Error('No palo loaded. Call loadPalo() first.');
     }
@@ -9719,10 +9755,12 @@ class AudioManager {
       await this.audioContext.resume();
     }
     this.isPlaying = true;
+    console.log('AudioManager.play() - isPlaying set to true');
     this.notifyPlayStateChange(true);
     this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
   }
   scheduleTrack(trackIndex, startTime) {
+    console.log('AudioManager.scheduleTrack() called for track:', this.tracks[this.playQueue[trackIndex]].title, 'at time:', startTime);
     if (!this.isPlaying) return;
     const trackId = this.playQueue[trackIndex];
     const track = this.tracks[trackId];
@@ -9736,7 +9774,10 @@ class AudioManager {
     source.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
     source.connect(this.gainNode);
     source.start(startTime);
-    this.currentSource = source;
+    this.activeSources.add(source);
+    source.onended = () => {
+      this.activeSources.delete(source);
+    };
     this.notifyTrackChange(track);
 
     // programamos la siguiente pista
@@ -9744,7 +9785,9 @@ class AudioManager {
     const adjustedDuration = buffer.duration / this.globalTempo;
     const nextStart = startTime + adjustedDuration;
     this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - checking isPlaying:', this.isPlaying);
       if (this.isPlaying) {
+        console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - isPlaying is true, scheduling next track');
         this.scheduleTrack(nextIndex, nextStart);
       }
     }).catch(err => {
@@ -9753,19 +9796,27 @@ class AudioManager {
 
     // avanzamos el índice
     this.currentTrackIndex = nextIndex;
+    console.log('AudioManager.scheduleTrack() - currentTrackIndex updated to:', this.currentTrackIndex);
   }
   stop() {
+    console.log('AudioManager.stop() called');
     if (!this.isPlaying) return;
     this.isPlaying = false;
-    if (this.currentSource) {
+    console.log('AudioManager.stop() - isPlaying set to false');
+
+    // Detener todas las fuentes de audio activas
+    this.activeSources.forEach(source => {
       try {
-        this.currentSource.stop();
-        this.currentSource.disconnect();
+        console.log('AudioManager.stop() - stopping source:', source);
+        source.stop();
+        source.disconnect();
       } catch (e) {
-        // Source might already be stopped
+        // La fuente podría ya estar detenida o desconectada
+        console.warn('Error al detener la fuente:', e);
       }
-      this.currentSource = null;
-    }
+    });
+    this.activeSources.clear(); // Limpiar el conjunto después de detener todas las fuentes
+    console.log('AudioManager.stop() - activeSources cleared');
     this.notifyPlayStateChange(false);
     console.log('Playback stopped');
   }
@@ -9787,13 +9838,17 @@ class AudioManager {
   /* --------------- Controles de audio --------------- */
   setTempo(tempo) {
     this.globalTempo = tempo;
-    if (this.currentSource && this.currentSource.playbackRate) {
-      try {
-        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
-      } catch (e) {
-        // Source might be stopped
+    // Aplicar el tempo a todas las fuentes activas
+    this.activeSources.forEach(source => {
+      if (source.playbackRate) {
+        try {
+          source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+        } catch (e) {
+          // La fuente podría estar detenida
+          console.warn('Error al cambiar el tempo:', e);
+        }
       }
-    }
+    });
     console.log('Tempo set to', tempo);
   }
   setPitchSemitones(semitones) {
@@ -9864,6 +9919,7 @@ class AudioManager {
       this.gainNode = null;
     }
     this.audioBuffers.clear();
+    this.activeSources.clear();
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     console.log('AudioManager destroyed');
@@ -10046,6 +10102,7 @@ class FlamencoApp {
     }
   }
   updatePlayState(isPlaying) {
+    console.log('FlamencoApp.updatePlayState() called with:', isPlaying, 'App isPlaying state:', this.isPlaying);
     this.isPlaying = isPlaying;
 
     // Update play button

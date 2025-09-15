@@ -22,7 +22,7 @@ export default class AudioManager {
 
     // Caching
     this.audioBuffers = new Map();  // track.id -> AudioBuffer
-    this.currentSource = null;
+    this.activeSources = new Set();
 
     // Controles de audio
     this.globalTempo = 1.0;
@@ -143,6 +143,7 @@ export default class AudioManager {
 
   /* --------------- Reproducción --------------- */
   async play() {
+    console.log('AudioManager.play() called');
     if (!this.currentPalo || !this.tracks.length) {
       throw new Error('No palo loaded. Call loadPalo() first.');
     }
@@ -158,11 +159,13 @@ export default class AudioManager {
     }
 
     this.isPlaying = true;
+    console.log('AudioManager.play() - isPlaying set to true');
     this.notifyPlayStateChange(true);
     this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
   }
 
   scheduleTrack(trackIndex, startTime) {
+    console.log('AudioManager.scheduleTrack() called for track:', this.tracks[this.playQueue[trackIndex]].title, 'at time:', startTime);
     if (!this.isPlaying) return;
 
     const trackId = this.playQueue[trackIndex];
@@ -180,7 +183,10 @@ export default class AudioManager {
     source.connect(this.gainNode);
     source.start(startTime);
 
-    this.currentSource = source;
+    this.activeSources.add(source);
+    source.onended = () => {
+      this.activeSources.delete(source);
+    };
     this.notifyTrackChange(track);
 
     // programamos la siguiente pista
@@ -189,7 +195,9 @@ export default class AudioManager {
     const nextStart = startTime + adjustedDuration;
 
     this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - checking isPlaying:', this.isPlaying);
       if (this.isPlaying) {
+        console.log('preloadTrack.then() callback for track:', this.tracks[this.playQueue[nextIndex]].title, ' - isPlaying is true, scheduling next track');
         this.scheduleTrack(nextIndex, nextStart);
       }
     }).catch(err => {
@@ -198,22 +206,29 @@ export default class AudioManager {
 
     // avanzamos el índice
     this.currentTrackIndex = nextIndex;
+    console.log('AudioManager.scheduleTrack() - currentTrackIndex updated to:', this.currentTrackIndex);
   }
 
   stop() {
+    console.log('AudioManager.stop() called');
     if (!this.isPlaying) return;
     
     this.isPlaying = false;
+    console.log('AudioManager.stop() - isPlaying set to false');
     
-    if (this.currentSource) {
+    // Detener todas las fuentes de audio activas
+    this.activeSources.forEach(source => {
       try {
-        this.currentSource.stop();
-        this.currentSource.disconnect();
+        console.log('AudioManager.stop() - stopping source:', source);
+        source.stop();
+        source.disconnect();
       } catch (e) {
-        // Source might already be stopped
+        // La fuente podría ya estar detenida o desconectada
+        console.warn('Error al detener la fuente:', e);
       }
-      this.currentSource = null;
-    }
+    });
+    this.activeSources.clear(); // Limpiar el conjunto después de detener todas las fuentes
+    console.log('AudioManager.stop() - activeSources cleared');
 
     this.notifyPlayStateChange(false);
     console.log('Playback stopped');
@@ -238,13 +253,17 @@ export default class AudioManager {
   /* --------------- Controles de audio --------------- */
   setTempo(tempo) {
     this.globalTempo = tempo;
-    if (this.currentSource && this.currentSource.playbackRate) {
-      try {
-        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
-      } catch (e) {
-        // Source might be stopped
+    // Aplicar el tempo a todas las fuentes activas
+    this.activeSources.forEach(source => {
+      if (source.playbackRate) {
+        try {
+          source.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+        } catch (e) {
+          // La fuente podría estar detenida
+          console.warn('Error al cambiar el tempo:', e);
+        }
       }
-    }
+    });
     console.log('Tempo set to', tempo);
   }
 
@@ -313,6 +332,7 @@ export default class AudioManager {
       this.gainNode = null;
     }
     this.audioBuffers.clear();
+    this.activeSources.clear();
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
     console.log('AudioManager destroyed');
