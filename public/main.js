@@ -21,6 +21,8 @@ class FlamencoApp {
                 </div>
             `;
     
+    console.log('PLAY_BUTTON_SVG_CONTENT:', this.PLAY_BUTTON_SVG_CONTENT);
+    
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
@@ -245,8 +247,13 @@ class FlamencoApp {
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
     
+    console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
+    console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
+    
     // Asegurar que el contenido SVG esté siempre presente
     this.playButton.innerHTML = this.PLAY_BUTTON_SVG_CONTENT;
+    
+    console.log('updatePlayState: Después de asignar innerHTML. Contenido actual:', this.playButton.innerHTML);
     
     // Update play button state - simply toggle the is-playing class
     if (isPlaying) {
@@ -256,6 +263,8 @@ class FlamencoApp {
       this.playButton.classList.remove('is-playing');
       console.log('Play button: switched to play icon');
     }
+    
+    console.log('updatePlayState: Clases del botón después de toggle:', this.playButton.classList.value);
     
     // Update visualizer
     if (isPlaying) {
