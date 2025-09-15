@@ -30,7 +30,6 @@ class FlamencoApp {
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
     this.playButton = document.getElementById('playButton');
-    this.trackInfo = document.getElementById('trackInfo');
     this.visualizer = document.getElementById('visualizer');
     this.statusMessage = document.getElementById('statusMessage');
     
@@ -193,18 +192,7 @@ class FlamencoApp {
   }
 
   updateTrackInfo(track) {
-    const titleElement = this.trackInfo.querySelector('.track-title');
-    const paloElement = this.trackInfo.querySelector('.track-palo');
-    
-    if (track) {
-      titleElement.textContent = track.title;
-      paloElement.textContent = `${track.palo} (reproducción aleatoria)`;
-    } else {
-      titleElement.textContent = this.currentPalo ? 
-        'Listo para reproducir' : 
-        'Selecciona un palo para comenzar';
-      paloElement.textContent = this.currentPalo || '';
-    }
+    // No mostrar información de pista
   }
 
 
