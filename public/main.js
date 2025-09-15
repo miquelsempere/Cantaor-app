@@ -165,13 +165,17 @@ class FlamencoApp {
       return;
     }
 
+    console.log('Play button clicked, current state:', this.isPlaying);
+
     try {
       if (this.isPlaying) {
         // Stop playback
+        console.log('Stopping playback...');
         this.audioManager.stop();
         this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
+        console.log('Starting playback...');
         this.showStatus('Iniciando reproducción...', 'loading');
         await this.audioManager.play();
         this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
@@ -227,11 +231,13 @@ class FlamencoApp {
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
     
-    // Update play button - toggle is-playing class
+    // Update play button state - simply toggle the is-playing class
     if (isPlaying) {
       this.playButton.classList.add('is-playing');
+      console.log('Play button: switched to pause icon');
     } else {
       this.playButton.classList.remove('is-playing');
+      console.log('Play button: switched to play icon');
     }
     
     // Update visualizer

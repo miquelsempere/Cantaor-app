@@ -120,27 +120,29 @@
         .pause-icon svg {
             width: 100%;
             height: 100%;
-            fill: white;
+            fill: currentColor;
         }
 
-        .play-icon {
-            display: block;
-            display: block !important;
+        /* Default state: show play icon, hide pause icon */
+        .play-button .play-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .pause-icon {
+        .play-button .pause-icon {
             display: none;
-            display: none !important;
         }
 
+        /* Playing state: hide play icon, show pause icon */
         .play-button.is-playing .play-icon {
             display: none;
-            display: none !important;
         }
 
         .play-button.is-playing .pause-icon {
-            display: block;
-            display: block !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .track-info {
@@ -308,16 +310,16 @@
 
         <div class="player-section">
             <button id="playButton" class="play-button" disabled>
-                <span class="play-icon">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
+                <div class="play-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M8 5v14l11-7z" fill="currentColor"/>
                     </svg>
-                </span>
-                <span class="pause-icon">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </div>
+                <div class="pause-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
                     </svg>
-                </span>
+                </div>
             </button>
             
             <div class="track-info" id="trackInfo">
