@@ -29,6 +29,12 @@ class FlamencoApp {
     
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
+    console.log('Constructor — paloSelect (referencia):', this.paloSelect);
+if (!this.paloSelect) {
+  console.warn('No se encontró #paloSelect — intento fallback con querySelector.');
+  this.paloSelect = document.querySelector('select') || null;
+  console.log('Constructor — paloSelect (fallback):', this.paloSelect);
+}
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
     
