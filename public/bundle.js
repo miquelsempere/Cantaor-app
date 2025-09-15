@@ -1,1196 +1,3 @@
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class FifoSampleBuffer {
-  constructor() {
-    this._vector = new Float32Array();
-    this._position = 0;
-    this._frameCount = 0;
-  }
-  get vector() {
-    return this._vector;
-  }
-  get position() {
-    return this._position;
-  }
-  get startIndex() {
-    return this._position * 2;
-  }
-  get frameCount() {
-    return this._frameCount;
-  }
-  get endIndex() {
-    return (this._position + this._frameCount) * 2;
-  }
-  clear() {
-    this.receive(this._frameCount);
-    this.rewind();
-  }
-  put(numFrames) {
-    this._frameCount += numFrames;
-  }
-  putSamples(samples, position, numFrames = 0) {
-    position = position || 0;
-    const sourceOffset = position * 2;
-    if (!(numFrames >= 0)) {
-      numFrames = (samples.length - sourceOffset) / 2;
-    }
-    const numSamples = numFrames * 2;
-    this.ensureCapacity(numFrames + this._frameCount);
-    const destOffset = this.endIndex;
-    this.vector.set(samples.subarray(sourceOffset, sourceOffset + numSamples), destOffset);
-    this._frameCount += numFrames;
-  }
-  putBuffer(buffer, position, numFrames = 0) {
-    position = position || 0;
-    if (!(numFrames >= 0)) {
-      numFrames = buffer.frameCount - position;
-    }
-    this.putSamples(buffer.vector, buffer.position + position, numFrames);
-  }
-  receive(numFrames) {
-    if (!(numFrames >= 0) || numFrames > this._frameCount) {
-      numFrames = this.frameCount;
-    }
-    this._frameCount -= numFrames;
-    this._position += numFrames;
-  }
-  receiveSamples(output, numFrames = 0) {
-    const numSamples = numFrames * 2;
-    const sourceOffset = this.startIndex;
-    output.set(this._vector.subarray(sourceOffset, sourceOffset + numSamples));
-    this.receive(numFrames);
-  }
-  extract(output, position = 0, numFrames = 0) {
-    const sourceOffset = this.startIndex + position * 2;
-    const numSamples = numFrames * 2;
-    output.set(this._vector.subarray(sourceOffset, sourceOffset + numSamples));
-  }
-  ensureCapacity(numFrames = 0) {
-    const minLength = parseInt(numFrames * 2);
-    if (this._vector.length < minLength) {
-      const newVector = new Float32Array(minLength);
-      newVector.set(this._vector.subarray(this.startIndex, this.endIndex));
-      this._vector = newVector;
-      this._position = 0;
-    } else {
-      this.rewind();
-    }
-  }
-  ensureAdditionalCapacity(numFrames = 0) {
-    this.ensureCapacity(this._frameCount + numFrames);
-  }
-  rewind() {
-    if (this._position > 0) {
-      this._vector.set(this._vector.subarray(this.startIndex, this.endIndex));
-      this._position = 0;
-    }
-  }
-}
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class AbstractFifoSamplePipe {
-  constructor(createBuffers) {
-    if (createBuffers) {
-      this._inputBuffer = new FifoSampleBuffer();
-      this._outputBuffer = new FifoSampleBuffer();
-    } else {
-      this._inputBuffer = this._outputBuffer = null;
-    }
-  }
-  get inputBuffer() {
-    return this._inputBuffer;
-  }
-  set inputBuffer(inputBuffer) {
-    this._inputBuffer = inputBuffer;
-  }
-  get outputBuffer() {
-    return this._outputBuffer;
-  }
-  set outputBuffer(outputBuffer) {
-    this._outputBuffer = outputBuffer;
-  }
-  clear() {
-    this._inputBuffer.clear();
-    this._outputBuffer.clear();
-  }
-}
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class RateTransposer extends AbstractFifoSamplePipe {
-  constructor(createBuffers) {
-    super(createBuffers);
-    this.reset();
-    this._rate = 1;
-  }
-  set rate(rate) {
-    this._rate = rate;
-    // TODO: aa filter
-  }
-  reset() {
-    this.slopeCount = 0;
-    this.prevSampleL = 0;
-    this.prevSampleR = 0;
-  }
-  clone() {
-    const result = new RateTransposer();
-    result.rate = this._rate;
-    return result;
-  }
-  process() {
-    // TODO: aa filter
-    const numFrames = this._inputBuffer.frameCount;
-    this._outputBuffer.ensureAdditionalCapacity(numFrames / this._rate + 1);
-    const numFramesOutput = this.transpose(numFrames);
-    this._inputBuffer.receive();
-    this._outputBuffer.put(numFramesOutput);
-  }
-  transpose(numFrames = 0) {
-    if (numFrames === 0) {
-      return 0;
-    }
-    const src = this._inputBuffer.vector;
-    const srcOffset = this._inputBuffer.startIndex;
-    const dest = this._outputBuffer.vector;
-    const destOffset = this._outputBuffer.endIndex;
-    let used = 0;
-    let i = 0;
-    while (this.slopeCount < 1.0) {
-      dest[destOffset + 2 * i] = (1.0 - this.slopeCount) * this.prevSampleL + this.slopeCount * src[srcOffset];
-      dest[destOffset + 2 * i + 1] = (1.0 - this.slopeCount) * this.prevSampleR + this.slopeCount * src[srcOffset + 1];
-      i = i + 1;
-      this.slopeCount += this._rate;
-    }
-    this.slopeCount -= 1.0;
-    if (numFrames !== 1) {
-      // eslint-disable-next-line no-constant-condition
-      out: while (true) {
-        while (this.slopeCount > 1.0) {
-          this.slopeCount -= 1.0;
-          used = used + 1;
-          if (used >= numFrames - 1) {
-            break out;
-          }
-        }
-        const srcIndex = srcOffset + 2 * used;
-        dest[destOffset + 2 * i] = (1.0 - this.slopeCount) * src[srcIndex] + this.slopeCount * src[srcIndex + 2];
-        dest[destOffset + 2 * i + 1] = (1.0 - this.slopeCount) * src[srcIndex + 1] + this.slopeCount * src[srcIndex + 3];
-        i = i + 1;
-        this.slopeCount += this._rate;
-      }
-    }
-    this.prevSampleL = src[srcOffset + 2 * numFrames - 2];
-    this.prevSampleR = src[srcOffset + 2 * numFrames - 1];
-    return i;
-  }
-}
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class FilterSupport {
-  constructor(pipe) {
-    this._pipe = pipe;
-  }
-  get pipe() {
-    return this._pipe;
-  }
-  get inputBuffer() {
-    return this._pipe.inputBuffer;
-  }
-  get outputBuffer() {
-    return this._pipe.outputBuffer;
-  }
-  fillInputBuffer(/*numFrames*/
-  ) {
-    throw new Error('fillInputBuffer() not overridden');
-  }
-  fillOutputBuffer(numFrames = 0) {
-    while (this.outputBuffer.frameCount < numFrames) {
-      // TODO hardcoded buffer size
-      const numInputFrames = 8192 * 2 - this.inputBuffer.frameCount;
-      this.fillInputBuffer(numInputFrames);
-      if (this.inputBuffer.frameCount < 8192 * 2) {
-        break;
-        // TODO: flush pipe
-      }
-      this._pipe.process();
-    }
-  }
-  clear() {
-    this._pipe.clear();
-  }
-}
-
-const noop$2 = function () {
-  return;
-};
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class SimpleFilter extends FilterSupport {
-  constructor(sourceSound, pipe, callback = noop$2) {
-    super(pipe);
-    this.callback = callback;
-    this.sourceSound = sourceSound;
-    //this.bufferDuration = sourceSound.buffer.duration;
-    this.historyBufferSize = 22050;
-    this._sourcePosition = 0;
-    this.outputBufferPosition = 0;
-    this._position = 0;
-  }
-  get position() {
-    return this._position;
-  }
-  set position(position) {
-    if (position > this._position) {
-      throw new RangeError('New position may not be greater than current position');
-    }
-    const newOutputBufferPosition = this.outputBufferPosition - (this._position - position);
-    if (newOutputBufferPosition < 0) {
-      throw new RangeError('New position falls outside of history buffer');
-    }
-    this.outputBufferPosition = newOutputBufferPosition;
-    this._position = position;
-  }
-  get sourcePosition() {
-    return this._sourcePosition;
-  }
-  set sourcePosition(sourcePosition) {
-    this.clear();
-    this._sourcePosition = sourcePosition;
-  }
-  onEnd() {
-    this.callback();
-  }
-  fillInputBuffer(numFrames = 0) {
-    const samples = new Float32Array(numFrames * 2);
-    const numFramesExtracted = this.sourceSound.extract(samples, numFrames, this._sourcePosition);
-    this._sourcePosition += numFramesExtracted;
-    this.inputBuffer.putSamples(samples, 0, numFramesExtracted);
-  }
-  extract(target, numFrames = 0) {
-    this.fillOutputBuffer(this.outputBufferPosition + numFrames);
-    const numFramesExtracted = Math.min(numFrames, this.outputBuffer.frameCount - this.outputBufferPosition);
-    this.outputBuffer.extract(target, this.outputBufferPosition, numFramesExtracted);
-    const currentFrames = this.outputBufferPosition + numFramesExtracted;
-    this.outputBufferPosition = Math.min(this.historyBufferSize, currentFrames);
-    this.outputBuffer.receive(Math.max(currentFrames - this.historyBufferSize, 0));
-    this._position += numFramesExtracted;
-    return numFramesExtracted;
-  }
-  handleSampleData(event) {
-    this.extract(event.data, 4096);
-  }
-  clear() {
-    super.clear();
-    this.outputBufferPosition = 0;
-  }
-}
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-
-/**
- * Giving this value for the sequence length sets automatic parameter value
- * according to tempo setting (recommended)
- */
-const USE_AUTO_SEQUENCE_LEN = 0;
-
-/**
- * Default length of a single processing sequence, in milliseconds. This determines to how
- * long sequences the original sound is chopped in the time-stretch algorithm.
- *
- * The larger this value is, the lesser sequences are used in processing. In principle
- * a bigger value sounds better when slowing down tempo, but worse when increasing tempo
- * and vice versa.
- *
- * Increasing this value reduces computational burden and vice versa.
- */
-//const DEFAULT_SEQUENCE_MS = 130
-const DEFAULT_SEQUENCE_MS = USE_AUTO_SEQUENCE_LEN;
-
-/**
- * Giving this value for the seek window length sets automatic parameter value
- * according to tempo setting (recommended)
- */
-const USE_AUTO_SEEKWINDOW_LEN = 0;
-
-/**
- * Seeking window default length in milliseconds for algorithm that finds the best possible
- * overlapping location. This determines from how wide window the algorithm may look for an
- * optimal joining location when mixing the sound sequences back together.
- *
- * The bigger this window setting is, the higher the possibility to find a better mixing
- * position will become, but at the same time large values may cause a 'drifting' artifact
- * because consequent sequences will be taken at more uneven intervals.
- *
- * If there's a disturbing artifact that sounds as if a constant frequency was drifting
- * around, try reducing this setting.
- *
- * Increasing this value increases computational burden and vice versa.
- */
-//const DEFAULT_SEEKWINDOW_MS = 25;
-const DEFAULT_SEEKWINDOW_MS = USE_AUTO_SEEKWINDOW_LEN;
-
-/**
- * Overlap length in milliseconds. When the chopped sound sequences are mixed back together,
- * to form a continuous sound stream, this parameter defines over how long period the two
- * consecutive sequences are let to overlap each other.
- *
- * This shouldn't be that critical parameter. If you reduce the DEFAULT_SEQUENCE_MS setting
- * by a large amount, you might wish to try a smaller value on this.
- *
- * Increasing this value increases computational burden and vice versa.
- */
-const DEFAULT_OVERLAP_MS = 8;
-
-// Table for the hierarchical mixing position seeking algorithm
-const _SCAN_OFFSETS = [[124, 186, 248, 310, 372, 434, 496, 558, 620, 682, 744, 806, 868, 930, 992, 1054, 1116, 1178, 1240, 1302, 1364, 1426, 1488, 0], [-100, -75, -50, -25, 25, 50, 75, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [-20, -15, -10, -5, 5, 10, 15, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [-4, -3, -2, -1, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
-
-// Adjust tempo param according to tempo, so that variating processing sequence length is used
-// at varius tempo settings, between the given low...top limits
-const AUTOSEQ_TEMPO_LOW = 0.25; // auto setting low tempo range (-25%)
-const AUTOSEQ_TEMPO_TOP = 4.0; // auto setting top tempo range (+100%)
-
-// sequence-ms setting values at above low & top tempo
-const AUTOSEQ_AT_MIN = 125.0;
-const AUTOSEQ_AT_MAX = 50.0;
-const AUTOSEQ_K = (AUTOSEQ_AT_MAX - AUTOSEQ_AT_MIN) / (AUTOSEQ_TEMPO_TOP - AUTOSEQ_TEMPO_LOW);
-const AUTOSEQ_C = AUTOSEQ_AT_MIN - AUTOSEQ_K * AUTOSEQ_TEMPO_LOW;
-
-// seek-window-ms setting values at above low & top tempo
-const AUTOSEEK_AT_MIN = 25.0;
-const AUTOSEEK_AT_MAX = 15.0;
-const AUTOSEEK_K = (AUTOSEEK_AT_MAX - AUTOSEEK_AT_MIN) / (AUTOSEQ_TEMPO_TOP - AUTOSEQ_TEMPO_LOW);
-const AUTOSEEK_C = AUTOSEEK_AT_MIN - AUTOSEEK_K * AUTOSEQ_TEMPO_LOW;
-class Stretch extends AbstractFifoSamplePipe {
-  constructor(createBuffers) {
-    super(createBuffers);
-    this._quickSeek = true;
-    this.midBufferDirty = false;
-    this.midBuffer = null;
-    this.overlapLength = 0;
-    this.autoSeqSetting = true;
-    this.autoSeekSetting = true;
-    this._tempo = 1;
-    this.setParameters(44100, DEFAULT_SEQUENCE_MS, DEFAULT_SEEKWINDOW_MS, DEFAULT_OVERLAP_MS);
-  }
-  clear() {
-    super.clear();
-    this.clearMidBuffer();
-  }
-  clearMidBuffer() {
-    if (this.midBufferDirty) {
-      this.midBufferDirty = false;
-      this.midBuffer = null;
-    }
-  }
-
-  /**
-   * Sets routine control parameters. These control are certain time constants
-   * defining how the sound is stretched to the desired duration.
-   *
-   * 'sampleRate' = sample rate of the sound
-   * 'sequenceMS' = one processing sequence length in milliseconds (default = 82 ms)
-   * 'seekwindowMS' = seeking window length for scanning the best overlapping
-   *      position (default = 28 ms)
-   * 'overlapMS' = overlapping length (default = 12 ms)
-   */
-  setParameters(sampleRate, sequenceMs, seekWindowMs, overlapMs) {
-    // accept only positive parameter values - if zero or negative, use old values instead
-    if (sampleRate > 0) {
-      this.sampleRate = sampleRate;
-    }
-    if (overlapMs > 0) {
-      this.overlapMs = overlapMs;
-    }
-    if (sequenceMs > 0) {
-      this.sequenceMs = sequenceMs;
-      this.autoSeqSetting = false;
-    } else {
-      // zero or below, use automatic setting
-      this.autoSeqSetting = true;
-    }
-    if (seekWindowMs > 0) {
-      this.seekWindowMs = seekWindowMs;
-      this.autoSeekSetting = false;
-    } else {
-      // zero or below, use automatic setting
-      this.autoSeekSetting = true;
-    }
-    this.calculateSequenceParameters();
-    this.calculateOverlapLength(this.overlapMs);
-
-    // set tempo to recalculate 'sampleReq'
-    this.tempo = this._tempo;
-  }
-
-  /**
-   * Sets new target tempo. Normal tempo = 'SCALE', smaller values represent slower
-   * tempo, larger faster tempo.
-   */
-  set tempo(newTempo) {
-    let intskip;
-    this._tempo = newTempo;
-
-    // Calculate new sequence duration
-    this.calculateSequenceParameters();
-
-    // Calculate ideal skip length (according to tempo value)
-    this.nominalSkip = this._tempo * (this.seekWindowLength - this.overlapLength);
-    this.skipFract = 0;
-    intskip = Math.floor(this.nominalSkip + 0.5);
-
-    // Calculate how many samples are needed in the 'inputBuffer' to process another batch of samples
-    this.sampleReq = Math.max(intskip + this.overlapLength, this.seekWindowLength) + this.seekLength;
-  }
-  get tempo() {
-    return this._tempo;
-  }
-  get inputChunkSize() {
-    return this.sampleReq;
-  }
-  get outputChunkSize() {
-    return this.overlapLength + Math.max(0, this.seekWindowLength - 2 * this.overlapLength);
-  }
-
-  /**
-   * Calculates overlapInMsec period length in samples.
-   */
-  calculateOverlapLength(overlapInMsec = 0) {
-    let newOvl;
-
-    // TODO assert(overlapInMsec >= 0);
-    newOvl = this.sampleRate * overlapInMsec / 1000;
-    newOvl = newOvl < 16 ? 16 : newOvl;
-
-    // must be divisible by 8
-    newOvl -= newOvl % 8;
-    this.overlapLength = newOvl;
-    this.refMidBuffer = new Float32Array(this.overlapLength * 2);
-    this.midBuffer = new Float32Array(this.overlapLength * 2);
-  }
-  checkLimits(x, mi, ma) {
-    return x < mi ? mi : x > ma ? ma : x;
-  }
-
-  /**
-   * Calculates processing sequence length according to tempo setting
-   */
-  calculateSequenceParameters() {
-    let seq;
-    let seek;
-    if (this.autoSeqSetting) {
-      seq = AUTOSEQ_C + AUTOSEQ_K * this._tempo;
-      seq = this.checkLimits(seq, AUTOSEQ_AT_MAX, AUTOSEQ_AT_MIN);
-      this.sequenceMs = Math.floor(seq + 0.5);
-    }
-    if (this.autoSeekSetting) {
-      seek = AUTOSEEK_C + AUTOSEEK_K * this._tempo;
-      seek = this.checkLimits(seek, AUTOSEEK_AT_MAX, AUTOSEEK_AT_MIN);
-      this.seekWindowMs = Math.floor(seek + 0.5);
-    }
-
-    // Update seek window lengths
-    this.seekWindowLength = Math.floor(this.sampleRate * this.sequenceMs / 1000);
-    this.seekLength = Math.floor(this.sampleRate * this.seekWindowMs / 1000);
-  }
-
-  /**
-   * Enables/disables the quick position seeking algorithm.
-   */
-  set quickSeek(enable) {
-    this._quickSeek = enable;
-  }
-  clone() {
-    const result = new Stretch();
-    result.tempo = this._tempo;
-    result.setParameters(this.sampleRate, this.sequenceMs, this.seekWindowMs, this.overlapMs);
-    return result;
-  }
-
-  /**
-   * Seeks for the optimal overlap-mixing position.
-   */
-  seekBestOverlapPosition() {
-    return this._quickSeek ? this.seekBestOverlapPositionStereoQuick() : this.seekBestOverlapPositionStereo();
-  }
-
-  /**
-   * Seeks for the optimal overlap-mixing position. The 'stereo' version of the
-   * routine
-   *
-   * The best position is determined as the position where the two overlapped
-   * sample sequences are 'most alike', in terms of the highest cross-correlation
-   * value over the overlapping period
-   */
-  seekBestOverlapPositionStereo() {
-    let bestOffset;
-    let bestCorrelation;
-    let correlation;
-    let i = 0;
-
-    // Slopes the amplitudes of the 'midBuffer' samples
-    this.preCalculateCorrelationReferenceStereo();
-    bestOffset = 0;
-    bestCorrelation = Number.MIN_VALUE;
-
-    // Scans for the best correlation value by testing each possible position over the permitted range
-    for (; i < this.seekLength; i = i + 1) {
-      // Calculates correlation value for the mixing position corresponding to 'i'
-      correlation = this.calculateCrossCorrelationStereo(2 * i, this.refMidBuffer);
-
-      // Checks for the highest correlation value
-      if (correlation > bestCorrelation) {
-        bestCorrelation = correlation;
-        bestOffset = i;
-      }
-    }
-    return bestOffset;
-  }
-
-  /**
-   * Seeks for the optimal overlap-mixing position. The 'stereo' version of the
-   * routine
-   *
-   * The best position is determined as the position where the two overlapped
-   * sample sequences are 'most alike', in terms of the highest cross-correlation
-   * value over the overlapping period
-   */
-  seekBestOverlapPositionStereoQuick() {
-    let bestOffset;
-    let bestCorrelation;
-    let correlation;
-    let scanCount = 0;
-    let correlationOffset;
-    let tempOffset;
-
-    // Slopes the amplitude of the 'midBuffer' samples
-    this.preCalculateCorrelationReferenceStereo();
-    bestCorrelation = Number.MIN_VALUE;
-    bestOffset = 0;
-    correlationOffset = 0;
-    tempOffset = 0;
-
-    // Scans for the best correlation value using four-pass hierarchical search.
-    //
-    // The look-up table 'scans' has hierarchical position adjusting steps.
-    // In first pass the routine searhes for the highest correlation with
-    // relatively coarse steps, then rescans the neighbourhood of the highest
-    // correlation with better resolution and so on.
-    for (; scanCount < 4; scanCount = scanCount + 1) {
-      let j = 0;
-      while (_SCAN_OFFSETS[scanCount][j]) {
-        tempOffset = correlationOffset + _SCAN_OFFSETS[scanCount][j];
-        if (tempOffset >= this.seekLength) {
-          break;
-        }
-
-        // Calculates correlation value for the mixing position corresponding to 'tempOffset'
-        correlation = this.calculateCrossCorrelationStereo(2 * tempOffset, this.refMidBuffer);
-
-        // Checks for the highest correlation value
-        if (correlation > bestCorrelation) {
-          bestCorrelation = correlation;
-          bestOffset = tempOffset;
-        }
-        j = j + 1;
-      }
-      correlationOffset = bestOffset;
-    }
-    return bestOffset;
-  }
-
-  /**
-   * Slopes the amplitude of the 'midBuffer' samples so that cross correlation
-   * is faster to calculate
-   */
-  preCalculateCorrelationReferenceStereo() {
-    let i = 0;
-    let context;
-    let temp;
-    for (; i < this.overlapLength; i = i + 1) {
-      temp = i * (this.overlapLength - i);
-      context = i * 2;
-      this.refMidBuffer[context] = this.midBuffer[context] * temp;
-      this.refMidBuffer[context + 1] = this.midBuffer[context + 1] * temp;
-    }
-  }
-  calculateCrossCorrelationStereo(mixingPosition, compare) {
-    const mixing = this._inputBuffer.vector;
-    mixingPosition += this._inputBuffer.startIndex;
-    let correlation = 0;
-    let i = 2;
-    const calcLength = 2 * this.overlapLength;
-    let mixingOffset;
-    for (; i < calcLength; i = i + 2) {
-      mixingOffset = i + mixingPosition;
-      correlation += mixing[mixingOffset] * compare[i] + mixing[mixingOffset + 1] * compare[i + 1];
-    }
-    return correlation;
-  }
-
-  // TODO inline
-  /**
-   * Overlaps samples in 'midBuffer' with the samples in 'pInputBuffer' at position
-   * of 'ovlPos'.
-   */
-  overlap(overlapPosition) {
-    this.overlapStereo(2 * overlapPosition);
-  }
-
-  /**
-   * Overlaps samples in 'midBuffer' with the samples in 'pInput'
-   */
-  overlapStereo(inputPosition) {
-    const input = this._inputBuffer.vector;
-    inputPosition += this._inputBuffer.startIndex;
-    const output = this._outputBuffer.vector;
-    const outputPosition = this._outputBuffer.endIndex;
-    let i = 0;
-    let context;
-    let tempFrame;
-    const frameScale = 1 / this.overlapLength;
-    let fi;
-    let inputOffset;
-    let outputOffset;
-    for (; i < this.overlapLength; i = i + 1) {
-      tempFrame = (this.overlapLength - i) * frameScale;
-      fi = i * frameScale;
-      context = 2 * i;
-      inputOffset = context + inputPosition;
-      outputOffset = context + outputPosition;
-      output[outputOffset + 0] = input[inputOffset + 0] * fi + this.midBuffer[context + 0] * tempFrame;
-      output[outputOffset + 1] = input[inputOffset + 1] * fi + this.midBuffer[context + 1] * tempFrame;
-    }
-  }
-  process() {
-    let offset;
-    let temp;
-    let overlapSkip;
-    if (this.midBuffer === null) {
-      // if midBuffer is empty, move the first samples of the input stream into it
-      if (this._inputBuffer.frameCount < this.overlapLength) {
-        // wait until we've got the overlapLength samples
-        return;
-      }
-      this.midBuffer = new Float32Array(this.overlapLength * 2);
-      this._inputBuffer.receiveSamples(this.midBuffer, this.overlapLength);
-    }
-
-    // Process samples as long as there are enough samples in 'inputBuffer' to form a processing frame
-    while (this._inputBuffer.frameCount >= this.sampleReq) {
-      // If tempo differs from the normal ('SCALE'), scan for hte best overlapping position
-      offset = this.seekBestOverlapPosition();
-
-      /**
-       * Mix the samples in the 'inputBuffer' at position of 'offset' with the samples in 'midBuffer'
-       * using sliding overlapping
-       * ... first partially overlap with the end of the previous sequence (that's in 'midBuffer')
-       */
-      this._outputBuffer.ensureAdditionalCapacity(this.overlapLength);
-      // FIXME unit?
-      // overlap(uint(offset));
-      this.overlap(Math.floor(offset));
-      this._outputBuffer.put(this.overlapLength);
-
-      // ... then copy sequence samples from 'inputBuffer' to output
-      temp = this.seekWindowLength - 2 * this.overlapLength; // & 0xfffffffe;
-      if (temp > 0) {
-        this._outputBuffer.putBuffer(this._inputBuffer, offset + this.overlapLength, temp);
-      }
-
-      /**
-       * Copies the end of the current sequence from 'inputBuffer' to 'midBuffer' for being mixed with
-       * the beginning of the next processing sequence and so on
-       */
-      // assert(offset + seekWindowLength <= (int)inputBuffer.numSamples());
-      const start = this._inputBuffer.startIndex + 2 * (offset + this.seekWindowLength - this.overlapLength);
-      this.midBuffer.set(this._inputBuffer.vector.subarray(start, start + 2 * this.overlapLength));
-
-      /**
-       * Remove the processed samples from the input buffer. Update the difference between
-       * integer & nominal skip step to 'skipFract' in order to prevent the error from
-       * accumulating over time
-       */
-      this.skipFract += this.nominalSkip; // real skip size
-      overlapSkip = Math.floor(this.skipFract);
-      this.skipFract -= overlapSkip;
-      this._inputBuffer.receive(overlapSkip);
-    }
-  }
-}
-
-const testFloatEqual = function (a, b) {
-  return (a > b ? a - b : b - a) > 1e-10;
-};
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class SoundTouch {
-  constructor() {
-    this.transposer = new RateTransposer(false);
-    this.stretch = new Stretch(false);
-    this._inputBuffer = new FifoSampleBuffer();
-    this._intermediateBuffer = new FifoSampleBuffer();
-    this._outputBuffer = new FifoSampleBuffer();
-    this._rate = 0;
-    this._tempo = 0;
-    this.virtualPitch = 1.0;
-    this.virtualRate = 1.0;
-    this.virtualTempo = 1.0;
-    this.calculateEffectiveRateAndTempo();
-  }
-  clear() {
-    this.transposer.clear();
-    this.stretch.clear();
-  }
-  clone() {
-    const result = new SoundTouch();
-    result.rate = this.rate;
-    result.tempo = this.tempo;
-    return result;
-  }
-  get rate() {
-    return this._rate;
-  }
-  set rate(rate) {
-    this.virtualRate = rate;
-    this.calculateEffectiveRateAndTempo();
-  }
-  set rateChange(rateChange) {
-    this._rate = 1.0 + 0.01 * rateChange;
-  }
-  get tempo() {
-    return this._tempo;
-  }
-  set tempo(tempo) {
-    this.virtualTempo = tempo;
-    this.calculateEffectiveRateAndTempo();
-  }
-  set tempoChange(tempoChange) {
-    this.tempo = 1.0 + 0.01 * tempoChange;
-  }
-  set pitch(pitch) {
-    this.virtualPitch = pitch;
-    this.calculateEffectiveRateAndTempo();
-  }
-  set pitchOctaves(pitchOctaves) {
-    this.pitch = Math.exp(0.69314718056 * pitchOctaves);
-    this.calculateEffectiveRateAndTempo();
-  }
-  set pitchSemitones(pitchSemitones) {
-    this.pitchOctaves = pitchSemitones / 12.0;
-  }
-  get inputBuffer() {
-    return this._inputBuffer;
-  }
-  get outputBuffer() {
-    return this._outputBuffer;
-  }
-  calculateEffectiveRateAndTempo() {
-    const previousTempo = this._tempo;
-    const previousRate = this._rate;
-    this._tempo = this.virtualTempo / this.virtualPitch;
-    this._rate = this.virtualRate * this.virtualPitch;
-    if (testFloatEqual(this._tempo, previousTempo)) {
-      this.stretch.tempo = this._tempo;
-    }
-    if (testFloatEqual(this._rate, previousRate)) {
-      this.transposer.rate = this._rate;
-    }
-    if (this._rate > 1.0) {
-      if (this._outputBuffer != this.transposer.outputBuffer) {
-        this.stretch.inputBuffer = this._inputBuffer;
-        this.stretch.outputBuffer = this._intermediateBuffer;
-        this.transposer.inputBuffer = this._intermediateBuffer;
-        this.transposer.outputBuffer = this._outputBuffer;
-      }
-    } else {
-      if (this._outputBuffer != this.stretch.outputBuffer) {
-        this.transposer.inputBuffer = this._inputBuffer;
-        this.transposer.outputBuffer = this._intermediateBuffer;
-        this.stretch.inputBuffer = this._intermediateBuffer;
-        this.stretch.outputBuffer = this._outputBuffer;
-      }
-    }
-  }
-  process() {
-    if (this._rate > 1.0) {
-      this.stretch.process();
-      this.transposer.process();
-    } else {
-      this.transposer.process();
-      this.stretch.process();
-    }
-  }
-}
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-class WebAudioBufferSource {
-  constructor(buffer) {
-    this.buffer = buffer;
-    this._position = 0;
-  }
-  get dualChannel() {
-    return this.buffer.numberOfChannels > 1;
-  }
-  get position() {
-    return this._position;
-  }
-  set position(value) {
-    this._position = value;
-  }
-  extract(target, numFrames = 0, position = 0) {
-    this.position = position;
-    let left = this.buffer.getChannelData(0);
-    let right = this.dualChannel ? this.buffer.getChannelData(1) : this.buffer.getChannelData(0);
-    let i = 0;
-    for (; i < numFrames; i++) {
-      target[i * 2] = left[i + position];
-      target[i * 2 + 1] = right[i + position];
-    }
-    return Math.min(numFrames, left.length - position);
-  }
-}
-
-/**
- * getWebAudioNode
- *
- * A wrapper to create an AudioNode and apply a filter for frame extraction
- * Copyright (c) Adrian Holovary https://github.com/adrianholovaty
- *
- * @param context - AudioContext
- * @param filter - Object containing an 'extract()' method
- * @param bufferSize - units of sample frames (256, 512, 1024, 2048, 4096, 8192, 16384)
- * @returns {ScriptProcessorNode}
- */
-const getWebAudioNode = function (context, filter, sourcePositionCallback = noop$2, bufferSize = 4096) {
-  const node = context.createScriptProcessor(bufferSize, 2, 2);
-  const samples = new Float32Array(bufferSize * 2);
-  let hasEnded = false;
-  let disconnectScheduled = false;
-  node.onaudioprocess = event => {
-    // If disconnection is scheduled, disconnect and stop processing
-    if (disconnectScheduled) {
-      node.disconnect();
-      return;
-    }
-
-    // If the track has already ended, fill with silence and return
-    if (hasEnded) {
-      let left = event.outputBuffer.getChannelData(0);
-      let right = event.outputBuffer.getChannelData(1);
-      left.fill(0);
-      right.fill(0);
-      // Schedule disconnection for the next audio process cycle
-      disconnectScheduled = true;
-      return;
-    }
-    let left = event.outputBuffer.getChannelData(0);
-    let right = event.outputBuffer.getChannelData(1);
-    let framesExtracted = filter.extract(samples, bufferSize);
-    sourcePositionCallback(filter.sourcePosition);
-    if (framesExtracted === 0) {
-      if (!hasEnded) {
-        hasEnded = true;
-        filter.onEnd();
-        // Don't disconnect immediately - let one more buffer of silence play
-      }
-    }
-    let i = 0;
-    for (; i < framesExtracted; i++) {
-      left[i] = samples[i * 2];
-      right[i] = samples[i * 2 + 1];
-    }
-
-    // Fill remaining buffer with silence if we extracted fewer frames than buffer size
-    for (; i < bufferSize; i++) {
-      left[i] = 0;
-      right[i] = 0;
-    }
-  };
-  return node;
-};
-
-const pad = function (n, width, z) {
-  z = z || '0';
-  n = n + '';
-  return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
-};
-const minsSecs = function (secs) {
-  const mins = Math.floor(secs / 60);
-  const seconds = secs - mins * 60;
-  return `${mins}:${pad(parseInt(seconds), 2)}`;
-};
-
-/*
- * SoundTouch JS audio processing library
- * Copyright (c) Olli Parviainen
- * Copyright (c) Ryan Berdeen
- * Copyright (c) Jakub Fiala
- * Copyright (c) Steve 'Cutter' Blades
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-const onUpdate = function (sourcePosition) {
-  const currentTimePlayed = this.timePlayed;
-  const sampleRate = this.sampleRate;
-  this.sourcePosition = sourcePosition;
-  this.timePlayed = sourcePosition / sampleRate;
-  if (currentTimePlayed !== this.timePlayed) {
-    const timePlayed = new CustomEvent('play', {
-      detail: {
-        timePlayed: this.timePlayed,
-        formattedTimePlayed: this.formattedTimePlayed,
-        percentagePlayed: this.percentagePlayed
-      }
-    });
-    this._node.dispatchEvent(timePlayed);
-  }
-};
-class PitchShifter {
-  constructor(context, buffer, bufferSize, onEnd = noop$2) {
-    this._soundtouch = new SoundTouch();
-    const source = new WebAudioBufferSource(buffer);
-    this.timePlayed = 0;
-    this.sourcePosition = 0;
-    this._filter = new SimpleFilter(source, this._soundtouch, onEnd);
-    this._node = getWebAudioNode(context, this._filter, sourcePostion => onUpdate.call(this, sourcePostion), bufferSize);
-    this.tempo = 1;
-    this.rate = 1;
-    this.duration = buffer.duration;
-    this.sampleRate = context.sampleRate;
-    this.listeners = [];
-  }
-  get formattedDuration() {
-    return minsSecs(this.duration);
-  }
-  get formattedTimePlayed() {
-    return minsSecs(this.timePlayed);
-  }
-  get percentagePlayed() {
-    return 100 * this._filter.sourcePosition / (this.duration * this.sampleRate);
-  }
-  set percentagePlayed(perc) {
-    this._filter.sourcePosition = parseInt(perc * this.duration * this.sampleRate);
-    this.sourcePosition = this._filter.sourcePosition;
-    this.timePlayed = this.sourcePosition / this.sampleRate;
-  }
-  get node() {
-    return this._node;
-  }
-  set pitch(pitch) {
-    this._soundtouch.pitch = pitch;
-  }
-  set pitchSemitones(semitone) {
-    this._soundtouch.pitchSemitones = semitone;
-  }
-  set rate(rate) {
-    this._soundtouch.rate = rate;
-  }
-  set tempo(tempo) {
-    this._soundtouch.tempo = tempo;
-  }
-  connect(toNode) {
-    this._node.connect(toNode);
-  }
-  disconnect() {
-    this._node.disconnect();
-  }
-  on(eventName, cb) {
-    this.listeners.push({
-      name: eventName,
-      cb: cb
-    });
-    this._node.addEventListener(eventName, event => cb(event.detail));
-  }
-  off(eventName = null) {
-    let listeners = this.listeners;
-    if (eventName) {
-      listeners = listeners.filter(e => e.name === eventName);
-    }
-    listeners.forEach(e => {
-      this._node.removeEventListener(e.name, event => e.cb(event.detail));
-    });
-  }
-}
-
 const resolveFetch$3 = customFetch => {
   let _fetch;
   if (customFetch) {
@@ -1453,12 +260,12 @@ const Request = globalObject.Request;
 const Response$1 = globalObject.Response;
 
 var browser = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  Headers: Headers$1,
-  Request: Request,
-  Response: Response$1,
-  default: nodeFetch,
-  fetch: fetch$1
+    __proto__: null,
+    Headers: Headers$1,
+    Request: Request,
+    Response: Response$1,
+    default: nodeFetch,
+    fetch: fetch$1
 });
 
 var require$$0 = /*@__PURE__*/getAugmentedNamespace(browser);
@@ -10803,456 +9610,262 @@ const canteTracksAPI = {
 };
 
 /*
- * Audio Manager for Flamenco Cante Practice App
- * Handles audio loading, playback queue management, and PitchShifter integration
- * Now with track concatenation for smoother playback
+ * Audio Manager with precise scheduling using AudioBufferSourceNode
+ * Based on the correct approach for seamless audio playback
  */
 
 class AudioManager {
   constructor() {
+    // WebAudio
     this.audioContext = null;
-    this.pitchShifter = null;
     this.gainNode = null;
 
-    // Playback state
+    // Estado de reproducción
     this.isPlaying = false;
     this.currentPalo = null;
 
-    // Track management
-    this.tracks = [];
-    this.playQueue = [];
-    this.audioBuffers = new Map(); // Cache for decoded audio buffers
+    // Pistas y cola
+    this.tracks = []; // array de objetos track { id, title, audio_url, ... }
+    this.playQueue = []; // array de índices dentro de this.tracks (barajada)
+    this.currentTrackIndex = 0; // posición dentro de playQueue
 
-    // Concatenated cycle management
-    this.currentCycleAudioBuffer = null;
-    this.currentCycle = 1;
-    this.totalTracksInCycle = 0;
+    // Caching
+    this.audioBuffers = new Map(); // track.id -> AudioBuffer
+    this.currentSource = null;
 
-    // Track timing for UI updates (optional for future enhancement)
-    this.trackTimings = []; // Array of {startTime, endTime, trackIndex}
+    // Controles de audio
+    this.globalTempo = 1.0;
+    this.globalPitchSemitones = 0;
+    this.currentVolume = 0.8;
 
-    // Event listeners
+    // Listeners
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    this.initializeAudioContext();
   }
 
-  /**
-   * Initialize Web Audio API context and gain node
-   */
-  initializeAudioContext() {
-    try {
+  /* --------------- Inicialización --------------- */
+  async initializeAudioContext() {
+    if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
-      console.log('Audio context initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize audio context:', error);
-      throw new Error('Web Audio API not supported in this browser');
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+      console.log('Audio context inicializado');
     }
   }
 
-  /**
-   * Concatenate multiple AudioBuffers into a single AudioBuffer
-   * @param {AudioBuffer[]} buffers - Array of AudioBuffers to concatenate
-   * @returns {AudioBuffer} Single concatenated AudioBuffer
-   */
-  _concatenateAudioBuffers(buffers) {
-    if (!buffers || buffers.length === 0) {
-      throw new Error('No buffers provided for concatenation');
-    }
-
-    // Calculate total duration and validate buffers
-    let totalLength = 0;
-    const sampleRate = buffers[0].sampleRate;
-    const numberOfChannels = buffers[0].numberOfChannels;
-    for (const buffer of buffers) {
-      if (buffer.sampleRate !== sampleRate) {
-        throw new Error('All buffers must have the same sample rate');
-      }
-      if (buffer.numberOfChannels !== numberOfChannels) {
-        throw new Error('All buffers must have the same number of channels');
-      }
-      totalLength += buffer.length;
-    }
-
-    // Create the concatenated buffer
-    const concatenatedBuffer = this.audioContext.createBuffer(numberOfChannels, totalLength, sampleRate);
-
-    // Copy data from each buffer
-    let offset = 0;
-    this.trackTimings = []; // Reset track timings
-
-    for (let i = 0; i < buffers.length; i++) {
-      const buffer = buffers[i];
-      const startTime = offset / sampleRate;
-      const endTime = (offset + buffer.length) / sampleRate;
-
-      // Store timing information for this track
-      this.trackTimings.push({
-        startTime,
-        endTime,
-        trackIndex: this.playQueue[i],
-        // Original track index
-        duration: buffer.duration
-      });
-
-      // Copy each channel
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sourceData = buffer.getChannelData(channel);
-        const destData = concatenatedBuffer.getChannelData(channel);
-        destData.set(sourceData, offset);
-      }
-      offset += buffer.length;
-    }
-    console.log(`Concatenated ${buffers.length} tracks into single buffer (${concatenatedBuffer.duration.toFixed(2)}s)`);
-    return concatenatedBuffer;
-  }
-
-  /**
-   * Prepare the current cycle buffer by concatenating tracks in playQueue order
-   */
-  async _prepareCurrentCycleBuffer() {
-    if (this.playQueue.length === 0) {
-      throw new Error('No play queue available for cycle preparation');
-    }
-    console.log('Preparando buffer de reproducción...');
-
-    // Get buffers in playQueue order
-    const orderedBuffers = this.playQueue.map(trackIndex => {
-      const track = this.tracks[trackIndex];
-      const buffer = this.audioBuffers.get(track.id);
-      if (!buffer) {
-        throw new Error(`Buffer not found for track: ${track.title}`);
-      }
-      return buffer;
-    });
-
-    // Concatenate all buffers
-    this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
-    console.log(`Buffer listo: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
-  }
-
-  /**
-   * Load tracks for a specific palo from Supabase and prepare first cycle
-   * @param {string} palo - The flamenco palo to load tracks for
-   */
+  /* --------------- Carga de pistas --------------- */
   async loadPalo(palo) {
     try {
-      console.log(`Cargando pistas para el palo: ${palo}`);
-
-      // Fetch tracks from Supabase
+      console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
-      if (this.tracks.length === 0) {
+      if (!this.tracks || this.tracks.length === 0) {
         throw new Error(`No tracks found for palo: ${palo}`);
       }
       this.currentPalo = palo;
-
-      // Decode all audio buffers
-      console.log('Decodificando archivos de audio...');
-      await this._decodeAllTracks();
-
-      // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
-      await this._prepareCurrentCycleBuffer();
-      console.log(`Cargadas ${this.tracks.length} pistas para ${palo}`);
+
+      // Preload first track
+      await this.preloadTrack(this.playQueue[this.currentTrackIndex]);
+      console.log(`Loaded ${this.tracks.length} tracks for ${palo}`);
       return this.tracks.length;
-    } catch (error) {
-      console.error('Error loading palo:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error loadPalo:', err);
+      throw err;
     }
   }
-
-  /**
-   * Decode all tracks and store in audioBuffers cache
-   */
-  async _decodeAllTracks() {
-    const decodePromises = this.tracks.map(async (track, index) => {
-      try {
-        console.log(`Decoding track ${index + 1}/${this.tracks.length}: ${track.title}`);
-
-        // Fetch audio file
-        const response = await fetch(track.audio_url);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch audio: ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-
-        // Decode audio data
-        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-
-        // Cache the buffer
-        this.audioBuffers.set(track.id, audioBuffer);
-        console.log(`Successfully decoded: ${track.title} (${audioBuffer.duration.toFixed(2)}s)`);
-      } catch (error) {
-        console.error(`Error decoding track ${track.title}:`, error);
-        throw error;
-      }
-    });
-    await Promise.all(decodePromises);
-    console.log('All tracks decoded successfully');
-  }
-
-  /**
-   * Create a shuffled play queue without repeats
-   */
   createPlayQueue() {
-    // Create array of indices
-    const indices = Array.from({
-      length: this.tracks.length
-    }, (_, i) => i);
-
-    // Shuffle using Fisher-Yates algorithm
+    const indices = Array.from(this.tracks.keys());
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     this.playQueue = indices;
-    this.totalTracksInCycle = this.tracks.length;
-    console.log('Lista de reproducción creada:', this.playQueue);
+    this.currentTrackIndex = 0;
+    console.log('Play queue creada:', this.playQueue);
   }
 
-  /**
-   * Start playback of the current cycle
-   */
+  /* --------------- Preload / Decodificado --------------- */
+  async preloadTrack(trackIndex) {
+    if (trackIndex == null || trackIndex < 0 || trackIndex >= this.tracks.length) return;
+    const track = this.tracks[trackIndex];
+    if (!track || this.audioBuffers.has(track.id)) return;
+    try {
+      console.log('Preloading:', track.title || track.id);
+      const response = await fetch(track.audio_url);
+      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.audioBuffers.set(track.id, audioBuffer);
+      console.log('Preloaded:', track.title || track.id);
+      return audioBuffer;
+    } catch (err) {
+      console.warn('Error preloading track', track.title, err);
+      throw err;
+    }
+  }
+
+  /* --------------- Reproducción --------------- */
   async play() {
-    if (!this.currentPalo || !this.currentCycleAudioBuffer) {
-      throw new Error('No cycle buffer ready. Call loadPalo() first.');
+    if (!this.currentPalo || !this.tracks.length) {
+      throw new Error('No palo loaded. Call loadPalo() first.');
     }
     if (this.isPlaying) {
       console.log('Already playing');
       return;
     }
-    try {
-      // Resume audio context if suspended (required by some browsers)
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+    await this.initializeAudioContext();
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+    this.isPlaying = true;
+    this.notifyPlayStateChange(true);
+    this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
+  }
+  scheduleTrack(trackIndex, startTime) {
+    if (!this.isPlaying) return;
+    const trackId = this.playQueue[trackIndex];
+    const track = this.tracks[trackId];
+    const buffer = this.audioBuffers.get(track.id);
+    if (!buffer) {
+      console.error('No buffer loaded for', track.title);
+      return;
+    }
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
+    source.connect(this.gainNode);
+    source.start(startTime);
+    this.currentSource = source;
+    this.notifyTrackChange(track);
 
-      // Start playing current cycle
-      await this.playCurrentCycle();
+    // programamos la siguiente pista
+    const nextIndex = (trackIndex + 1) % this.playQueue.length;
+    const adjustedDuration = buffer.duration / this.globalTempo;
+    const nextStart = startTime + adjustedDuration;
+    this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      if (this.isPlaying) {
+        this.scheduleTrack(nextIndex, nextStart);
+      }
+    }).catch(err => {
+      console.error('Error preloading next track:', err);
+    });
+
+    // avanzamos el índice
+    this.currentTrackIndex = nextIndex;
+  }
+  stop() {
+    if (!this.isPlaying) return;
+    this.isPlaying = false;
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+        this.currentSource.disconnect();
+      } catch (e) {
+        // Source might already be stopped
+      }
+      this.currentSource = null;
+    }
+    this.notifyPlayStateChange(false);
+    console.log('Playback stopped');
+  }
+  pause() {
+    if (this.audioContext && this.isPlaying) {
+      this.audioContext.suspend();
+      this.isPlaying = false;
+      this.notifyPlayStateChange(false);
+    }
+  }
+  resume() {
+    if (this.audioContext && !this.isPlaying) {
+      this.audioContext.resume();
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
-      console.log('Reproducción iniciada');
-    } catch (error) {
-      console.error('Error starting playback:', error);
-      throw error;
     }
   }
 
-  /**
-   * Stop playback
-   */
-  stop() {
-    if (!this.isPlaying) {
-      return;
-    }
-
-    // Disconnect PitchShifter to stop audio
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
-    }
-    this.isPlaying = false;
-    this.notifyPlayStateChange(false);
-    console.log('Reproducción detenida');
-  }
-
-  /**
-   * Play the current concatenated cycle
-   */
-  async playCurrentCycle() {
-    if (!this.currentCycleAudioBuffer) {
-      throw new Error('No cycle buffer available');
-    }
-    console.log(`Reproduciendo (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
-
-    // Disconnect any existing PitchShifter to ensure clean transition
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
-    }
-
-    // Create new PitchShifter instance with concatenated buffer
-    this.pitchShifter = new PitchShifter(this.audioContext, this.currentCycleAudioBuffer, 4096, () => this.onCycleEnd() // Callback when cycle ends
-    );
-
-    // Apply current audio settings to the new PitchShifter
-    if (this.currentTempo !== undefined) {
-      this.pitchShifter.tempo = this.currentTempo;
-    }
-    if (this.currentPitchSemitones !== undefined) {
-      this.pitchShifter.pitchSemitones = this.currentPitchSemitones;
-    }
-
-    // Connect to audio output
-    this.pitchShifter.connect(this.gainNode);
-
-    // Notify cycle start (using first track info for UI)
-    const firstTrackIndex = this.playQueue[0];
-    const firstTrack = this.tracks[firstTrackIndex];
-    this.notifyTrackChange(firstTrack);
-  }
-
-  /**
-   * Handle cycle end - prepare and start next cycle
-   */
-  onCycleEnd() {
-    console.log('Reproducción completada, iniciando siguiente ciclo...');
-    if (!this.isPlaying) {
-      console.log('Reproducción detenida');
-      return;
-    }
-
-    // Small delay to ensure clean audio transition
-    setTimeout(async () => {
-      if (!this.isPlaying) {
-        console.log('Reproducción detenida durante la transición');
-        return;
-      }
-      try {
-        // Create new play queue and prepare next cycle
-        this.createPlayQueue();
-        await this._prepareCurrentCycleBuffer();
-
-        // Start next cycle
-        await this.playCurrentCycle();
-      } catch (error) {
-        console.error('Error iniciando siguiente ciclo:', error);
-        this.stop();
-      }
-    }, 100); // Slightly longer delay for cycle preparation
-  }
-
-  /**
-   * Get current track information (first track of current cycle)
-   * @returns {Object|null} Current track object or null
-   */
-  getCurrentTrack() {
-    if (!this.tracks.length || !this.playQueue.length) {
-      return null;
-    }
-    const firstTrackIndex = this.playQueue[0];
-    return this.tracks[firstTrackIndex];
-  }
-
-  /**
-   * Set playback tempo
-   * @param {number} tempo - Tempo value (1.0 = normal speed)
-   */
+  /* --------------- Controles de audio --------------- */
   setTempo(tempo) {
-    this.currentTempo = tempo;
-    if (this.pitchShifter) {
-      this.pitchShifter.tempo = tempo;
-      console.log(`Tempo set to: ${tempo}`);
+    this.globalTempo = tempo;
+    if (this.currentSource && this.currentSource.playbackRate) {
+      try {
+        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+      } catch (e) {
+        // Source might be stopped
+      }
     }
+    console.log('Tempo set to', tempo);
   }
-
-  /**
-   * Set pitch
-   * @param {number} pitch - Pitch value (1.0 = normal pitch)
-   */
-  setPitch(pitch) {
-    this.currentPitch = pitch;
-    if (this.pitchShifter) {
-      this.pitchShifter.pitch = pitch;
-      console.log(`Pitch set to: ${pitch}`);
-    }
-  }
-
-  /**
-   * Set pitch in semitones
-   * @param {number} semitones - Semitones to shift (-12 to +12)
-   */
   setPitchSemitones(semitones) {
-    this.currentPitchSemitones = semitones;
-    if (this.pitchShifter) {
-      this.pitchShifter.pitchSemitones = semitones;
-      console.log(`Pitch set to: ${semitones} semitones`);
-    }
+    this.globalPitchSemitones = semitones;
+    // Note: AudioBufferSourceNode doesn't support pitch shifting without tempo change
+    // For real pitch shifting, we'd need to use a more complex approach
+    console.log('Pitch semitones set to', semitones, '(tempo-based approximation)');
   }
-
-  /**
-   * Set volume
-   * @param {number} volume - Volume level (0.0 to 1.0)
-   */
   setVolume(volume) {
-    if (this.gainNode) {
-      this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
-      console.log(`Volume set to: ${volume}`);
+    this.currentVolume = Math.max(0, Math.min(1, volume));
+    if (this.gainNode && this.audioContext) {
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
     }
   }
 
-  /**
-   * Get available palos from Supabase
-   * @returns {Promise<Array>} Array of available palo names
-   */
+  /* --------------- Getters --------------- */
+  getCurrentTrack() {
+    if (!this.tracks.length) return null;
+    const queueIndex = this.playQueue[this.currentTrackIndex];
+    return this.tracks[queueIndex] || null;
+  }
   async getAvailablePalos() {
     try {
       return await canteTracksAPI.getAvailablePalos();
-    } catch (error) {
-      console.error('Error fetching available palos:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error fetching palos:', err);
+      throw err;
     }
   }
 
-  /**
-   * Add listener for track changes
-   * @param {Function} callback - Callback function to call when track changes
-   */
-  onTrackChange(callback) {
-    this.onTrackChangeListeners.push(callback);
+  /* --------------- Event listeners --------------- */
+  onTrackChange(cb) {
+    this.onTrackChangeListeners.push(cb);
   }
-
-  /**
-   * Add listener for play state changes
-   * @param {Function} callback - Callback function to call when play state changes
-   */
-  onPlayStateChange(callback) {
-    this.onPlayStateChangeListeners.push(callback);
+  onPlayStateChange(cb) {
+    this.onPlayStateChangeListeners.push(cb);
   }
-
-  /**
-   * Notify all track change listeners
-   * @param {Object} track - Current track object
-   */
   notifyTrackChange(track) {
-    this.onTrackChangeListeners.forEach(callback => {
+    console.log(`Now playing: ${track.title}`);
+    this.onTrackChangeListeners.forEach(cb => {
       try {
-        callback(track);
-      } catch (error) {
-        console.error('Error in track change listener:', error);
+        cb(track);
+      } catch (e) {
+        console.error('Track change listener error:', e);
       }
     });
   }
-
-  /**
-   * Notify all play state change listeners
-   * @param {boolean} isPlaying - Current play state
-   */
   notifyPlayStateChange(isPlaying) {
-    this.onPlayStateChangeListeners.forEach(callback => {
+    this.onPlayStateChangeListeners.forEach(cb => {
       try {
-        callback(isPlaying);
-      } catch (error) {
-        console.error('Error in play state change listener:', error);
+        cb(isPlaying);
+      } catch (e) {
+        console.error('Play state listener error:', e);
       }
     });
   }
 
-  /**
-   * Clean up resources
-   */
+  /* --------------- Cleanup --------------- */
   destroy() {
     this.stop();
     if (this.audioContext) {
-      this.audioContext.close();
+      try {
+        this.audioContext.close();
+      } catch (e) {
+        console.warn('Error closing audio context:', e);
+      }
+      this.audioContext = null;
+      this.gainNode = null;
     }
     this.audioBuffers.clear();
-    this.currentCycleAudioBuffer = null;
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    this.trackTimings = [];
     console.log('AudioManager destroyed');
   }
 }
@@ -11264,20 +9877,6 @@ class AudioManager {
 
 class FlamencoApp {
   constructor() {
-    // Constante para el contenido SVG del botón de reproducción
-    this.PLAY_BUTTON_SVG_CONTENT = `
-                <div class="play-icon">
-                    <svg viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M8 5v14l11-7z" fill="currentColor"></path>
-                    </svg>
-                </div>
-                <div class="pause-icon">
-                    <svg viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"></path>
-                    </svg>
-                </div>
-            `;
-    console.log('PLAY_BUTTON_SVG_CONTENT:', this.PLAY_BUTTON_SVG_CONTENT);
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
@@ -11285,17 +9884,23 @@ class FlamencoApp {
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
     this.playButton = document.getElementById('playButton');
+    this.trackInfo = document.getElementById('trackInfo');
     this.visualizer = document.getElementById('visualizer');
+    this.statusMessage = document.getElementById('statusMessage');
 
     // Control Elements
     this.tempoSlider = document.getElementById('tempoSlider');
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
+    this.volumeSlider = document.getElementById('volumeSlider');
+    this.volumeValue = document.getElementById('volumeValue');
     this.init();
   }
   async init() {
     try {
+      this.showStatus('Inicializando aplicación...', 'loading');
+
       // Set up event listeners
       this.setupEventListeners();
 
@@ -11304,8 +9909,10 @@ class FlamencoApp {
 
       // Set up audio manager listeners
       this.setupAudioManagerListeners();
+      this.showStatus('¡Listo para practicar!', 'success');
     } catch (error) {
       console.error('Error initializing app:', error);
+      this.showStatus('Error al inicializar la aplicación', 'error');
     }
   }
   setupEventListeners() {
@@ -11332,6 +9939,13 @@ class FlamencoApp {
       this.audioManager.setPitchSemitones(semitones);
       this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
     });
+
+    // Volume control
+    this.volumeSlider.addEventListener('input', e => {
+      const volume = parseFloat(e.target.value);
+      this.audioManager.setVolume(volume);
+      this.volumeValue.textContent = `${Math.round(volume * 100)}%`;
+    });
   }
   setupAudioManagerListeners() {
     // Listen for track changes
@@ -11346,10 +9960,11 @@ class FlamencoApp {
   }
   async loadAvailablePalos() {
     try {
+      this.showStatus('Cargando palos disponibles...', 'loading');
       const palos = await this.audioManager.getAvailablePalos();
 
       // Clear existing options
-      this.paloSelect.innerHTML = '';
+      this.paloSelect.innerHTML = '<option value="">Selecciona un palo</option>';
 
       // Add palo options
       palos.forEach(palo => {
@@ -11358,15 +9973,10 @@ class FlamencoApp {
         option.textContent = palo;
         this.paloSelect.appendChild(option);
       });
-
-      // Set Tangos as default if available
-      if (palos.includes('Tangos')) {
-        this.paloSelect.value = 'Tangos';
-        await this.handlePaloChange('Tangos');
-      }
       console.log(`Loaded ${palos.length} palos:`, palos);
     } catch (error) {
       console.error('Error loading palos:', error);
+      this.showStatus('Error cargando palos disponibles', 'error');
       this.paloSelect.innerHTML = '<option value="">Error cargando palos</option>';
     }
   }
@@ -11378,6 +9988,7 @@ class FlamencoApp {
       return;
     }
     try {
+      this.showStatus(`Cargando pistas de ${selectedPalo}...`, 'loading');
       this.playButton.disabled = true;
 
       // Stop current playback if any
@@ -11391,67 +10002,74 @@ class FlamencoApp {
 
       // Enable play button
       this.playButton.disabled = false;
+      this.showStatus(`${trackCount} pistas cargadas para ${selectedPalo}`, 'success');
 
       // Update track info
       const currentTrack = this.audioManager.getCurrentTrack();
       this.updateTrackInfo(currentTrack);
     } catch (error) {
       console.error('Error loading palo:', error);
+      this.showStatus(`Error cargando ${selectedPalo}`, 'error');
       this.playButton.disabled = true;
     }
   }
   async handlePlayButtonClick() {
     if (!this.currentPalo) {
+      this.showStatus('Selecciona un palo primero', 'error');
       return;
     }
-    console.log('Play button clicked, current state:', this.isPlaying);
     try {
       if (this.isPlaying) {
         // Stop playback
-        console.log('Stopping playback...');
         this.audioManager.stop();
+        this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
-        console.log('Starting playback...');
+        this.showStatus('Iniciando reproducción...', 'loading');
         await this.audioManager.play();
+        this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
       }
     } catch (error) {
       console.error('Error with playback:', error);
+      this.showStatus('Error en la reproducción', 'error');
     }
   }
   updateTrackInfo(track) {
-    // No mostrar información de pista
+    const titleElement = this.trackInfo.querySelector('.track-title');
+    const paloElement = this.trackInfo.querySelector('.track-palo');
+    if (track) {
+      titleElement.textContent = track.title;
+      paloElement.textContent = track.palo;
+    } else {
+      titleElement.textContent = this.currentPalo ? 'Listo para reproducir' : 'Selecciona un palo para comenzar';
+      paloElement.textContent = this.currentPalo || '';
+    }
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
 
-    // Deshabilitar el menú desplegable durante la reproducción
-    this.paloSelect.disabled = isPlaying;
-
-    // Deshabilitar el menú desplegable durante la reproducción
-    this.paloSelect.disabled = isPlaying;
-    console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
-    console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
-
-    // Asegurar que el contenido SVG esté siempre presente
-    this.playButton.innerHTML = this.PLAY_BUTTON_SVG_CONTENT;
-    console.log('updatePlayState: Después de asignar innerHTML. Contenido actual:', this.playButton.innerHTML);
-
-    // Update play button state - simply toggle the is-playing class
-    if (isPlaying) {
-      this.playButton.classList.add('is-playing');
-      console.log('Play button: switched to pause icon');
-    } else {
-      this.playButton.classList.remove('is-playing');
-      console.log('Play button: switched to play icon');
-    }
-    console.log('updatePlayState: Clases del botón después de toggle:', this.playButton.classList.value);
+    // Update play button
+    this.playButton.textContent = isPlaying ? '⏸️' : '▶️';
 
     // Update visualizer
     if (isPlaying) {
       this.visualizer.classList.add('playing');
     } else {
       this.visualizer.classList.remove('playing');
+    }
+  }
+  showStatus(message, type = '') {
+    this.statusMessage.textContent = message;
+    this.statusMessage.className = `status-message ${type}`;
+
+    // Auto-clear success messages after 3 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        if (this.statusMessage.textContent === message) {
+          this.statusMessage.textContent = '';
+          this.statusMessage.className = 'status-message';
+        }
+      }, 3000);
     }
   }
 }
