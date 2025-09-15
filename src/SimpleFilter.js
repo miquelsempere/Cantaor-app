@@ -20,8 +20,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-import FilterSupport from './FilterSupport.js';
-import noop from './noop.js';
+import FilterSupport from './FilterSupport';
+import noop from './noop';
 
 export default class SimpleFilter extends FilterSupport {
   constructor(sourceSound, pipe, callback = noop) {
