@@ -187,15 +187,6 @@ class FlamencoApp {
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
     
-    console.log('DEBUG: updatePlayState - isPlaying:', isPlaying);
-    console.log('DEBUG: updatePlayState - paloSelect antes de deshabilitar:', this.paloSelect.disabled);
-    
-    // Disable/enable palo selector during playback
-    this.paloSelect.disabled = isPlaying;
-    
-    console.log('DEBUG: updatePlayState - paloSelect después de deshabilitar:', this.paloSelect.disabled);
-    console.log('DEBUG: updatePlayState - Elemento paloSelect:', this.paloSelect);
-    
     console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
     console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
     
