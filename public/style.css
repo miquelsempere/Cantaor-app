@@ -38,6 +38,7 @@ body {
 
 .app-subtitle {
     font-size: 0.9rem;
+    font-weight: 600;
     color: #8B7355;
     margin-bottom: 2rem;
 }
