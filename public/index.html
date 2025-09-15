@@ -1,105 +1,325 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-    <title>soundtouch.js demo</title>
+    <title>Práctica de Cante Flamenco</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background: grey;
-            line-height: 30px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
         }
 
-        input, button {
-            display:block;
-        }
-        .progress,
-        #progressMeter {
-            width: 400px;
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
         }
 
-        .progress #duration {
+        .app-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+
+        .app-subtitle {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 2rem;
+        }
+
+        .palo-selector {
+            margin-bottom: 2rem;
+        }
+
+        .palo-selector label {
+            display: block;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+
+        .palo-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .palo-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .player-section {
+            margin-bottom: 2rem;
+        }
+
+        .play-button {
+            width: 80px;
+            height: 80px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            margin-bottom: 1rem;
+        }
+
+        .play-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .play-button:active {
+            transform: translateY(0);
+        }
+
+        .play-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .track-info {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .track-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+        }
+
+        .track-palo {
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .controls-section {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .control-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+
+        .control-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+
+        .control-value {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.9rem;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 60px;
+            background: #f7fafc;
+            border-radius: 10px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
             position: relative;
-            float: right;
+        }
+
+        .visualizer-bars {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 40px;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: height 0.3s ease;
+            opacity: 0.3;
+        }
+
+        .visualizer.playing .visualizer-bar {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .visualizer.playing .visualizer-bar:nth-child(2n) {
+            animation-delay: 0.2s;
+        }
+
+        .visualizer.playing .visualizer-bar:nth-child(3n) {
+            animation-delay: 0.4s;
+        }
+
+        .visualizer.playing .visualizer-bar:nth-child(4n) {
+            animation-delay: 0.6s;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                height: 10px;
+                opacity: 0.3;
+            }
+            50% {
+                height: 35px;
+                opacity: 1;
+            }
+        }
+
+        .status-message {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 1rem;
+            min-height: 20px;
+        }
+
+        .loading {
+            color: #667eea;
+        }
+
+        .error {
+            color: #e53e3e;
+        }
+
+        .success {
+            color: #38a169;
         }
     </style>
 </head>
 <body>
-<button id="play" disabled>Play</button>
-<button id="stop">Pause</button>
-<div class="progress">
-    <div>
-        <span id="currentTime">0:00</span><span id="duration"></span>
+    <div class="app-container">
+        <h1 class="app-title">Cante Flamenco</h1>
+        <p class="app-subtitle">Práctica de guitarra con pistas de cante</p>
+        
+        <div class="palo-selector">
+            <label for="paloSelect">Selecciona el Palo:</label>
+            <select id="paloSelect" class="palo-select">
+                <option value="">Cargando palos...</option>
+            </select>
+        </div>
+
+        <div class="player-section">
+            <button id="playButton" class="play-button" disabled>
+                ▶️
+            </button>
+            
+            <div class="track-info" id="trackInfo">
+                <div class="track-title">Selecciona un palo para comenzar</div>
+                <div class="track-palo"></div>
+            </div>
+
+            <div class="visualizer" id="visualizer">
+                <div class="visualizer-bars">
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                    <div class="visualizer-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="control-group">
+                <label class="control-label">Tempo</label>
+                <input type="range" id="tempoSlider" class="control-slider" 
+                       min="0.5" max="2.0" step="0.05" value="1.0">
+                <div class="control-value" id="tempoValue">1.00x</div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">Tono (Semitonos)</label>
+                <input type="range" id="pitchSlider" class="control-slider" 
+                       min="-12" max="12" step="1" value="0">
+                <div class="control-value" id="pitchValue">0</div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">Volumen</label>
+                <input type="range" id="volumeSlider" class="control-slider" 
+                       min="0" max="1" step="0.05" value="0.8">
+                <div class="control-value" id="volumeValue">80%</div>
+            </div>
+        </div>
+
+        <div class="status-message" id="statusMessage"></div>
     </div>
-    <progress id="progressMeter" value="0" max="100"></progress>
-</div>
-Rate: <input type="range" autofocus="true" min="0.1" max="4.0" name="tempoSlider" value="1.0" id="tempoSlider" step="0.01" list="temporange">
-<datalist id="temporange">
-    <option value="0.1" label="0">
-    <option value="0.5">
-    <option value="1.0">
-    <option value="1.5">
-    <option value="2.0">
-    <option value="2.5">
-    <option value="3.0">
-    <option value="3.5">
-    <option value="4.0" label="4">
-</datalist>
-<div id="tempo"></div>
-Pitch: <input type="range" autofocus="true" min="0.1" max="2.0" name="pitchSlider" value="1.0" id="pitchSlider" step="0.01" list="pitchrange">
-<datalist id="pitchrange">
-    <option value="0.1" label="0">
-    <option value="0.5">
-    <option value="1.0">
-    <option value="1.5">
-    <option value="2.0" label="2">
-</datalist>
-<div id="pitch"></div>
 
-Change Key: <input type="range" autofocus="true" min="-7.0" max="7.0" name="keySlider" value="0" id="keySlider" step="1" list="keyrange" />
-<datalist id="keyrange">
-    <option value="-7">
-    <option value="-6">
-    <option value="-5">
-    <option value="-4">
-    <option value="-3">
-    <option value="-2">
-    <option value="-1">
-    <option value="0">
-    <option value="1">
-    <option value="2">
-    <option value="3">
-    <option value="4">
-    <option value="5">
-    <option value="6">
-    <option value="7">
-</datalist>
-<div id="key"></div>
-
-Volume: <input type="range" autofocus="true" min="0.0" max="10.0" name="volumeSlider" value="1.0" id="volumeSlider" step="0.01" list="volumerange">
-<datalist id="volumerange">
-    <option value="0.0" label="0">
-    <option value="0.5">
-    <option value="1.0">
-    <option value="1.5">
-    <option value="2.0" label="2">
-    <option value="2.5">
-    <option value="3.0">
-    <option value="3.5">
-    <option value="4.0" label="4">
-    <option value="4.5">
-    <option value="5.0">
-    <option value="5.5">
-    <option value="6.0" label="6">
-    <option value="6.5">
-    <option value="7.0">
-    <option value="7.5">
-    <option value="8.0" label="8">
-    <option value="8.5">
-    <option value="9.0">
-    <option value="9.5">
-    <option value="10.0" label="10">
-</datalist>
-<div id="volume"></div>
+    <script type="module" src="bundle.js"></script>
 </body>
-<!-- <script src="soundtouch.js"></script> -->
-<script type="module" src="example.js"></script>
 </html>

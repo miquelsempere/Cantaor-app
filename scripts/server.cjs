@@ -8,6 +8,7 @@ const port = 8080;
 connect()
   .use(serveStatic(path.join(__dirname, '../public')))
   .use(serveStatic(path.join(__dirname, '../dist')))
+  .use('/src', serveStatic(path.join(__dirname, '../src')))
   .listen(port, function () {
     console.log('dir is ', path.join(__dirname, '../public'));
     console.log(`Listing on http://${ip}:${port}`);

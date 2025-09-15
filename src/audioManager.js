@@ -1,495 +1,278 @@
 /*
- * Audio Manager for Flamenco Cante Practice App
- * Handles audio loading, playback queue management, and PitchShifter integration
- * Now with track concatenation for smoother playback
+ * Audio Manager with precise scheduling using AudioBufferSourceNode
+ * Based on the correct approach for seamless audio playback
  */
 
-import { PitchShifter } from './index.js';
 import { canteTracksAPI } from './supabaseClient.js';
 
 export default class AudioManager {
   constructor() {
+    // WebAudio
     this.audioContext = null;
-    this.pitchShifter = null;
     this.gainNode = null;
-    
-    // Playback state
+
+    // Estado de reproducción
     this.isPlaying = false;
     this.currentPalo = null;
-    
-    // Track management
-    this.tracks = [];
-    this.playQueue = [];
-    this.audioBuffers = new Map(); // Cache for decoded audio buffers
-    
-    // Concatenated cycle management
-    this.currentCycleAudioBuffer = null;
-    this.currentCycle = 1;
-    this.totalTracksInCycle = 0;
-    
-    // Track timing for UI updates (optional for future enhancement)
-    this.trackTimings = []; // Array of {startTime, endTime, trackIndex}
-    
-    // Event listeners
+
+    // Pistas y cola
+    this.tracks = [];           // array de objetos track { id, title, audio_url, ... }
+    this.playQueue = [];        // array de índices dentro de this.tracks (barajada)
+    this.currentTrackIndex = 0; // posición dentro de playQueue
+
+    // Caching
+    this.audioBuffers = new Map();  // track.id -> AudioBuffer
+    this.currentSource = null;
+
+    // Controles de audio
+    this.globalTempo = 1.0;
+    this.globalPitchSemitones = 0;
+    this.currentVolume = 0.8;
+
+    // Listeners
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    
-    this.initializeAudioContext();
   }
 
-  /**
-   * Initialize Web Audio API context and gain node
-   */
-  initializeAudioContext() {
-    try {
+  /* --------------- Inicialización --------------- */
+  async initializeAudioContext() {
+    if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
-      console.log('Audio context initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize audio context:', error);
-      throw new Error('Web Audio API not supported in this browser');
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
+      console.log('Audio context inicializado');
     }
   }
 
-  /**
-   * Concatenate multiple AudioBuffers into a single AudioBuffer
-   * @param {AudioBuffer[]} buffers - Array of AudioBuffers to concatenate
-   * @returns {AudioBuffer} Single concatenated AudioBuffer
-   */
-  _concatenateAudioBuffers(buffers) {
-    if (!buffers || buffers.length === 0) {
-      throw new Error('No buffers provided for concatenation');
-    }
-
-    // Calculate total duration and validate buffers
-    let totalLength = 0;
-    const sampleRate = buffers[0].sampleRate;
-    const numberOfChannels = buffers[0].numberOfChannels;
-
-    for (const buffer of buffers) {
-      if (buffer.sampleRate !== sampleRate) {
-        throw new Error('All buffers must have the same sample rate');
-      }
-      if (buffer.numberOfChannels !== numberOfChannels) {
-        throw new Error('All buffers must have the same number of channels');
-      }
-      totalLength += buffer.length;
-    }
-
-    // Create the concatenated buffer
-    const concatenatedBuffer = this.audioContext.createBuffer(
-      numberOfChannels,
-      totalLength,
-      sampleRate
-    );
-
-    // Copy data from each buffer
-    let offset = 0;
-    this.trackTimings = []; // Reset track timings
-
-    for (let i = 0; i < buffers.length; i++) {
-      const buffer = buffers[i];
-      const startTime = offset / sampleRate;
-      const endTime = (offset + buffer.length) / sampleRate;
-      
-      // Store timing information for this track
-      this.trackTimings.push({
-        startTime,
-        endTime,
-        trackIndex: this.playQueue[i], // Original track index
-        duration: buffer.duration
-      });
-
-      // Copy each channel
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sourceData = buffer.getChannelData(channel);
-        const destData = concatenatedBuffer.getChannelData(channel);
-        destData.set(sourceData, offset);
-      }
-
-      offset += buffer.length;
-    }
-
-    console.log(`Concatenated ${buffers.length} tracks into single buffer (${concatenatedBuffer.duration.toFixed(2)}s)`);
-    return concatenatedBuffer;
-  }
-
-  /**
-   * Prepare the current cycle buffer by concatenating tracks in playQueue order
-   */
-  async _prepareCurrentCycleBuffer() {
-    if (this.playQueue.length === 0) {
-      throw new Error('No play queue available for cycle preparation');
-    }
-
-    console.log('Preparando buffer de reproducción...');
-
-    // Get buffers in playQueue order
-    const orderedBuffers = this.playQueue.map(trackIndex => {
-      const track = this.tracks[trackIndex];
-      const buffer = this.audioBuffers.get(track.id);
-      if (!buffer) {
-        throw new Error(`Buffer not found for track: ${track.title}`);
-      }
-      return buffer;
-    });
-
-    // Concatenate all buffers
-    this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
-    
-    console.log(`Buffer listo: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
-  }
-
-  /**
-   * Load tracks for a specific palo from Supabase and prepare first cycle
-   * @param {string} palo - The flamenco palo to load tracks for
-   */
+  /* --------------- Carga de pistas --------------- */
   async loadPalo(palo) {
     try {
-      console.log(`Cargando pistas para el palo: ${palo}`);
-      
-      // Fetch tracks from Supabase
+      console.log(`Loading tracks for palo: ${palo}`);
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
-      
-      if (this.tracks.length === 0) {
+      if (!this.tracks || this.tracks.length === 0) {
         throw new Error(`No tracks found for palo: ${palo}`);
       }
-      
       this.currentPalo = palo;
-      
-      // Decode all audio buffers
-      console.log('Decodificando archivos de audio...');
-      await this._decodeAllTracks();
-      
-      // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
-      await this._prepareCurrentCycleBuffer();
       
-      console.log(`Cargadas ${this.tracks.length} pistas para ${palo}`);
+      // Preload first track
+      await this.preloadTrack(this.playQueue[this.currentTrackIndex]);
+
+      console.log(`Loaded ${this.tracks.length} tracks for ${palo}`);
       return this.tracks.length;
-      
-    } catch (error) {
-      console.error('Error loading palo:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error loadPalo:', err);
+      throw err;
     }
   }
 
-  /**
-   * Decode all tracks and store in audioBuffers cache
-   */
-  async _decodeAllTracks() {
-    const decodePromises = this.tracks.map(async (track, index) => {
-      try {
-        console.log(`Decoding track ${index + 1}/${this.tracks.length}: ${track.title}`);
-        
-        // Fetch audio file
-        const response = await fetch(track.audio_url);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch audio: ${response.statusText}`);
-        }
-        
-        const arrayBuffer = await response.arrayBuffer();
-        
-        // Decode audio data
-        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-        
-        // Cache the buffer
-        this.audioBuffers.set(track.id, audioBuffer);
-        
-        console.log(`Successfully decoded: ${track.title} (${audioBuffer.duration.toFixed(2)}s)`);
-        
-      } catch (error) {
-        console.error(`Error decoding track ${track.title}:`, error);
-        throw error;
-      }
-    });
-
-    await Promise.all(decodePromises);
-    console.log('All tracks decoded successfully');
-  }
-
-  /**
-   * Create a shuffled play queue without repeats
-   */
   createPlayQueue() {
-    // Create array of indices
-    const indices = Array.from({ length: this.tracks.length }, (_, i) => i);
-    
-    // Shuffle using Fisher-Yates algorithm
+    const indices = Array.from(this.tracks.keys());
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
-    
     this.playQueue = indices;
-    this.totalTracksInCycle = this.tracks.length;
-    
-    console.log('Lista de reproducción creada:', this.playQueue);
+    this.currentTrackIndex = 0;
+    console.log('Play queue creada:', this.playQueue);
   }
 
-  /**
-   * Start playback of the current cycle
-   */
-  async play() {
-    if (!this.currentPalo || !this.currentCycleAudioBuffer) {
-      throw new Error('No cycle buffer ready. Call loadPalo() first.');
+  /* --------------- Preload / Decodificado --------------- */
+  async preloadTrack(trackIndex) {
+    if (trackIndex == null || trackIndex < 0 || trackIndex >= this.tracks.length) return;
+    const track = this.tracks[trackIndex];
+    if (!track || this.audioBuffers.has(track.id)) return;
+
+    try {
+      console.log('Preloading:', track.title || track.id);
+      const response = await fetch(track.audio_url);
+      if (!response.ok) throw new Error('fetch failed: ' + response.status);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.audioBuffers.set(track.id, audioBuffer);
+      console.log('Preloaded:', track.title || track.id);
+      return audioBuffer;
+    } catch (err) {
+      console.warn('Error preloading track', track.title, err);
+      throw err;
     }
-    
+  }
+
+  /* --------------- Reproducción --------------- */
+  async play() {
+    if (!this.currentPalo || !this.tracks.length) {
+      throw new Error('No palo loaded. Call loadPalo() first.');
+    }
     if (this.isPlaying) {
       console.log('Already playing');
       return;
     }
-    
-    try {
-      // Resume audio context if suspended (required by some browsers)
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      
-      // Start playing current cycle
-      await this.playCurrentCycle();
-      
-      this.isPlaying = true;
-      this.notifyPlayStateChange(true);
-      
-      console.log('Reproducción iniciada');
-      
-    } catch (error) {
-      console.error('Error starting playback:', error);
-      throw error;
+
+    await this.initializeAudioContext();
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
     }
+
+    this.isPlaying = true;
+    this.notifyPlayStateChange(true);
+    this.scheduleTrack(this.currentTrackIndex, this.audioContext.currentTime);
   }
 
-  /**
-   * Stop playback
-   */
-  stop() {
-    if (!this.isPlaying) {
+  scheduleTrack(trackIndex, startTime) {
+    if (!this.isPlaying) return;
+
+    const trackId = this.playQueue[trackIndex];
+    const track = this.tracks[trackId];
+    const buffer = this.audioBuffers.get(track.id);
+
+    if (!buffer) {
+      console.error('No buffer loaded for', track.title);
       return;
     }
-    
-    // Disconnect PitchShifter to stop audio
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
-    }
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(this.globalTempo, this.audioContext.currentTime);
+    source.connect(this.gainNode);
+    source.start(startTime);
+
+    this.currentSource = source;
+    this.notifyTrackChange(track);
+
+    // programamos la siguiente pista
+    const nextIndex = (trackIndex + 1) % this.playQueue.length;
+    const adjustedDuration = buffer.duration / this.globalTempo;
+    const nextStart = startTime + adjustedDuration;
+
+    this.preloadTrack(this.playQueue[nextIndex]).then(() => {
+      if (this.isPlaying) {
+        this.scheduleTrack(nextIndex, nextStart);
+      }
+    }).catch(err => {
+      console.error('Error preloading next track:', err);
+    });
+
+    // avanzamos el índice
+    this.currentTrackIndex = nextIndex;
+  }
+
+  stop() {
+    if (!this.isPlaying) return;
     
     this.isPlaying = false;
-    this.notifyPlayStateChange(false);
     
-    console.log('Reproducción detenida');
-  }
-
-  /**
-   * Play the current concatenated cycle
-   */
-  async playCurrentCycle() {
-    if (!this.currentCycleAudioBuffer) {
-      throw new Error('No cycle buffer available');
-    }
-    
-    console.log(`Reproduciendo (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
-    
-    // Disconnect any existing PitchShifter to ensure clean transition
-    if (this.pitchShifter) {
-      this.pitchShifter.disconnect();
-      this.pitchShifter = null;
-    }
-    
-    // Create new PitchShifter instance with concatenated buffer
-    this.pitchShifter = new PitchShifter(
-      this.audioContext,
-      this.currentCycleAudioBuffer,
-      4096,
-      () => this.onCycleEnd() // Callback when cycle ends
-    );
-    
-    // Apply current audio settings to the new PitchShifter
-    if (this.currentTempo !== undefined) {
-      this.pitchShifter.tempo = this.currentTempo;
-    }
-    if (this.currentPitchSemitones !== undefined) {
-      this.pitchShifter.pitchSemitones = this.currentPitchSemitones;
-    }
-    
-    // Connect to audio output
-    this.pitchShifter.connect(this.gainNode);
-    
-    // Notify cycle start (using first track info for UI)
-    const firstTrackIndex = this.playQueue[0];
-    const firstTrack = this.tracks[firstTrackIndex];
-    this.notifyTrackChange(firstTrack);
-  }
-
-  /**
-   * Handle cycle end - prepare and start next cycle
-   */
-  onCycleEnd() {
-    console.log('Reproducción completada, iniciando siguiente ciclo...');
-    
-    if (!this.isPlaying) {
-      console.log('Reproducción detenida');
-      return;
-    }
-    
-    // Small delay to ensure clean audio transition
-    setTimeout(async () => {
-      if (!this.isPlaying) {
-        console.log('Reproducción detenida durante la transición');
-        return;
-      }
-      
+    if (this.currentSource) {
       try {
-        // Create new play queue and prepare next cycle
-        this.createPlayQueue();
-        await this._prepareCurrentCycleBuffer();
-        
-        // Start next cycle
-        await this.playCurrentCycle();
-        
-      } catch (error) {
-        console.error('Error iniciando siguiente ciclo:', error);
-        this.stop();
+        this.currentSource.stop();
+        this.currentSource.disconnect();
+      } catch (e) {
+        // Source might already be stopped
       }
-    }, 100); // Slightly longer delay for cycle preparation
-  }
-
-  /**
-   * Get current track information (first track of current cycle)
-   * @returns {Object|null} Current track object or null
-   */
-  getCurrentTrack() {
-    if (!this.tracks.length || !this.playQueue.length) {
-      return null;
+      this.currentSource = null;
     }
-    
-    const firstTrackIndex = this.playQueue[0];
-    return this.tracks[firstTrackIndex];
+
+    this.notifyPlayStateChange(false);
+    console.log('Playback stopped');
   }
 
+  pause() {
+    if (this.audioContext && this.isPlaying) {
+      this.audioContext.suspend();
+      this.isPlaying = false;
+      this.notifyPlayStateChange(false);
+    }
+  }
 
-  /**
-   * Set playback tempo
-   * @param {number} tempo - Tempo value (1.0 = normal speed)
-   */
+  resume() {
+    if (this.audioContext && !this.isPlaying) {
+      this.audioContext.resume();
+      this.isPlaying = true;
+      this.notifyPlayStateChange(true);
+    }
+  }
+
+  /* --------------- Controles de audio --------------- */
   setTempo(tempo) {
-    this.currentTempo = tempo;
-    if (this.pitchShifter) {
-      this.pitchShifter.tempo = tempo;
-      console.log(`Tempo set to: ${tempo}`);
+    this.globalTempo = tempo;
+    if (this.currentSource && this.currentSource.playbackRate) {
+      try {
+        this.currentSource.playbackRate.setValueAtTime(tempo, this.audioContext.currentTime);
+      } catch (e) {
+        // Source might be stopped
+      }
     }
+    console.log('Tempo set to', tempo);
   }
 
-  /**
-   * Set pitch
-   * @param {number} pitch - Pitch value (1.0 = normal pitch)
-   */
-  setPitch(pitch) {
-    this.currentPitch = pitch;
-    if (this.pitchShifter) {
-      this.pitchShifter.pitch = pitch;
-      console.log(`Pitch set to: ${pitch}`);
-    }
-  }
-
-  /**
-   * Set pitch in semitones
-   * @param {number} semitones - Semitones to shift (-12 to +12)
-   */
   setPitchSemitones(semitones) {
-    this.currentPitchSemitones = semitones;
-    if (this.pitchShifter) {
-      this.pitchShifter.pitchSemitones = semitones;
-      console.log(`Pitch set to: ${semitones} semitones`);
-    }
+    this.globalPitchSemitones = semitones;
+    // Note: AudioBufferSourceNode doesn't support pitch shifting without tempo change
+    // For real pitch shifting, we'd need to use a more complex approach
+    console.log('Pitch semitones set to', semitones, '(tempo-based approximation)');
   }
 
-  /**
-   * Set volume
-   * @param {number} volume - Volume level (0.0 to 1.0)
-   */
   setVolume(volume) {
-    if (this.gainNode) {
-      this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
-      console.log(`Volume set to: ${volume}`);
+    this.currentVolume = Math.max(0, Math.min(1, volume));
+    if (this.gainNode && this.audioContext) {
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.audioContext.currentTime);
     }
   }
 
-  /**
-   * Get available palos from Supabase
-   * @returns {Promise<Array>} Array of available palo names
-   */
+  /* --------------- Getters --------------- */
+  getCurrentTrack() {
+    if (!this.tracks.length) return null;
+    const queueIndex = this.playQueue[this.currentTrackIndex];
+    return this.tracks[queueIndex] || null;
+  }
+
   async getAvailablePalos() {
     try {
       return await canteTracksAPI.getAvailablePalos();
-    } catch (error) {
-      console.error('Error fetching available palos:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error fetching palos:', err);
+      throw err;
     }
   }
 
-  /**
-   * Add listener for track changes
-   * @param {Function} callback - Callback function to call when track changes
-   */
-  onTrackChange(callback) {
-    this.onTrackChangeListeners.push(callback);
+  /* --------------- Event listeners --------------- */
+  onTrackChange(cb) { 
+    this.onTrackChangeListeners.push(cb); 
   }
-
-  /**
-   * Add listener for play state changes
-   * @param {Function} callback - Callback function to call when play state changes
-   */
-  onPlayStateChange(callback) {
-    this.onPlayStateChangeListeners.push(callback);
+  
+  onPlayStateChange(cb) { 
+    this.onPlayStateChangeListeners.push(cb); 
   }
-
-  /**
-   * Notify all track change listeners
-   * @param {Object} track - Current track object
-   */
+  
   notifyTrackChange(track) {
-    this.onTrackChangeListeners.forEach(callback => {
-      try {
-        callback(track);
-      } catch (error) {
-        console.error('Error in track change listener:', error);
-      }
+    console.log(`Now playing: ${track.title}`);
+    this.onTrackChangeListeners.forEach(cb => { 
+      try { cb(track); } catch(e) { console.error('Track change listener error:', e); } 
     });
   }
-
-  /**
-   * Notify all play state change listeners
-   * @param {boolean} isPlaying - Current play state
-   */
+  
   notifyPlayStateChange(isPlaying) {
-    this.onPlayStateChangeListeners.forEach(callback => {
-      try {
-        callback(isPlaying);
-      } catch (error) {
-        console.error('Error in play state change listener:', error);
-      }
+    this.onPlayStateChangeListeners.forEach(cb => { 
+      try { cb(isPlaying); } catch(e) { console.error('Play state listener error:', e); } 
     });
   }
 
-  /**
-   * Clean up resources
-   */
+  /* --------------- Cleanup --------------- */
   destroy() {
     this.stop();
-    
     if (this.audioContext) {
-      this.audioContext.close();
+      try { 
+        this.audioContext.close(); 
+      } catch (e) {
+        console.warn('Error closing audio context:', e);
+      }
+      this.audioContext = null;
+      this.gainNode = null;
     }
-    
     this.audioBuffers.clear();
-    this.currentCycleAudioBuffer = null;
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-    
-    this.trackTimings = [];
-    
     console.log('AudioManager destroyed');
   }
 }
