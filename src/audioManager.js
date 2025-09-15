@@ -306,6 +306,7 @@ export default class AudioManager {
    * Handle track end - move to next track
    */
   onTrackEnd() {
+    console.log('[AudioManager] onTrackEnd() called - processing track end');
     console.log(`Track ended - ${this.tracksPlayedInCycle}/${this.totalTracksInCycle} completed in cycle ${this.currentCycle}`);
     
     if (!this.isPlaying) {
@@ -323,19 +324,21 @@ export default class AudioManager {
       this.createPlayQueue();
     }
     
-    // Small delay to ensure clean audio transition
+    // 1 second delay between tracks for clean transition
+    console.log('Waiting 4 seconds before next track...');
     setTimeout(() => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during transition delay');
+        console.log('Playback was stopped during 4-second transition delay');
         return;
       }
       
+      console.log('Starting next track after 4-second delay');
       // Play next track
       this.playCurrentTrack().catch(error => {
         console.error('Error playing next track:', error);
         this.stop();
       });
-    }, 100); // Slightly increased delay to account for AudioWorklet initialization
+    }, 4000); // 4 seconds delay between tracks
   }
 
   /**
