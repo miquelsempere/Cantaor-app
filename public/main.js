@@ -7,6 +7,20 @@ import AudioManager from '../src/audioManager.js';
 
 class FlamencoApp {
   constructor() {
+    // Constante para el contenido SVG del botón de reproducción
+    this.PLAY_BUTTON_SVG_CONTENT = `
+                <div class="play-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                    </svg>
+                </div>
+                <div class="pause-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"></path>
+                    </svg>
+                </div>
+            `;
+    
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
@@ -230,6 +244,9 @@ class FlamencoApp {
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
+    
+    // Asegurar que el contenido SVG esté siempre presente
+    this.playButton.innerHTML = this.PLAY_BUTTON_SVG_CONTENT;
     
     // Update play button state - simply toggle the is-playing class
     if (isPlaying) {
