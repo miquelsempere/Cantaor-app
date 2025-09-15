@@ -3,7 +3,7 @@ import noop from './noop.js';
  * getWebAudioNode
  *
  * A wrapper to create an AudioNode and apply a filter for frame extraction
- * Copyright (c) Adrian Holovaty https://github.com/adrianholovaty
+ * Copyright (c) Adrian Holovary https://github.com/adrianholovaty
  *
  * @param context - AudioContext
  * @param filter - Object containing an 'extract()' method
@@ -33,14 +33,16 @@ const getWebAudioNode = function (
     let left = event.outputBuffer.getChannelData(0);
     let right = event.outputBuffer.getChannelData(1);
     let framesExtracted = filter.extract(samples, bufferSize);
+    console.log(`[getWebAudioNode] Frames extracted: ${framesExtracted}`);
     sourcePositionCallback(filter.sourcePosition);
     
     if (framesExtracted === 0) {
       if (!hasEnded) {
+        console.log('[getWebAudioNode] Track ended - calling filter.onEnd()');
         hasEnded = true;
+        filter.onEnd();
         // Disconnect the node to stop further processing
         node.disconnect();
-        filter.onEnd();
       }
     }
     

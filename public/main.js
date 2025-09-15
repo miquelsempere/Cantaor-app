@@ -87,6 +87,7 @@ class FlamencoApp {
     // Listen for track changes
     this.audioManager.onTrackChange((track) => {
       this.updateTrackInfo(track);
+      this.updatePlaybackStatus();
     });
 
     // Listen for play state changes
@@ -196,6 +197,32 @@ class FlamencoApp {
     }
   }
 
+  updatePlaybackStatus() {
+    if (this.isPlaying) {
+      const status = this.audioManager.getPlaybackStatus();
+      const statusText = `Ciclo ${status.currentCycle} - ${status.tracksPlayedInCycle}/${status.totalTracksInCycle} pistas`;
+      
+      // Update status in the track info or create a new status element
+      const existingStatus = document.querySelector('.playback-status');
+      if (existingStatus) {
+        existingStatus.textContent = statusText;
+      } else {
+        const statusElement = document.createElement('div');
+        statusElement.className = 'playback-status';
+        statusElement.textContent = statusText;
+        statusElement.style.fontSize = '0.8rem';
+        statusElement.style.color = '#718096';
+        statusElement.style.marginTop = '0.5rem';
+        this.trackInfo.appendChild(statusElement);
+      }
+    } else {
+      // Remove status when not playing
+      const existingStatus = document.querySelector('.playback-status');
+      if (existingStatus) {
+        existingStatus.remove();
+      }
+    }
+  }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
     
@@ -208,6 +235,9 @@ class FlamencoApp {
     } else {
       this.visualizer.classList.remove('playing');
     }
+    
+    // Update playback status
+    this.updatePlaybackStatus();
   }
 
   showStatus(message, type = '') {
