@@ -10715,8 +10715,8 @@ if (shouldShowDeprecationWarning()) {
 
 
 // These environment variables should be set in your .env file
-const supabaseUrl = "https://bkfzecsjpcvntyvldiii.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZnplY3NqcGN2bnR5dmxkaWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTc0NDAsImV4cCI6MjA3MzA3MzQ0MH0.z7aJ6pbS-2p_psa69iA-71VuVsYwF0y8gP3EYob5Ci0";
+const supabaseUrl = "your_supabase_project_url_here";
+const supabaseAnonKey = "your_supabase_anon_key_here";
 
 // Create and export the Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -11284,6 +11284,12 @@ class FlamencoApp {
 
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
+    console.log('Constructor — paloSelect (referencia):', this.paloSelect);
+    if (!this.paloSelect) {
+      console.warn('No se encontró #paloSelect — intento fallback con querySelector.');
+      this.paloSelect = document.querySelector('select') || null;
+      console.log('Constructor — paloSelect (fallback):', this.paloSelect);
+    }
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
 
