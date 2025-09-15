@@ -40,6 +40,8 @@ const getWebAudioNode = function (
         hasEnded = true;
         // Disconnect the node to stop further processing
         node.disconnect();
+        // Disconnect the node to stop further processing
+        node.disconnect();
         filter.onEnd();
       }
     }
