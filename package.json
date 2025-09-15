@@ -31,7 +31,8 @@
     "build": "rollup -c scripts/rollup.config.mjs",
     "prettier": "prettier --write 'src/**/*.js'",
     "release": "commit-and-tag-version",
-    "start": "node scripts/server.cjs"
+    "start": "node scripts/server.cjs",
+    "dev": "node scripts/server.cjs"
   },
   "devDependencies": {
     "@babel/core": "7.26.9",
@@ -52,5 +53,8 @@
     "rollup-plugin-cleanup": "3.2.1",
     "rollup-plugin-clear": "2.0.7",
     "serve-static": "1.16.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
   }
 }

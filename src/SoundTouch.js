@@ -20,10 +20,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-import RateTransposer from './RateTransposer';
-import Stretch from './Stretch';
-import FifoSampleBuffer from './FifoSampleBuffer';
-import testFloatEqual from './testFloatEqual';
+import RateTransposer from './RateTransposer.js';
+import Stretch from './Stretch.js';
+import FifoSampleBuffer from './FifoSampleBuffer.js';
+import testFloatEqual from './testFloatEqual.js';
 
 export default class SoundTouch {
   constructor() {
