@@ -39,8 +39,6 @@ class FlamencoApp {
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
-    this.volumeSlider = document.getElementById('volumeSlider');
-    this.volumeValue = document.getElementById('volumeValue');
     
     this.init();
   }
@@ -89,13 +87,6 @@ class FlamencoApp {
       const semitones = parseInt(e.target.value);
       this.audioManager.setPitchSemitones(semitones);
       this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
-    });
-
-    // Volume control
-    this.volumeSlider.addEventListener('input', (e) => {
-      const volume = parseFloat(e.target.value);
-      this.audioManager.setVolume(volume);
-      this.volumeValue.textContent = `${Math.round(volume * 100)}%`;
     });
   }
 

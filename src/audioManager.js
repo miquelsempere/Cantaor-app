@@ -426,15 +426,6 @@ export default class AudioManager {
    * Set volume
    * @param {number} volume - Volume level (0.0 to 1.0)
    */
-  setVolume(volume) {
-    this.currentVolume = volume;
-    if (this.gainNode) {
-      this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
-      console.log(`Volume set to: ${volume}`);
-    }
-  }
-
-  /**
    * Get available palos from Supabase
    * @returns {Promise<Array>} Array of available palo names
    */
