@@ -10916,7 +10916,7 @@ class AudioManager {
     if (this.playQueue.length === 0) {
       throw new Error('No play queue available for cycle preparation');
     }
-    console.log(`Preparing cycle ${this.currentCycle} buffer...`);
+    console.log('Preparando buffer de reproducción...');
 
     // Get buffers in playQueue order
     const orderedBuffers = this.playQueue.map(trackIndex => {
@@ -10930,7 +10930,7 @@ class AudioManager {
 
     // Concatenate all buffers
     this.currentCycleAudioBuffer = this._concatenateAudioBuffers(orderedBuffers);
-    console.log(`Cycle ${this.currentCycle} buffer ready: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
+    console.log(`Buffer listo: ${this.currentCycleAudioBuffer.duration.toFixed(2)}s`);
   }
 
   /**
@@ -10939,7 +10939,7 @@ class AudioManager {
    */
   async loadPalo(palo) {
     try {
-      console.log(`Loading tracks for palo: ${palo}`);
+      console.log(`Cargando pistas para el palo: ${palo}`);
 
       // Fetch tracks from Supabase
       this.tracks = await canteTracksAPI.getTracksByPalo(palo);
@@ -10949,13 +10949,13 @@ class AudioManager {
       this.currentPalo = palo;
 
       // Decode all audio buffers
-      console.log('Decoding all audio buffers...');
+      console.log('Decodificando archivos de audio...');
       await this._decodeAllTracks();
 
       // Create shuffled play queue and prepare first cycle
       this.createPlayQueue();
       await this._prepareCurrentCycleBuffer();
-      console.log(`Loaded ${this.tracks.length} tracks for ${palo}, first cycle ready`);
+      console.log(`Cargadas ${this.tracks.length} pistas para ${palo}`);
       return this.tracks.length;
     } catch (error) {
       console.error('Error loading palo:', error);
@@ -11009,7 +11009,7 @@ class AudioManager {
     }
     this.playQueue = indices;
     this.totalTracksInCycle = this.tracks.length;
-    console.log(`Play queue created for cycle ${this.currentCycle}:`, this.playQueue);
+    console.log('Lista de reproducción creada:', this.playQueue);
   }
 
   /**
@@ -11033,7 +11033,7 @@ class AudioManager {
       await this.playCurrentCycle();
       this.isPlaying = true;
       this.notifyPlayStateChange(true);
-      console.log(`Playback started - Cycle ${this.currentCycle}`);
+      console.log('Reproducción iniciada');
     } catch (error) {
       console.error('Error starting playback:', error);
       throw error;
@@ -11055,7 +11055,7 @@ class AudioManager {
     }
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
-    console.log(`Playback stopped - Was in cycle ${this.currentCycle}`);
+    console.log('Reproducción detenida');
   }
 
   /**
@@ -11065,7 +11065,7 @@ class AudioManager {
     if (!this.currentCycleAudioBuffer) {
       throw new Error('No cycle buffer available');
     }
-    console.log(`Playing cycle ${this.currentCycle} (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
+    console.log(`Reproduciendo (${this.currentCycleAudioBuffer.duration.toFixed(2)}s)`);
 
     // Disconnect any existing PitchShifter to ensure clean transition
     if (this.pitchShifter) {
@@ -11098,19 +11098,16 @@ class AudioManager {
    * Handle cycle end - prepare and start next cycle
    */
   onCycleEnd() {
-    console.log(`Cycle ${this.currentCycle} completed!`);
+    console.log('Reproducción completada, iniciando siguiente ciclo...');
     if (!this.isPlaying) {
-      console.log('Playback stopped, not starting next cycle');
+      console.log('Reproducción detenida');
       return;
     }
-
-    // Increment cycle counter
-    this.currentCycle++;
 
     // Small delay to ensure clean audio transition
     setTimeout(async () => {
       if (!this.isPlaying) {
-        console.log('Playback was stopped during transition delay');
+        console.log('Reproducción detenida durante la transición');
         return;
       }
       try {
@@ -11121,7 +11118,7 @@ class AudioManager {
         // Start next cycle
         await this.playCurrentCycle();
       } catch (error) {
-        console.error('Error starting next cycle:', error);
+        console.error('Error iniciando siguiente ciclo:', error);
         this.stop();
       }
     }, 100); // Slightly longer delay for cycle preparation
@@ -11137,21 +11134,6 @@ class AudioManager {
     }
     const firstTrackIndex = this.playQueue[0];
     return this.tracks[firstTrackIndex];
-  }
-
-  /**
-   * Get current playback status information
-   * @returns {Object} Status information including cycle and track progress
-   */
-  getPlaybackStatus() {
-    return {
-      isPlaying: this.isPlaying,
-      currentPalo: this.currentPalo,
-      currentCycle: this.currentCycle,
-      totalTracksInCycle: this.totalTracksInCycle,
-      currentTrack: this.getCurrentTrack(),
-      cycleDuration: this.currentCycleAudioBuffer ? this.currentCycleAudioBuffer.duration : 0
-    };
   }
 
   /**
@@ -11195,7 +11177,6 @@ class AudioManager {
    * @param {number} volume - Volume level (0.0 to 1.0)
    */
   setVolume(volume) {
-    this.currentVolume = volume;
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
       console.log(`Volume set to: ${volume}`);
@@ -11271,10 +11252,6 @@ class AudioManager {
     this.currentCycleAudioBuffer = null;
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
-
-    // Reset cycle tracking
-    this.currentCycle = 1;
-    this.totalTracksInCycle = 0;
     this.trackTimings = [];
     console.log('AudioManager destroyed');
   }
@@ -11287,6 +11264,20 @@ class AudioManager {
 
 class FlamencoApp {
   constructor() {
+    // Constante para el contenido SVG del botón de reproducción
+    this.PLAY_BUTTON_SVG_CONTENT = `
+                <div class="play-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                    </svg>
+                </div>
+                <div class="pause-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"></path>
+                    </svg>
+                </div>
+            `;
+    console.log('PLAY_BUTTON_SVG_CONTENT:', this.PLAY_BUTTON_SVG_CONTENT);
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
@@ -11294,23 +11285,17 @@ class FlamencoApp {
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
     this.playButton = document.getElementById('playButton');
-    this.trackInfo = document.getElementById('trackInfo');
     this.visualizer = document.getElementById('visualizer');
-    this.statusMessage = document.getElementById('statusMessage');
 
     // Control Elements
     this.tempoSlider = document.getElementById('tempoSlider');
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
-    this.volumeSlider = document.getElementById('volumeSlider');
-    this.volumeValue = document.getElementById('volumeValue');
     this.init();
   }
   async init() {
     try {
-      this.showStatus('Inicializando aplicación...', 'loading');
-
       // Set up event listeners
       this.setupEventListeners();
 
@@ -11319,10 +11304,8 @@ class FlamencoApp {
 
       // Set up audio manager listeners
       this.setupAudioManagerListeners();
-      this.showStatus('¡Listo para practicar!', 'success');
     } catch (error) {
       console.error('Error initializing app:', error);
-      this.showStatus('Error al inicializar la aplicación', 'error');
     }
   }
   setupEventListeners() {
@@ -11349,19 +11332,11 @@ class FlamencoApp {
       this.audioManager.setPitchSemitones(semitones);
       this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
     });
-
-    // Volume control
-    this.volumeSlider.addEventListener('input', e => {
-      const volume = parseFloat(e.target.value);
-      this.audioManager.setVolume(volume);
-      this.volumeValue.textContent = `${Math.round(volume * 100)}%`;
-    });
   }
   setupAudioManagerListeners() {
     // Listen for track changes
     this.audioManager.onTrackChange(track => {
       this.updateTrackInfo(track);
-      this.updatePlaybackStatus();
     });
 
     // Listen for play state changes
@@ -11371,11 +11346,10 @@ class FlamencoApp {
   }
   async loadAvailablePalos() {
     try {
-      this.showStatus('Cargando palos disponibles...', 'loading');
       const palos = await this.audioManager.getAvailablePalos();
 
       // Clear existing options
-      this.paloSelect.innerHTML = '<option value="">Selecciona un palo</option>';
+      this.paloSelect.innerHTML = '';
 
       // Add palo options
       palos.forEach(palo => {
@@ -11384,10 +11358,15 @@ class FlamencoApp {
         option.textContent = palo;
         this.paloSelect.appendChild(option);
       });
+
+      // Set Tangos as default if available
+      if (palos.includes('Tangos')) {
+        this.paloSelect.value = 'Tangos';
+        await this.handlePaloChange('Tangos');
+      }
       console.log(`Loaded ${palos.length} palos:`, palos);
     } catch (error) {
       console.error('Error loading palos:', error);
-      this.showStatus('Error cargando palos disponibles', 'error');
       this.paloSelect.innerHTML = '<option value="">Error cargando palos</option>';
     }
   }
@@ -11399,7 +11378,6 @@ class FlamencoApp {
       return;
     }
     try {
-      this.showStatus(`Cargando pistas de ${selectedPalo}...`, 'loading');
       this.playButton.disabled = true;
 
       // Stop current playback if any
@@ -11413,108 +11391,67 @@ class FlamencoApp {
 
       // Enable play button
       this.playButton.disabled = false;
-      this.showStatus(`${trackCount} pistas cargadas para ${selectedPalo}`, 'success');
 
       // Update track info
       const currentTrack = this.audioManager.getCurrentTrack();
       this.updateTrackInfo(currentTrack);
     } catch (error) {
       console.error('Error loading palo:', error);
-      this.showStatus(`Error cargando ${selectedPalo}`, 'error');
       this.playButton.disabled = true;
     }
   }
   async handlePlayButtonClick() {
     if (!this.currentPalo) {
-      this.showStatus('Selecciona un palo primero', 'error');
       return;
     }
+    console.log('Play button clicked, current state:', this.isPlaying);
     try {
       if (this.isPlaying) {
         // Stop playback
+        console.log('Stopping playback...');
         this.audioManager.stop();
-        this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
-        this.showStatus('Iniciando reproducción...', 'loading');
+        console.log('Starting playback...');
         await this.audioManager.play();
-        this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
       }
     } catch (error) {
       console.error('Error with playback:', error);
-      this.showStatus('Error en la reproducción', 'error');
     }
   }
   updateTrackInfo(track) {
-    const titleElement = this.trackInfo.querySelector('.track-title');
-    const paloElement = this.trackInfo.querySelector('.track-palo');
-    if (track) {
-      titleElement.textContent = `Ciclo ${this.audioManager.currentCycle} - ${track.title}`;
-      paloElement.textContent = `${track.palo} (${this.audioManager.totalTracksInCycle} pistas aleatorias)`;
-    } else {
-      titleElement.textContent = this.currentPalo ? 'Listo para reproducir' : 'Selecciona un palo para comenzar';
-      paloElement.textContent = this.currentPalo || '';
-    }
-  }
-  updatePlaybackStatus() {
-    if (this.isPlaying) {
-      const status = this.audioManager.getPlaybackStatus();
-      const cycleDuration = status.cycleDuration ? `${status.cycleDuration.toFixed(1)}s` : '';
-      const statusText = `Ciclo ${status.currentCycle} - ${status.totalTracksInCycle} pistas ${cycleDuration}`;
-
-      // Update status in the track info or create a new status element
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.textContent = statusText;
-      } else {
-        const statusElement = document.createElement('div');
-        statusElement.className = 'playback-status';
-        statusElement.textContent = statusText;
-        statusElement.style.fontSize = '0.8rem';
-        statusElement.style.color = '#718096';
-        statusElement.style.marginTop = '0.5rem';
-        this.trackInfo.appendChild(statusElement);
-      }
-    } else {
-      // Remove status when not playing
-      const existingStatus = document.querySelector('.playback-status');
-      if (existingStatus) {
-        existingStatus.remove();
-      }
-    }
+    // Esta función ya no se usa
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
 
-    // Update play button - toggle is-playing class
+    // Deshabilitar el menú desplegable durante la reproducción
+    this.paloSelect.disabled = isPlaying;
+
+    // Deshabilitar el menú desplegable durante la reproducción
+    this.paloSelect.disabled = isPlaying;
+    console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
+    console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
+
+    // Asegurar que el contenido SVG esté siempre presente
+    this.playButton.innerHTML = this.PLAY_BUTTON_SVG_CONTENT;
+    console.log('updatePlayState: Después de asignar innerHTML. Contenido actual:', this.playButton.innerHTML);
+
+    // Update play button state - simply toggle the is-playing class
     if (isPlaying) {
       this.playButton.classList.add('is-playing');
+      console.log('Play button: switched to pause icon');
     } else {
       this.playButton.classList.remove('is-playing');
+      console.log('Play button: switched to play icon');
     }
+    console.log('updatePlayState: Clases del botón después de toggle:', this.playButton.classList.value);
 
     // Update visualizer
     if (isPlaying) {
       this.visualizer.classList.add('playing');
     } else {
       this.visualizer.classList.remove('playing');
-    }
-
-    // Update playback status
-    this.updatePlaybackStatus();
-  }
-  showStatus(message, type = '') {
-    this.statusMessage.textContent = message;
-    this.statusMessage.className = `status-message ${type}`;
-
-    // Auto-clear success messages after 3 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        if (this.statusMessage.textContent === message) {
-          this.statusMessage.textContent = '';
-          this.statusMessage.className = 'status-message';
-        }
-      }, 3000);
     }
   }
 }
