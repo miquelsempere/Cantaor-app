@@ -228,11 +228,7 @@ class FlamencoApp {
     this.isPlaying = isPlaying;
     
     // Update play button
-    if (isPlaying) {
-      this.playButton.classList.add('is-playing');
-    } else {
-      this.playButton.classList.remove('is-playing');
-    }
+    this.playButton.textContent = isPlaying ? '⏸️' : '▶️';
     
     // Update visualizer
     if (isPlaying) {
