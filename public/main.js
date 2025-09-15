@@ -31,7 +31,6 @@ class FlamencoApp {
     this.paloSelect = document.getElementById('paloSelect');
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
-    this.statusMessage = document.getElementById('statusMessage');
     
     // Control Elements
     this.tempoSlider = document.getElementById('tempoSlider');
@@ -44,8 +43,6 @@ class FlamencoApp {
 
   async init() {
     try {
-      this.showStatus('Inicializando aplicación...', 'loading');
-      
       // Set up event listeners
       this.setupEventListeners();
       
@@ -55,11 +52,8 @@ class FlamencoApp {
       // Set up audio manager listeners
       this.setupAudioManagerListeners();
       
-      this.showStatus('¡Listo para practicar!', 'success');
-      
     } catch (error) {
       console.error('Error initializing app:', error);
-      this.showStatus('Error al inicializar la aplicación', 'error');
     }
   }
 
@@ -103,8 +97,6 @@ class FlamencoApp {
 
   async loadAvailablePalos() {
     try {
-      this.showStatus('Cargando palos disponibles...', 'loading');
-      
       const palos = await this.audioManager.getAvailablePalos();
       
       // Clear existing options
@@ -122,7 +114,6 @@ class FlamencoApp {
       
     } catch (error) {
       console.error('Error loading palos:', error);
-      this.showStatus('Error cargando palos disponibles', 'error');
       this.paloSelect.innerHTML = '<option value="">Error cargando palos</option>';
     }
   }
@@ -136,7 +127,6 @@ class FlamencoApp {
     }
 
     try {
-      this.showStatus(`Cargando pistas de ${selectedPalo}...`, 'loading');
       this.playButton.disabled = true;
       
       // Stop current playback if any
@@ -151,22 +141,18 @@ class FlamencoApp {
       // Enable play button
       this.playButton.disabled = false;
       
-      this.showStatus(`${trackCount} pistas cargadas para ${selectedPalo}`, 'success');
-      
       // Update track info
       const currentTrack = this.audioManager.getCurrentTrack();
       this.updateTrackInfo(currentTrack);
       
     } catch (error) {
       console.error('Error loading palo:', error);
-      this.showStatus(`Error cargando ${selectedPalo}`, 'error');
       this.playButton.disabled = true;
     }
   }
 
   async handlePlayButtonClick() {
     if (!this.currentPalo) {
-      this.showStatus('Selecciona un palo primero', 'error');
       return;
     }
 
@@ -177,17 +163,13 @@ class FlamencoApp {
         // Stop playback
         console.log('Stopping playback...');
         this.audioManager.stop();
-        this.showStatus('Reproducción detenida', 'success');
       } else {
         // Start playback
         console.log('Starting playback...');
-        this.showStatus('Iniciando reproducción...', 'loading');
         await this.audioManager.play();
-        this.showStatus(`Reproduciendo ${this.currentPalo}`, 'success');
       }
     } catch (error) {
       console.error('Error with playback:', error);
-      this.showStatus('Error en la reproducción', 'error');
     }
   }
 
@@ -223,21 +205,6 @@ class FlamencoApp {
       this.visualizer.classList.add('playing');
     } else {
       this.visualizer.classList.remove('playing');
-    }
-  }
-
-  showStatus(message, type = '') {
-    this.statusMessage.textContent = message;
-    this.statusMessage.className = `status-message ${type}`;
-    
-    // Auto-clear success messages after 3 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        if (this.statusMessage.textContent === message) {
-          this.statusMessage.textContent = '';
-          this.statusMessage.className = 'status-message';
-        }
-      }, 3000);
     }
   }
 }
