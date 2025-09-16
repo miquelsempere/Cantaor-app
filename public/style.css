@@ -321,6 +321,7 @@ body {
 #pitchSlider {
     height: 12px;
     position: relative;
+    z-index: 1;
 }
 
 #pitchSlider::-webkit-slider-runnable-track {
@@ -345,22 +346,13 @@ body {
 #pitchSlider {
     height: 12px;
     position: relative;
+    z-index: 1;
 }
 
 #pitchSlider::-webkit-slider-runnable-track {
     width: 100%;
     height: 12px;
-    background: repeating-linear-gradient(
-        to right,
-        #2C1A10 0%,
-        #2C1A10 9.75%,
-        #C0C0C0 9.75%,
-        #C0C0C0 10.25%,
-        #2C1A10 10.25%,
-        #2C1A10 10%
-    );
-    background-size: calc(100% - 8px) 100%;
-    background-position-x: 4px;
+    background: #2C1A10;
     border-radius: 6px;
     border: 1px solid #1A0F08;
     box-shadow: 
@@ -372,17 +364,7 @@ body {
 #pitchSlider::-moz-range-track {
     width: 100%;
     height: 12px;
-    background: repeating-linear-gradient(
-        to right,
-        #2C1A10 0%,
-        #2C1A10 9.75%,
-        #C0C0C0 9.75%,
-        #C0C0C0 10.25%,
-        #2C1A10 10.25%,
-        #2C1A10 10%
-    );
-    background-size: calc(100% - 8px) 100%;
-    background-position-x: 4px;
+    background: #2C1A10;
     border-radius: 6px;
     border: 1px solid #1A0F08;
     box-shadow: 
@@ -391,6 +373,41 @@ body {
         0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
+/* Slider track wrapper for positioning fret markers */
+.slider-track-wrapper {
+    position: relative;
+    width: 100%;
+    height: 12px;
+    margin-bottom: 0.5rem;
+}
+
+/* Fret markers container */
+.fret-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Individual fret marker */
+.fret-marker {
+    width: 1px;
+    height: 100%;
+    background-color: #C0C0C0;
+    border-radius: 0.5px;
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+/* Remove margin adjustment from capo thumb since we're using natural positioning */
 .control-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -416,7 +433,7 @@ body {
         0 3px 6px rgba(0, 0, 0, 0.5), 
         inset 0 1px 3px rgba(255, 255, 255, 0.4);
     border: 1px solid #888;
-    margin-top: -6px;
+    margin-top: 0;
 }
 
 .control-slider::-moz-range-thumb {

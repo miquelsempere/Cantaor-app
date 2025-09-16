@@ -35,6 +35,7 @@ class FlamencoApp {
     this.customSelectText = this.customSelectDisplay.querySelector('.custom-select-text');
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
+    this.fretMarkersContainer = document.getElementById('fretMarkers');
     
     // Control Elements
     this.tempoSlider = document.getElementById('tempoSlider');
@@ -50,6 +51,7 @@ class FlamencoApp {
       // Set up event listeners
       this.setupEventListeners();
       
+      this.createFretMarkers();
       // Load available palos
       await this.loadAvailablePalos();
       
@@ -59,6 +61,22 @@ class FlamencoApp {
     } catch (error) {
       console.error('Error initializing app:', error);
     }
+  }
+
+  createFretMarkers() {
+    const minSemitones = parseInt(this.pitchSlider.min); // -5
+    const maxSemitones = parseInt(this.pitchSlider.max); // 5
+    const numberOfMarkers = maxSemitones - minSemitones + 1; // 11 marcadores (Traste 0 a Traste 10)
+
+    this.fretMarkersContainer.innerHTML = ''; // Limpiar marcadores existentes
+
+    for (let i = 0; i < numberOfMarkers; i++) {
+      const fretMarker = document.createElement('div');
+      fretMarker.className = 'fret-marker';
+      this.fretMarkersContainer.appendChild(fretMarker);
+    }
+    
+    console.log(`Created ${numberOfMarkers} fret markers`);
   }
 
   setupEventListeners() {
