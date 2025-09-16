@@ -60,12 +60,7 @@
             margin-bottom: 0.5rem;
         }
 
-        .custom-select-wrapper {
-            position: relative;
-            width: 100%;
-        }
-
-        .custom-select-display {
+        .palo-select {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid #D1D5DB;
@@ -73,102 +68,12 @@
             font-size: 1rem;
             background: white;
             transition: all 0.3s ease;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #4A2C2C;
         }
 
-        .custom-select-display:hover {
-            border-color: #C0392B;
-            box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
-        }
-
-        .custom-select-display.active {
+        .palo-select:focus {
             outline: none;
             border-color: #C0392B;
             box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
-        }
-
-        .custom-select-text {
-            flex: 1;
-        }
-
-        .custom-select-arrow {
-            width: 20px;
-            height: 20px;
-            color: #C0392B;
-            transition: transform 0.3s ease;
-        }
-
-        .custom-select-display.active .custom-select-arrow {
-            transform: rotate(180deg);
-        }
-
-        .custom-select-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #D1D5DB;
-            border-top: none;
-            border-radius: 0 0 10px 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            max-height: 200px;
-            overflow-y: auto;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-10px);
-            transition: all 0.3s ease;
-        }
-
-        .custom-select-options.open {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .custom-select-option {
-            background-color: white;
-            color: #4A2C2C;
-            padding: 0.5rem 0.75rem;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border-bottom: 1px solid #F7F7F7;
-        }
-
-        .custom-select-option:last-child {
-            border-bottom: none;
-        }
-
-        .custom-select-option:hover {
-            background-color: #FDF5E6;
-            color: #C0392B;
-        }
-
-        .custom-select-option.selected {
-            background-color: #C0392B;
-            color: white;
-            font-weight: 600;
-        }
-
-        .custom-select-option.selected:hover {
-            background-color: #A02020;
-        }
-
-        .palo-select-hidden {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            pointer-events: none;
-            z-index: -1;
         }
 
         .player-section {
@@ -396,21 +301,8 @@
         <p class="app-subtitle">Vamo a cantá un poquito pó . . .</p>
         
         <div class="palo-selector">
-            <div class="custom-select-wrapper">
-                <div class="custom-select-display" id="customSelectDisplay">
-                    <span class="custom-select-text">Selecciona un palo...</span>
-                    <div class="custom-select-arrow">
-                        <svg viewBox="0 0 24 24" width="20" height="20">
-                            <path d="M7 10l5 5 5-5z" fill="currentColor"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="custom-select-options" id="customSelectOptions">
-                    <!-- Options will be populated dynamically -->
-                </div>
-                <select id="paloSelect" class="palo-select-hidden">
-                </select>
-            </div>
+            <select id="paloSelect" class="palo-select">
+            </select>
         </div>
 
         <div class="player-section">

@@ -22,7 +22,7 @@
 
 import AbstractFifoSamplePipe from './AbstractFifoSamplePipe.js';
 
-class RateTransposer extends AbstractFifoSamplePipe {
+export default class RateTransposer extends AbstractFifoSamplePipe {
   constructor(createBuffers) {
     super(createBuffers);
     this.reset();
@@ -112,5 +112,3 @@ class RateTransposer extends AbstractFifoSamplePipe {
     return i;
   }
 }
-
-export default RateTransposer;
