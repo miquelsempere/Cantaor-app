@@ -405,8 +405,8 @@ body {
     position: absolute;
     top: 0;
     height: 100%;
-  width: 5px !important;
-  background-color: blue !important;
+  width: 1px;
+  background-color: #C0C0C0;
     border-radius: 0.5px;
     box-shadow: 
         0 1px 2px rgba(0, 0, 0, 0.3),
