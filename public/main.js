@@ -81,6 +81,16 @@ class FlamencoApp {
     const effectiveTravelDistance = trackWidth - thumbWidth;
 
     // La distancia entre el centro de un traste y el siguiente
+    const spaceBetweenFrets = effectiveTravelDistance / (numberOfMarkers - 1);
+
+    for (let i = 0; i < numberOfMarkers; i++) {
+      const fretMarker = document.createElement('div');
+      fretMarker.className = 'fret-marker';
+      fretMarker.textContent = `${i}`;
+
+      // Calcular la posición del centro de cada traste
+      const centerPosition = i * spaceBetweenFrets + (thumbWidth / 2);
+
       const leftPosition = centerPosition - 2.5; // Centrar el traste de 5px
       fretMarker.style.left = `${leftPosition}px`;
 
