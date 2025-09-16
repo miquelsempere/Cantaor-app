@@ -353,12 +353,14 @@ body {
     background: repeating-linear-gradient(
         to right,
         #2C1A10 0%,
-        #2C1A10 9.85%,
-        #C0C0C0 9.85%,
-        #C0C0C0 10.35%,
-        #2C1A10 10.35%,
+        #2C1A10 9.75%,
+        #C0C0C0 9.75%,
+        #C0C0C0 10.25%,
+        #2C1A10 10.25%,
         #2C1A10 10%
     );
+    background-size: calc(100% - 8px) 100%;
+    background-position-x: 4px;
     border-radius: 6px;
     border: 1px solid #1A0F08;
     box-shadow: 
@@ -373,12 +375,14 @@ body {
     background: repeating-linear-gradient(
         to right,
         #2C1A10 0%,
-        #2C1A10 9.85%,
-        #C0C0C0 9.85%,
-        #C0C0C0 10.35%,
-        #2C1A10 10.35%,
+        #2C1A10 9.75%,
+        #C0C0C0 9.75%,
+        #C0C0C0 10.25%,
+        #2C1A10 10.25%,
         #2C1A10 10%
     );
+    background-size: calc(100% - 8px) 100%;
+    background-position-x: 4px;
     border-radius: 6px;
     border: 1px solid #1A0F08;
     box-shadow: 
