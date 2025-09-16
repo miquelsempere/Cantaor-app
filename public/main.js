@@ -81,17 +81,15 @@ class FlamencoApp {
     const effectiveTravelDistance = trackWidth - thumbWidth;
 
     // La distancia entre el centro de un traste y el siguiente
-    // (hay 10 intervalos para 11 trastes).
-    const intervalDistance = effectiveTravelDistance / (numberOfMarkers - 1);
+      const leftPosition = centerPosition - 2.5; // Centrar el traste de 5px
+      fretMarker.style.left = `${leftPosition}px`;
 
-    for (let i = 0; i < numberOfMarkers; i++) {
-      const fretMarker = document.createElement('div');
+      console.log(`Traste ${i}: centerPosition=${centerPosition}, leftPosition=${leftPosition}`);
 
       this.fretMarkersContainer.appendChild(fretMarker);
     }
     
-    console.log(`Created ${numberOfMarkers} fret markers with calculated positions`);
-    console.log(`Track width: ${trackWidth}px, Effective travel: ${effectiveTravelDistance}px, Interval: ${intervalDistance}px`);
+    console.log(`=== Created ${numberOfMarkers} fret markers ===`);
   }
 
   setupEventListeners() {

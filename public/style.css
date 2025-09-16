@@ -405,8 +405,8 @@ body {
     position: absolute;
     top: 0;
     height: 100%;
-    width: 1px;
-    background-color: #C0C0C0;
+  width: 5px !important;
+  background-color: blue !important;
     border-radius: 0.5px;
     box-shadow: 
         0 1px 2px rgba(0, 0, 0, 0.3),
@@ -429,8 +429,8 @@ body {
 #pitchSlider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 8px;
-    height: 24px;
+  width: 8px !important;
+  height: 24px !important;
     border-radius: 2px;
     background: linear-gradient(135deg, #F0F0F0 0%, #B0B0B0 50%, #D0D0D0 100%);
     cursor: pointer;
@@ -453,8 +453,8 @@ body {
 }
 
 #pitchSlider::-moz-range-thumb {
-    width: 8px;
-    height: 24px;
+  width: 8px !important;
+  height: 24px !important;
     border-radius: 2px;
     background: linear-gradient(135deg, #F0F0F0 0%, #B0B0B0 50%, #D0D0D0 100%);
     cursor: pointer;
