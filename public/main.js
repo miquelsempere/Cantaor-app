@@ -86,15 +86,6 @@ class FlamencoApp {
 
     for (let i = 0; i < numberOfMarkers; i++) {
       const fretMarker = document.createElement('div');
-      fretMarker.className = 'fret-marker';
-
-      // Calcular la posición central para este traste.
-      // El centro del primer traste (i=0) debe estar a thumbWidth/2 del borde izquierdo del track.
-      const centerPosition = (thumbWidth / 2) + (i * intervalDistance);
-
-      // Como el marcador de traste tiene 1px de ancho, su borde izquierdo debe ser
-      // centerPosition - 0.5px para que quede centrado.
-      fretMarker.style.left = `${centerPosition - 0.5}px`;
 
       this.fretMarkersContainer.appendChild(fretMarker);
     }
@@ -143,6 +134,11 @@ class FlamencoApp {
       this.audioManager.setPitchSemitones(semitones);
       const fretNumber = semitones + 5;
       this.pitchValue.textContent = `Traste ${fretNumber}`;
+    });
+
+    // Recalculate fret markers on window resize
+    window.addEventListener('resize', () => {
+      this.createFretMarkers();
     });
   }
 

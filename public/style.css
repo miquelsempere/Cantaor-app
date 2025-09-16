@@ -379,6 +379,14 @@ body {
     width: 100%;
     height: 12px;
     margin-bottom: 0.5rem;
+    background: #2C1A10;
+    border-radius: 6px;
+    border: 1px solid #1A0F08;
+    box-shadow: 
+        inset 0 3px 8px rgba(0, 0, 0, 0.6), 
+        inset 0 -3px 8px rgba(255, 255, 255, 0.1), 
+        0 1px 0 rgba(0, 0, 0, 0.2);
+    overflow: hidden;
 }
 
 /* Fret markers container */
@@ -388,7 +396,6 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    display: block;
     pointer-events: none;
     z-index: 0;
 }
@@ -406,7 +413,6 @@ body {
         inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
-/* Remove margin adjustment from capo thumb since we're using natural positioning */
 .control-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -416,7 +422,7 @@ body {
     background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    margin-top: -4px;
 }
 
 /* Capo styling for pitch slider */
@@ -432,7 +438,7 @@ body {
         0 3px 6px rgba(0, 0, 0, 0.5), 
         inset 0 1px 3px rgba(255, 255, 255, 0.4);
     border: 1px solid #888;
-    margin-top: 0;
+    margin-top: -6px;
 }
 
 .control-slider::-moz-range-thumb {
@@ -443,7 +449,7 @@ body {
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    margin-top: -4px;
 }
 
 #pitchSlider::-moz-range-thumb {
@@ -456,6 +462,37 @@ body {
     box-shadow: 
         0 3px 6px rgba(0, 0, 0, 0.5), 
         inset 0 1px 3px rgba(255, 255, 255, 0.4);
+    margin-top: -6px;
+}
+
+/* Guitar neck styling for pitch slider */
+#pitchSlider {
+    height: 12px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: transparent;
+}
+
+#pitchSlider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 12px;
+    background: transparent;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+}
+
+#pitchSlider::-moz-range-track {
+    width: 100%;
+    height: 12px;
+    background: transparent;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
 }
 .control-value {
     font-weight: 600;
