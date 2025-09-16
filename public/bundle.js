@@ -11286,7 +11286,6 @@ class FlamencoApp {
     this.paloSelect = document.getElementById('paloSelect');
     this.customSelectDisplay = document.getElementById('customSelectDisplay');
     this.customSelectOptions = document.getElementById('customSelectOptions');
-    this.customSelectWrapper = document.querySelector('.custom-select-wrapper');
     this.customSelectText = this.customSelectDisplay.querySelector('.custom-select-text');
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
@@ -11350,8 +11349,7 @@ class FlamencoApp {
     this.pitchSlider.addEventListener('input', e => {
       const semitones = parseInt(e.target.value);
       this.audioManager.setPitchSemitones(semitones);
-      const fretNumber = semitones + 5;
-      this.pitchValue.textContent = `Traste ${fretNumber}`;
+      this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
     });
   }
   setupAudioManagerListeners() {
@@ -11466,15 +11464,11 @@ class FlamencoApp {
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
 
-    // Disable dropdown during playback
+    // Deshabilitar el menú desplegable durante la reproducción
     this.paloSelect.disabled = isPlaying;
-    if (isPlaying) {
-      this.customSelectWrapper.classList.add('disabled');
-      // Close dropdown if it's open when playback starts
-      this.closeCustomDropdown();
-    } else {
-      this.customSelectWrapper.classList.remove('disabled');
-    }
+
+    // Deshabilitar el menú desplegable durante la reproducción
+    this.paloSelect.disabled = isPlaying;
     console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
     console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
 
@@ -11500,10 +11494,6 @@ class FlamencoApp {
     }
   }
   toggleCustomDropdown() {
-    // Prevent interaction if disabled
-    if (this.customSelectWrapper.classList.contains('disabled')) {
-      return;
-    }
     const isOpen = this.customSelectOptions.classList.contains('open');
     if (isOpen) {
       this.closeCustomDropdown();
@@ -11520,11 +11510,6 @@ class FlamencoApp {
     this.customSelectDisplay.classList.remove('active');
   }
   selectCustomOption(value, optionElement) {
-    // Prevent interaction if disabled
-    if (this.customSelectWrapper.classList.contains('disabled')) {
-      return;
-    }
-
     // Update native select
     this.paloSelect.value = value;
 
