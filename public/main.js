@@ -42,6 +42,7 @@ class FlamencoApp {
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
+    this.sliderTrackWrapper = document.querySelector('.slider-track-wrapper');
     
     this.init();
   }
@@ -67,16 +68,39 @@ class FlamencoApp {
     const minSemitones = parseInt(this.pitchSlider.min); // -5
     const maxSemitones = parseInt(this.pitchSlider.max); // 5
     const numberOfMarkers = maxSemitones - minSemitones + 1; // 11 marcadores (Traste 0 a Traste 10)
+    const thumbWidth = 8; // Ancho de la cejilla, definido en CSS
 
     this.fretMarkersContainer.innerHTML = ''; // Limpiar marcadores existentes
+
+    // Obtener el ancho real del contenedor del slider.
+    // Esto representa el ancho total del "track" visual.
+    const trackWidth = this.sliderTrackWrapper.offsetWidth;
+
+    // La distancia total que el centro de la cejilla puede recorrer
+    // es el ancho del track menos el ancho de la cejilla.
+    const effectiveTravelDistance = trackWidth - thumbWidth;
+
+    // La distancia entre el centro de un traste y el siguiente
+    // (hay 10 intervalos para 11 trastes).
+    const intervalDistance = effectiveTravelDistance / (numberOfMarkers - 1);
 
     for (let i = 0; i < numberOfMarkers; i++) {
       const fretMarker = document.createElement('div');
       fretMarker.className = 'fret-marker';
+
+      // Calcular la posición central para este traste.
+      // El centro del primer traste (i=0) debe estar a thumbWidth/2 del borde izquierdo del track.
+      const centerPosition = (thumbWidth / 2) + (i * intervalDistance);
+
+      // Como el marcador de traste tiene 1px de ancho, su borde izquierdo debe ser
+      // centerPosition - 0.5px para que quede centrado.
+      fretMarker.style.left = `${centerPosition - 0.5}px`;
+
       this.fretMarkersContainer.appendChild(fretMarker);
     }
     
-    console.log(`Created ${numberOfMarkers} fret markers`);
+    console.log(`Created ${numberOfMarkers} fret markers with calculated positions`);
+    console.log(`Track width: ${trackWidth}px, Effective travel: ${effectiveTravelDistance}px, Interval: ${intervalDistance}px`);
   }
 
   setupEventListeners() {
