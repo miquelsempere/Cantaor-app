@@ -292,10 +292,48 @@ body {
     width: 100%;
     height: 6px;
     border-radius: 3px;
-    background: #EFEFEF;
+    background: transparent;
     outline: none;
     -webkit-appearance: none;
     appearance: none;
+}
+
+/* Guitar neck styling for pitch slider */
+#pitchSlider {
+    height: 12px;
+    position: relative;
+}
+
+#pitchSlider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 12px;
+    background: repeating-linear-gradient(
+        to right,
+        #8B4513 0%,
+        #8B4513 9%,
+        #D2691E 9%,
+        #D2691E 10%,
+        #8B4513 10%
+    );
+    border-radius: 6px;
+    border: 1px solid #654321;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+#pitchSlider::-moz-range-track {
+    width: 100%;
+    height: 12px;
+    background: repeating-linear-gradient(
+        to right,
+        #8B4513 0%,
+        #8B4513 9%,
+        #D2691E 9%,
+        #D2691E 10%,
+        #8B4513 10%
+    );
+    border-radius: 6px;
+    border: 1px solid #654321;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .control-slider::-webkit-slider-thumb {
@@ -309,6 +347,22 @@ body {
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
 }
 
+/* Capo styling for pitch slider */
+#pitchSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 24px;
+    border-radius: 2px;
+    background: linear-gradient(135deg, #C0C0C0 0%, #808080 50%, #A0A0A0 100%);
+    cursor: pointer;
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    border: 1px solid #666;
+    margin-top: -6px;
+}
+
 .control-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
@@ -319,6 +373,17 @@ body {
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
 }
 
+#pitchSlider::-moz-range-thumb {
+    width: 8px;
+    height: 24px;
+    border-radius: 2px;
+    background: linear-gradient(135deg, #C0C0C0 0%, #808080 50%, #A0A0A0 100%);
+    cursor: pointer;
+    border: 1px solid #666;
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
 .control-value {
     font-weight: 600;
     color: #E74C3C;

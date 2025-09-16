@@ -99,7 +99,8 @@ class FlamencoApp {
     this.pitchSlider.addEventListener('input', (e) => {
       const semitones = parseInt(e.target.value);
       this.audioManager.setPitchSemitones(semitones);
-      this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
+      const fretNumber = semitones + 5;
+      this.pitchValue.textContent = `Traste ${fretNumber}`;
     });
   }
 
