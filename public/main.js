@@ -102,6 +102,25 @@ class FlamencoApp {
       const fretNumber = semitones + 5;
       this.pitchValue.textContent = `Traste ${fretNumber}`;
     });
+
+    // Spacebar control for play/pause
+    document.addEventListener('keydown', (e) => {
+      // Check if spacebar was pressed
+      if (e.code === 'Space') {
+        // Prevent spacebar from triggering if user is typing in an input field
+        const activeElement = document.activeElement;
+        const isInputField = activeElement && (
+          activeElement.tagName === 'INPUT' || 
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable
+        );
+        
+        if (!isInputField && !this.playButton.disabled) {
+          e.preventDefault(); // Prevent page scroll
+          this.handlePlayButtonClick();
+        }
+      }
+    });
   }
 
   setupAudioManagerListeners() {
