@@ -4,296 +4,7 @@
     <title>Cantaor app</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style type="text/css">
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #A02020 0%, #C0392B 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
-        }
-
-        .app-container {
-            background: #FDF5E6;
-            backdrop-filter: blur(10px);
-            border-radius: 30px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-        }
-
-        .app-title {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 1.8rem;
-            font-weight: 700;
-            background-image: linear-gradient(45deg, #FF6B6B, #C0392B);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.5rem;
-        }
-
-        .app-subtitle {
-            font-size: 0.9rem;
-            color: #8B7355;
-            margin-bottom: 2rem;
-        }
-
-        .palo-selector {
-            margin-bottom: 2rem;
-        }
-
-        .palo-selector label {
-            display: block;
-            font-weight: 600;
-            color: #4A2C2C;
-            margin-bottom: 0.5rem;
-        }
-
-        .palo-select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #D1D5DB;
-            border-radius: 10px;
-            font-size: 1rem;
-            background: white;
-            transition: all 0.3s ease;
-        }
-
-        .palo-select:focus {
-            outline: none;
-            border-color: #C0392B;
-            box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
-        }
-
-        .player-section {
-            margin-bottom: 2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .play-button {
-            width: 80px;
-            height: 80px;
-            border: none;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 20px rgba(192, 57, 43, 0.3);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .play-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 25px rgba(192, 57, 43, 0.4);
-        }
-
-        .play-button:active {
-            transform: translateY(0);
-        }
-
-        .play-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .play-icon,
-        .pause-icon {
-            width: 24px;
-            height: 24px;
-        }
-
-        .play-icon svg,
-        .pause-icon svg {
-            width: 100%;
-            height: 100%;
-            fill: currentColor;
-        }
-
-        /* Default state: show play icon, hide pause icon */
-        .play-button .play-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .play-button .pause-icon {
-            display: none;
-        }
-
-        /* Playing state: hide play icon, show pause icon */
-        .play-button.is-playing .play-icon {
-            display: none;
-        }
-
-        .play-button.is-playing .pause-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .track-info {
-            margin-bottom: 1rem;
-            color: #8B7355;
-            font-size: 0.9rem;
-        }
-
-        .track-title {
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 0.25rem;
-        }
-
-        .track-palo {
-            font-size: 0.85rem;
-            color: #718096;
-        }
-
-        .controls-section {
-            display: grid;
-            gap: 1.5rem;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .control-label {
-            font-weight: 600;
-            color: #4A2C2C;
-            font-size: 0.9rem;
-        }
-
-        .control-slider {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: #EFEFEF;
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        .control-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-        }
-
-        .control-slider::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-        }
-
-        .control-value {
-            font-weight: 600;
-            color: #E74C3C;
-            font-size: 0.9rem;
-        }
-
-        .visualizer {
-            width: 100%;
-            height: 60px;
-            background: transparent;
-            border-radius: 10px;
-            margin: 1rem 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .visualizer-bars {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            height: 40px;
-        }
-
-        .visualizer-bar {
-            width: 4px;
-            background: linear-gradient(to top, #E74C3C, #C0392B);
-            border-radius: 2px;
-            transition: height 0.3s ease;
-            opacity: 0.3;
-        }
-
-        .visualizer.playing .visualizer-bar {
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        .visualizer.playing .visualizer-bar:nth-child(2n) {
-            animation-delay: 0.2s;
-        }
-
-        .visualizer.playing .visualizer-bar:nth-child(3n) {
-            animation-delay: 0.4s;
-        }
-
-        .visualizer.playing .visualizer-bar:nth-child(4n) {
-            animation-delay: 0.6s;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                height: 10px;
-                opacity: 0.3;
-            }
-            50% {
-                height: 35px;
-                opacity: 1;
-            }
-        }
-
-        .status-message {
-            font-size: 0.85rem;
-            color: #718096;
-            margin-top: 1rem;
-            min-height: 20px;
-        }
-
-        .loading {
-            color: #E74C3C;
-        }
-
-        .error {
-            color: #e53e3e;
-        }
-
-        .success {
-            color: #38a169;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
@@ -301,8 +12,21 @@
         <p class="app-subtitle">Vamo a cantá un poquito pó . . .</p>
         
         <div class="palo-selector">
-            <select id="paloSelect" class="palo-select">
-            </select>
+            <div class="custom-select-wrapper">
+                <div class="custom-select-display" id="customSelectDisplay">
+                    <span class="custom-select-text">Selecciona un palo...</span>
+                    <div class="custom-select-arrow">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M7 10l5 5 5-5z" fill="currentColor"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="custom-select-options" id="customSelectOptions">
+                    <!-- Options will be populated dynamically -->
+                </div>
+                <select id="paloSelect" class="palo-select-hidden">
+                </select>
+            </div>
         </div>
 
         <div class="player-section">
@@ -330,10 +54,10 @@
             </div>
 
             <div class="control-group">
-                <label class="control-label">Tono (Semitonos)</label>
+                <label class="control-label">Cejilla</label>
                 <input type="range" id="pitchSlider" class="control-slider" 
                        min="-5" max="5" step="1" value="0">
-                <div class="control-value" id="pitchValue">0</div>
+                <div class="control-value" id="pitchValue">Traste 5</div>
             </div>
         </div>
 

@@ -11284,6 +11284,10 @@ class FlamencoApp {
 
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
+    this.customSelectDisplay = document.getElementById('customSelectDisplay');
+    this.customSelectOptions = document.getElementById('customSelectOptions');
+    this.customSelectWrapper = document.querySelector('.custom-select-wrapper');
+    this.customSelectText = this.customSelectDisplay.querySelector('.custom-select-text');
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
 
@@ -11314,6 +11318,22 @@ class FlamencoApp {
       this.handlePaloChange(e.target.value);
     });
 
+    // Custom dropdown events
+    this.customSelectDisplay.addEventListener('click', e => {
+      e.stopPropagation();
+      this.toggleCustomDropdown();
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      this.closeCustomDropdown();
+    });
+
+    // Prevent closing when clicking inside options
+    this.customSelectOptions.addEventListener('click', e => {
+      e.stopPropagation();
+    });
+
     // Play/Stop button
     this.playButton.addEventListener('click', () => {
       this.handlePlayButtonClick();
@@ -11330,7 +11350,8 @@ class FlamencoApp {
     this.pitchSlider.addEventListener('input', e => {
       const semitones = parseInt(e.target.value);
       this.audioManager.setPitchSemitones(semitones);
-      this.pitchValue.textContent = semitones > 0 ? `+${semitones}` : `${semitones}`;
+      const fretNumber = semitones + 5;
+      this.pitchValue.textContent = `Traste ${fretNumber}`;
     });
   }
   setupAudioManagerListeners() {
@@ -11350,24 +11371,44 @@ class FlamencoApp {
 
       // Clear existing options
       this.paloSelect.innerHTML = '';
+      this.customSelectOptions.innerHTML = '';
 
       // Add palo options
       palos.forEach(palo => {
+        // Add to native select (hidden)
         const option = document.createElement('option');
         option.value = palo;
         option.textContent = palo;
         this.paloSelect.appendChild(option);
+
+        // Add to custom dropdown
+        const customOption = document.createElement('div');
+        customOption.className = 'custom-select-option';
+        customOption.textContent = palo;
+        customOption.dataset.value = palo;
+        customOption.addEventListener('click', () => {
+          this.selectCustomOption(palo, customOption);
+        });
+        this.customSelectOptions.appendChild(customOption);
       });
 
       // Set Tangos as default if available
       if (palos.includes('Tangos')) {
         this.paloSelect.value = 'Tangos';
+        this.updateCustomSelectDisplay('Tangos');
         await this.handlePaloChange('Tangos');
+      } else if (palos.length > 0) {
+        // If no Tangos, select first available palo
+        this.paloSelect.value = palos[0];
+        this.updateCustomSelectDisplay(palos[0]);
+        await this.handlePaloChange(palos[0]);
       }
       console.log(`Loaded ${palos.length} palos:`, palos);
     } catch (error) {
       console.error('Error loading palos:', error);
       this.paloSelect.innerHTML = '<option value="">Error cargando palos</option>';
+      this.customSelectOptions.innerHTML = '<div class="custom-select-option">Error cargando palos</div>';
+      this.updateCustomSelectDisplay('Error cargando palos');
     }
   }
   async handlePaloChange(selectedPalo) {
@@ -11420,16 +11461,20 @@ class FlamencoApp {
     }
   }
   updateTrackInfo(track) {
-    // No mostrar información de pista
+    // Esta función ya no se usa
   }
   updatePlayState(isPlaying) {
     this.isPlaying = isPlaying;
 
-    // Deshabilitar el menú desplegable durante la reproducción
+    // Disable dropdown during playback
     this.paloSelect.disabled = isPlaying;
-
-    // Deshabilitar el menú desplegable durante la reproducción
-    this.paloSelect.disabled = isPlaying;
+    if (isPlaying) {
+      this.customSelectWrapper.classList.add('disabled');
+      // Close dropdown if it's open when playback starts
+      this.closeCustomDropdown();
+    } else {
+      this.customSelectWrapper.classList.remove('disabled');
+    }
     console.log('updatePlayState: Antes de asignar innerHTML. isPlaying:', isPlaying);
     console.log('updatePlayState: Contenido SVG a asignar:', this.PLAY_BUTTON_SVG_CONTENT);
 
@@ -11453,6 +11498,53 @@ class FlamencoApp {
     } else {
       this.visualizer.classList.remove('playing');
     }
+  }
+  toggleCustomDropdown() {
+    // Prevent interaction if disabled
+    if (this.customSelectWrapper.classList.contains('disabled')) {
+      return;
+    }
+    const isOpen = this.customSelectOptions.classList.contains('open');
+    if (isOpen) {
+      this.closeCustomDropdown();
+    } else {
+      this.openCustomDropdown();
+    }
+  }
+  openCustomDropdown() {
+    this.customSelectOptions.classList.add('open');
+    this.customSelectDisplay.classList.add('active');
+  }
+  closeCustomDropdown() {
+    this.customSelectOptions.classList.remove('open');
+    this.customSelectDisplay.classList.remove('active');
+  }
+  selectCustomOption(value, optionElement) {
+    // Prevent interaction if disabled
+    if (this.customSelectWrapper.classList.contains('disabled')) {
+      return;
+    }
+
+    // Update native select
+    this.paloSelect.value = value;
+
+    // Update custom display
+    this.updateCustomSelectDisplay(value);
+
+    // Update selected state in custom options
+    this.customSelectOptions.querySelectorAll('.custom-select-option').forEach(option => {
+      option.classList.remove('selected');
+    });
+    optionElement.classList.add('selected');
+
+    // Close dropdown
+    this.closeCustomDropdown();
+
+    // Trigger change event
+    this.paloSelect.dispatchEvent(new Event('change'));
+  }
+  updateCustomSelectDisplay(text) {
+    this.customSelectText.textContent = text;
   }
 }
 
