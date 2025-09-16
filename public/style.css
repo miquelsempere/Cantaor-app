@@ -321,6 +321,7 @@ body {
 #pitchSlider {
     height: 12px;
     position: relative;
+    z-index: 1;
 }
 
 #pitchSlider::-webkit-slider-runnable-track {
@@ -345,38 +346,71 @@ body {
 #pitchSlider {
     height: 12px;
     position: relative;
+    z-index: 1;
 }
 
 #pitchSlider::-webkit-slider-runnable-track {
     width: 100%;
     height: 12px;
-    background: repeating-linear-gradient(
-        to right,
-        #8B4513 0%,
-        #8B4513 9%,
-        #D2691E 9%,
-        #D2691E 10%,
-        #8B4513 10%
-    );
+    background: #2C1A10;
     border-radius: 6px;
-    border: 1px solid #654321;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    border: 1px solid #1A0F08;
+    box-shadow: 
+        inset 0 3px 8px rgba(0, 0, 0, 0.6), 
+        inset 0 -3px 8px rgba(255, 255, 255, 0.1), 
+        0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 #pitchSlider::-moz-range-track {
     width: 100%;
     height: 12px;
-    background: repeating-linear-gradient(
-        to right,
-        #8B4513 0%,
-        #8B4513 9%,
-        #D2691E 9%,
-        #D2691E 10%,
-        #8B4513 10%
-    );
+    background: #2C1A10;
     border-radius: 6px;
-    border: 1px solid #654321;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    border: 1px solid #1A0F08;
+    box-shadow: 
+        inset 0 3px 8px rgba(0, 0, 0, 0.6), 
+        inset 0 -3px 8px rgba(255, 255, 255, 0.1), 
+        0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Slider track wrapper for positioning fret markers */
+.slider-track-wrapper {
+    position: relative;
+    width: 100%;
+    height: 12px;
+    margin-bottom: 0.5rem;
+    background: #2C1A10;
+    border-radius: 6px;
+    border: 1px solid #1A0F08;
+    box-shadow: 
+        inset 0 3px 8px rgba(0, 0, 0, 0.6), 
+        inset 0 -3px 8px rgba(255, 255, 255, 0.1), 
+        0 1px 0 rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+/* Fret markers container */
+.fret-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Individual fret marker */
+.fret-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+  width: 1px;
+  background-color: #C0C0C0;
+    border-radius: 0.5px;
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 .control-slider::-webkit-slider-thumb {
@@ -388,22 +422,22 @@ body {
     background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    margin-top: -4px;
 }
 
 /* Capo styling for pitch slider */
 #pitchSlider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 8px;
-    height: 24px;
+  width: 8px !important;
+  height: 24px !important;
     border-radius: 2px;
-    background: linear-gradient(135deg, #C0C0C0 0%, #808080 50%, #A0A0A0 100%);
+    background: linear-gradient(135deg, #F0F0F0 0%, #B0B0B0 50%, #D0D0D0 100%);
     cursor: pointer;
     box-shadow: 
-        0 2px 4px rgba(0, 0, 0, 0.4),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
-    border: 1px solid #666;
+        0 3px 6px rgba(0, 0, 0, 0.5), 
+        inset 0 1px 3px rgba(255, 255, 255, 0.4);
+    border: 1px solid #888;
     margin-top: -6px;
 }
 
@@ -415,19 +449,50 @@ body {
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    margin-top: -4px;
 }
 
 #pitchSlider::-moz-range-thumb {
-    width: 8px;
-    height: 24px;
+  width: 8px !important;
+  height: 24px !important;
     border-radius: 2px;
-    background: linear-gradient(135deg, #C0C0C0 0%, #808080 50%, #A0A0A0 100%);
+    background: linear-gradient(135deg, #F0F0F0 0%, #B0B0B0 50%, #D0D0D0 100%);
     cursor: pointer;
-    border: 1px solid #666;
+    border: 1px solid #888;
     box-shadow: 
-        0 2px 4px rgba(0, 0, 0, 0.4),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
+        0 3px 6px rgba(0, 0, 0, 0.5), 
+        inset 0 1px 3px rgba(255, 255, 255, 0.4);
+    margin-top: -6px;
+}
+
+/* Guitar neck styling for pitch slider */
+#pitchSlider {
+    height: 12px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: transparent;
+}
+
+#pitchSlider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 12px;
+    background: transparent;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+}
+
+#pitchSlider::-moz-range-track {
+    width: 100%;
+    height: 12px;
+    background: transparent;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
 }
 .control-value {
     font-weight: 600;

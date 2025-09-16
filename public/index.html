@@ -55,8 +55,13 @@
 
             <div class="control-group">
                 <label class="control-label">Cejilla</label>
-                <input type="range" id="pitchSlider" class="control-slider" 
-                       min="-5" max="5" step="1" value="0">
+                <div class="slider-track-wrapper">
+                    <div id="fretMarkers" class="fret-markers">
+                        <!-- Los marcadores de traste se generarán aquí dinámicamente -->
+                    </div>
+                    <input type="range" id="pitchSlider" class="control-slider" 
+                           min="-5" max="5" step="1" value="0">
+                </div>
                 <div class="control-value" id="pitchValue">Traste 5</div>
             </div>
         </div>

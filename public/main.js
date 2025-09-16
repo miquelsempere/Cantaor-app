@@ -35,12 +35,14 @@ class FlamencoApp {
     this.customSelectText = this.customSelectDisplay.querySelector('.custom-select-text');
     this.playButton = document.getElementById('playButton');
     this.visualizer = document.getElementById('visualizer');
+    this.fretMarkersContainer = document.getElementById('fretMarkers');
     
     // Control Elements
     this.tempoSlider = document.getElementById('tempoSlider');
     this.tempoValue = document.getElementById('tempoValue');
     this.pitchSlider = document.getElementById('pitchSlider');
     this.pitchValue = document.getElementById('pitchValue');
+    this.sliderTrackWrapper = document.querySelector('.slider-track-wrapper');
     
     this.init();
   }
@@ -50,6 +52,7 @@ class FlamencoApp {
       // Set up event listeners
       this.setupEventListeners();
       
+      this.createFretMarkers();
       // Load available palos
       await this.loadAvailablePalos();
       
@@ -59,6 +62,44 @@ class FlamencoApp {
     } catch (error) {
       console.error('Error initializing app:', error);
     }
+  }
+
+  createFretMarkers() {
+    const minSemitones = parseInt(this.pitchSlider.min); // -5
+    const maxSemitones = parseInt(this.pitchSlider.max); // 5
+    const numberOfMarkers = maxSemitones - minSemitones + 1; // 11 marcadores (Traste 0 a Traste 10)
+    const thumbWidth = 8; // Ancho de la cejilla, definido en CSS
+
+    this.fretMarkersContainer.innerHTML = ''; // Limpiar marcadores existentes
+
+    // Obtener el ancho real del contenedor del slider.
+    // Esto representa el ancho total del "track" visual.
+    const trackWidth = this.sliderTrackWrapper.offsetWidth;
+
+    // La distancia total que el centro de la cejilla puede recorrer
+    // es el ancho del track menos el ancho de la cejilla.
+    const effectiveTravelDistance = trackWidth - thumbWidth;
+
+    // La distancia entre el centro de un traste y el siguiente
+    const spaceBetweenFrets = effectiveTravelDistance / (numberOfMarkers - 1);
+
+    for (let i = 0; i < numberOfMarkers; i++) {
+      const fretMarker = document.createElement('div');
+      fretMarker.className = 'fret-marker';
+      fretMarker.textContent = `${i}`;
+
+      // Calcular la posición del centro de cada traste
+      const centerPosition = i * spaceBetweenFrets + (thumbWidth / 2);
+
+      const leftPosition = centerPosition - 2.5; // Centrar el traste de 5px
+      fretMarker.style.left = `${leftPosition}px`;
+
+      console.log(`Traste ${i}: centerPosition=${centerPosition}, leftPosition=${leftPosition}`);
+
+      this.fretMarkersContainer.appendChild(fretMarker);
+    }
+    
+    console.log(`=== Created ${numberOfMarkers} fret markers ===`);
   }
 
   setupEventListeners() {
@@ -101,6 +142,11 @@ class FlamencoApp {
       this.audioManager.setPitchSemitones(semitones);
       const fretNumber = semitones + 5;
       this.pitchValue.textContent = `Traste ${fretNumber}`;
+    });
+
+    // Recalculate fret markers on window resize
+    window.addEventListener('resize', () => {
+      this.createFretMarkers();
     });
   }
 
