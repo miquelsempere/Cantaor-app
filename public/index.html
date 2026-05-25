@@ -76,6 +76,42 @@
             </div>
         </div>
 
+        <div class="admin-toggle-section">
+            <button id="adminToggle" class="admin-toggle-btn">Gestionar pistas</button>
+        </div>
+
+        <div class="admin-panel" id="adminPanel">
+            <h2 class="admin-title">Subir pista de cante</h2>
+
+            <div class="admin-form">
+                <div class="form-group">
+                    <label for="newPalo">Palo</label>
+                    <input type="text" id="newPalo" placeholder="Ej: Tangos, Soleá..." class="form-input" list="paloSuggestions">
+                    <datalist id="paloSuggestions"></datalist>
+                </div>
+                <div class="form-group">
+                    <label for="newTitle">Titulo</label>
+                    <input type="text" id="newTitle" placeholder="Ej: Tangos - Tientos" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="newAudio">Archivo de audio</label>
+                    <div class="file-input-wrapper">
+                        <button type="button" id="audioFileBtn" class="file-input-btn">Seleccionar archivo</button>
+                        <span id="audioFileName" class="file-input-name">Ningun archivo seleccionado</span>
+                        <input type="file" id="newAudio" accept="audio/*" class="file-input-hidden">
+                    </div>
+                </div>
+                <button id="uploadBtn" class="upload-btn" disabled>Subir pista</button>
+            </div>
+
+            <div id="uploadStatus" class="upload-status"></div>
+
+            <div class="track-list-section">
+                <h3 class="track-list-title">Pistas existentes</h3>
+                <div id="trackList" class="track-list"></div>
+            </div>
+        </div>
+
     </div>
 
     <script type="module" src="bundle.js"></script>

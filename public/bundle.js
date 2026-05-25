@@ -10715,8 +10715,8 @@ if (shouldShowDeprecationWarning()) {
 
 
 // These environment variables should be set in your .env file
-const supabaseUrl = "https://bkfzecsjpcvntyvldiii.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZnplY3NqcGN2bnR5dmxkaWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTc0NDAsImV4cCI6MjA3MzA3MzQ0MH0.z7aJ6pbS-2p_psa69iA-71VuVsYwF0y8gP3EYob5Ci0";
+const supabaseUrl = "https://bjyfaqgwdqvgcjhssfhj.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqeWZhcWd3ZHF2Z2NqaHNzZmhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTcxMDUsImV4cCI6MjA5NTI3MzEwNX0.WRuxRfZf0Yo_EZe_1uh2NKycrjk9oXJQt6JegVKltAU";
 
 // Create and export the Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -10799,6 +10799,75 @@ const canteTracksAPI = {
       throw error;
     }
     return data || [];
+  },
+  /**
+   * Upload an audio file to Supabase Storage
+   * @param {File} file - The audio file to upload
+   * @param {string} palo - The palo name (used for folder organization)
+   * @returns {Promise<string>} The public URL of the uploaded file
+   */
+  async uploadAudio(file, palo) {
+    file.name.split('.').pop();
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `${palo}/${timestamp}_${safeName}`;
+    const {
+      error
+    } = await supabase.storage.from('cante-audio').upload(filePath, file, {
+      contentType: file.type,
+      upsert: false
+    });
+    if (error) {
+      console.error('Error uploading audio:', error);
+      throw error;
+    }
+    const {
+      data: urlData
+    } = supabase.storage.from('cante-audio').getPublicUrl(filePath);
+    return urlData.publicUrl;
+  },
+  /**
+   * Upload audio and create a track record in one step
+   * @param {File} file - The audio file
+   * @param {string} palo - The flamenco palo/style
+   * @param {string} title - Track title
+   * @param {number} [duration] - Duration in seconds
+   * @returns {Promise<Object>} The created track
+   */
+  async uploadAndCreateTrack(file, palo, title, duration) {
+    const audioUrl = await this.uploadAudio(file, palo);
+    return this.addTrack({
+      palo,
+      title,
+      audio_url: audioUrl,
+      duration: duration || 0
+    });
+  },
+  /**
+   * Delete a track and its audio file from storage
+   * @param {string} trackId - The track ID
+   * @param {string} audioUrl - The audio URL to extract the storage path
+   * @returns {Promise<void>}
+   */
+  async deleteTrack(trackId, audioUrl) {
+    // Extract storage path from URL
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        const filePath = pathParts[1];
+        await supabase.storage.from('cante-audio').remove([filePath]);
+      }
+    } catch (e) {
+      console.warn('Could not delete audio file from storage:', e);
+    }
+    const {
+      error
+    } = await supabase.from('cante_tracks').delete().eq('id', trackId);
+    if (error) {
+      console.error('Error deleting track:', error);
+      throw error;
+    }
   }
 };
 
@@ -11308,6 +11377,9 @@ class FlamencoApp {
 
       // Set up audio manager listeners
       this.setupAudioManagerListeners();
+
+      // Set up admin panel
+      this.setupAdminPanel();
     } catch (error) {
       console.error('Error initializing app:', error);
     }
@@ -11352,6 +11424,20 @@ class FlamencoApp {
       this.audioManager.setPitchSemitones(semitones);
       const fretNumber = semitones + 5;
       this.pitchValue.textContent = `Traste ${fretNumber}`;
+    });
+
+    // Spacebar control for play/pause
+    document.addEventListener('keydown', e => {
+      // Check if spacebar was pressed
+      if (e.code === 'Space') {
+        // Prevent spacebar from triggering if user is typing in an input field
+        const activeElement = document.activeElement;
+        const isInputField = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
+        if (!isInputField && !this.playButton.disabled) {
+          e.preventDefault(); // Prevent page scroll
+          this.handlePlayButtonClick();
+        }
+      }
     });
   }
   setupAudioManagerListeners() {
@@ -11545,6 +11631,143 @@ class FlamencoApp {
   }
   updateCustomSelectDisplay(text) {
     this.customSelectText.textContent = text;
+  }
+
+  // Admin panel methods
+  setupAdminPanel() {
+    this.adminToggle = document.getElementById('adminToggle');
+    this.adminPanel = document.getElementById('adminPanel');
+    this.newPaloInput = document.getElementById('newPalo');
+    this.newTitleInput = document.getElementById('newTitle');
+    this.newAudioInput = document.getElementById('newAudio');
+    this.audioFileBtn = document.getElementById('audioFileBtn');
+    this.audioFileName = document.getElementById('audioFileName');
+    this.uploadBtn = document.getElementById('uploadBtn');
+    this.uploadStatus = document.getElementById('uploadStatus');
+    this.trackList = document.getElementById('trackList');
+    this.paloSuggestions = document.getElementById('paloSuggestions');
+    this.adminToggle.addEventListener('click', () => this.toggleAdminPanel());
+    this.audioFileBtn.addEventListener('click', () => this.newAudioInput.click());
+    this.newAudioInput.addEventListener('change', () => this.handleAudioFileSelect());
+    this.uploadBtn.addEventListener('click', () => this.handleUpload());
+
+    // Enable upload button when form is valid
+    [this.newPaloInput, this.newTitleInput].forEach(input => {
+      input.addEventListener('input', () => this.validateUploadForm());
+    });
+  }
+  toggleAdminPanel() {
+    const isOpen = this.adminPanel.classList.contains('open');
+    if (isOpen) {
+      this.adminPanel.classList.remove('open');
+      this.adminToggle.textContent = 'Gestionar pistas';
+    } else {
+      this.adminPanel.classList.add('open');
+      this.adminToggle.textContent = 'Ocultar gestion';
+      this.loadTrackList();
+      this.loadPaloSuggestions();
+    }
+  }
+  async loadPaloSuggestions() {
+    try {
+      const palos = await this.audioManager.getAvailablePalos();
+      this.paloSuggestions.innerHTML = '';
+      palos.forEach(palo => {
+        const option = document.createElement('option');
+        option.value = palo;
+        this.paloSuggestions.appendChild(option);
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+  handleAudioFileSelect() {
+    const file = this.newAudioInput.files[0];
+    if (file) {
+      this.audioFileName.textContent = file.name;
+    } else {
+      this.audioFileName.textContent = 'Ningun archivo seleccionado';
+    }
+    this.validateUploadForm();
+  }
+  validateUploadForm() {
+    const hasPalo = this.newPaloInput.value.trim().length > 0;
+    const hasTitle = this.newTitleInput.value.trim().length > 0;
+    const hasFile = this.newAudioInput.files.length > 0;
+    this.uploadBtn.disabled = !(hasPalo && hasTitle && hasFile);
+  }
+  setUploadStatus(message, type) {
+    this.uploadStatus.textContent = message;
+    this.uploadStatus.className = `upload-status ${type}`;
+  }
+  async handleUpload() {
+    const palo = this.newPaloInput.value.trim();
+    const title = this.newTitleInput.value.trim();
+    const file = this.newAudioInput.files[0];
+    if (!palo || !title || !file) return;
+    try {
+      this.uploadBtn.disabled = true;
+      this.setUploadStatus('Subiendo archivo...', 'uploading');
+      await canteTracksAPI.uploadAndCreateTrack(file, palo, title);
+      this.setUploadStatus('Pista subida correctamente', 'success');
+
+      // Reset form
+      this.newPaloInput.value = '';
+      this.newTitleInput.value = '';
+      this.newAudioInput.value = '';
+      this.audioFileName.textContent = 'Ningun archivo seleccionado';
+      this.uploadBtn.disabled = true;
+
+      // Refresh data
+      this.loadTrackList();
+      this.loadPaloSuggestions();
+      await this.loadAvailablePalos();
+      setTimeout(() => {
+        this.setUploadStatus('', '');
+      }, 3000);
+    } catch (error) {
+      console.error('Upload error:', error);
+      this.setUploadStatus('Error al subir la pista: ' + error.message, 'error');
+      this.uploadBtn.disabled = false;
+    }
+  }
+  async loadTrackList() {
+    try {
+      const tracks = await canteTracksAPI.getAllTracks();
+      this.trackList.innerHTML = '';
+      if (tracks.length === 0) {
+        this.trackList.innerHTML = '<div style="text-align:center;color:#8B7355;font-size:0.8rem;">No hay pistas</div>';
+        return;
+      }
+      tracks.forEach(track => {
+        const item = document.createElement('div');
+        item.className = 'track-list-item';
+        item.innerHTML = `
+          <div class="track-list-item-info">
+            <div class="track-list-item-palo">${track.palo}</div>
+            <div class="track-list-item-title">${track.title}</div>
+          </div>
+          <button class="track-list-item-delete" data-id="${track.id}" data-url="${track.audio_url}" title="Eliminar">&times;</button>
+        `;
+        const deleteBtn = item.querySelector('.track-list-item-delete');
+        deleteBtn.addEventListener('click', () => this.handleDeleteTrack(track.id, track.audio_url));
+        this.trackList.appendChild(item);
+      });
+    } catch (error) {
+      console.error('Error loading track list:', error);
+    }
+  }
+  async handleDeleteTrack(trackId, audioUrl) {
+    if (!confirm('Eliminar esta pista?')) return;
+    try {
+      await canteTracksAPI.deleteTrack(trackId, audioUrl);
+      this.loadTrackList();
+      this.loadPaloSuggestions();
+      await this.loadAvailablePalos();
+    } catch (error) {
+      console.error('Error deleting track:', error);
+      alert('Error al eliminar la pista: ' + error.message);
+    }
   }
 }
 

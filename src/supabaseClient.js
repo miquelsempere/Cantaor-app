@@ -98,5 +98,79 @@ export const canteTracksAPI = {
     }
 
     return data || [];
+  },
+
+  /**
+   * Upload an audio file to Supabase Storage
+   * @param {File} file - The audio file to upload
+   * @param {string} palo - The palo name (used for folder organization)
+   * @returns {Promise<string>} The public URL of the uploaded file
+   */
+  async uploadAudio(file, palo) {
+    const ext = file.name.split('.').pop();
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `${palo}/${timestamp}_${safeName}`;
+
+    const { error } = await supabase.storage
+      .from('cante-audio')
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading audio:', error);
+      throw error;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('cante-audio')
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  },
+
+  /**
+   * Upload audio and create a track record in one step
+   * @param {File} file - The audio file
+   * @param {string} palo - The flamenco palo/style
+   * @param {string} title - Track title
+   * @param {number} [duration] - Duration in seconds
+   * @returns {Promise<Object>} The created track
+   */
+  async uploadAndCreateTrack(file, palo, title, duration) {
+    const audioUrl = await this.uploadAudio(file, palo);
+    return this.addTrack({ palo, title, audio_url: audioUrl, duration: duration || 0 });
+  },
+
+  /**
+   * Delete a track and its audio file from storage
+   * @param {string} trackId - The track ID
+   * @param {string} audioUrl - The audio URL to extract the storage path
+   * @returns {Promise<void>}
+   */
+  async deleteTrack(trackId, audioUrl) {
+    // Extract storage path from URL
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        const filePath = pathParts[1];
+        await supabase.storage.from('cante-audio').remove([filePath]);
+      }
+    } catch (e) {
+      console.warn('Could not delete audio file from storage:', e);
+    }
+
+    const { error } = await supabase
+      .from('cante_tracks')
+      .delete()
+      .eq('id', trackId);
+
+    if (error) {
+      console.error('Error deleting track:', error);
+      throw error;
+    }
   }
 };
