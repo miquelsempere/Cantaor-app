@@ -59,6 +59,7 @@ class FlamencoApp {
 
       // Set up admin panel
       this.setupAdminPanel();
+      this.setupSecretAdminAccess();
 
     } catch (error) {
       console.error('Error initializing app:', error);
@@ -343,6 +344,20 @@ class FlamencoApp {
 
   updateCustomSelectDisplay(text) {
     this.customSelectText.textContent = text;
+  }
+
+  setupSecretAdminAccess() {
+    const SECRET = 'admin';
+    let typed = '';
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      typed += e.key.toLowerCase();
+      if (typed.length > SECRET.length) typed = typed.slice(-SECRET.length);
+      if (typed === SECRET) {
+        document.getElementById('adminToggleSection').style.display = '';
+        typed = '';
+      }
+    });
   }
 
   // Admin panel methods
