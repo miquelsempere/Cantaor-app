@@ -4,7 +4,7 @@
  */
 
 import AudioManager from '../src/audioManager.js';
-import { canteTracksAPI } from '../src/supabaseClient.js';
+import { canteTracksAPI, authAPI } from '../src/supabaseClient.js';
 
 class FlamencoApp {
   constructor() {
@@ -27,6 +27,7 @@ class FlamencoApp {
     this.audioManager = new AudioManager();
     this.isPlaying = false;
     this.currentPalo = null;
+    this.currentUser = null;
     
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
@@ -50,10 +51,13 @@ class FlamencoApp {
     try {
       // Set up event listeners
       this.setupEventListeners();
-      
+
+      // Set up auth modal
+      this.setupAuthModal();
+
       // Load available palos
       await this.loadAvailablePalos();
-      
+
       // Set up audio manager listeners
       this.setupAudioManagerListeners();
 
@@ -126,6 +130,136 @@ class FlamencoApp {
         }
       }
     });
+  }
+
+  setupAuthModal() {
+    this.authModalOverlay = document.getElementById('authModalOverlay');
+    this.authModalClose = document.getElementById('authModalClose');
+    this.authFormLogin = document.getElementById('authFormLogin');
+    this.authFormRegister = document.getElementById('authFormRegister');
+    this.loginEmail = document.getElementById('loginEmail');
+    this.loginPassword = document.getElementById('loginPassword');
+    this.loginSubmitBtn = document.getElementById('loginSubmitBtn');
+    this.registerEmail = document.getElementById('registerEmail');
+    this.registerPassword = document.getElementById('registerPassword');
+    this.registerSubmitBtn = document.getElementById('registerSubmitBtn');
+    this.authError = document.getElementById('authError');
+    this.authErrorRegister = document.getElementById('authErrorRegister');
+    this.userBar = document.getElementById('userBar');
+    this.userBarEmail = document.getElementById('userBarEmail');
+    this.userBarLogout = document.getElementById('userBarLogout');
+
+    this.authModalClose.addEventListener('click', () => this.closeAuthModal());
+    this.authModalOverlay.addEventListener('click', (e) => {
+      if (e.target === this.authModalOverlay) this.closeAuthModal();
+    });
+
+    document.getElementById('switchToRegister').addEventListener('click', () => {
+      this.authFormLogin.style.display = 'none';
+      this.authFormRegister.style.display = 'flex';
+      this.authError.textContent = '';
+    });
+
+    document.getElementById('switchToLogin').addEventListener('click', () => {
+      this.authFormRegister.style.display = 'none';
+      this.authFormLogin.style.display = 'flex';
+      this.authErrorRegister.textContent = '';
+    });
+
+    this.loginSubmitBtn.addEventListener('click', () => this.handleLogin());
+    this.registerSubmitBtn.addEventListener('click', () => this.handleRegister());
+
+    [this.loginEmail, this.loginPassword].forEach(el => {
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.handleLogin(); });
+    });
+    [this.registerEmail, this.registerPassword].forEach(el => {
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.handleRegister(); });
+    });
+
+    this.userBarLogout.addEventListener('click', () => this.handleLogout());
+
+    authAPI.onAuthStateChange((event, session) => {
+      (() => {
+        this.currentUser = session?.user ?? null;
+        this.updateUserBar();
+        if (session?.user) {
+          this.closeAuthModal();
+        }
+      })();
+    });
+
+    authAPI.getSession().then(session => {
+      this.currentUser = session?.user ?? null;
+      this.updateUserBar();
+    });
+  }
+
+  openAuthModal() {
+    this.authFormLogin.style.display = 'flex';
+    this.authFormRegister.style.display = 'none';
+    this.authError.textContent = '';
+    this.authErrorRegister.textContent = '';
+    this.authModalOverlay.classList.add('open');
+    setTimeout(() => this.loginEmail.focus(), 100);
+  }
+
+  closeAuthModal() {
+    this.authModalOverlay.classList.remove('open');
+  }
+
+  async handleLogin() {
+    const email = this.loginEmail.value.trim();
+    const password = this.loginPassword.value;
+    if (!email || !password) {
+      this.authError.textContent = 'Por favor completa todos los campos.';
+      return;
+    }
+    this.loginSubmitBtn.disabled = true;
+    this.authError.textContent = '';
+    try {
+      await authAPI.signIn(email, password);
+    } catch (err) {
+      this.authError.textContent = 'Email o contraseña incorrectos.';
+      this.loginSubmitBtn.disabled = false;
+    }
+  }
+
+  async handleRegister() {
+    const email = this.registerEmail.value.trim();
+    const password = this.registerPassword.value;
+    if (!email || !password) {
+      this.authErrorRegister.textContent = 'Por favor completa todos los campos.';
+      return;
+    }
+    if (password.length < 6) {
+      this.authErrorRegister.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+      return;
+    }
+    this.registerSubmitBtn.disabled = true;
+    this.authErrorRegister.textContent = '';
+    try {
+      await authAPI.signUp(email, password);
+    } catch (err) {
+      this.authErrorRegister.textContent = err.message || 'Error al crear la cuenta.';
+      this.registerSubmitBtn.disabled = false;
+    }
+  }
+
+  async handleLogout() {
+    try {
+      await authAPI.signOut();
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+  }
+
+  updateUserBar() {
+    if (this.currentUser) {
+      this.userBar.style.display = 'flex';
+      this.userBarEmail.textContent = this.currentUser.email;
+    } else {
+      this.userBar.style.display = 'none';
+    }
   }
 
   setupAudioManagerListeners() {
