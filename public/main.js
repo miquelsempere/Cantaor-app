@@ -28,6 +28,7 @@ class FlamencoApp {
     this.isPlaying = false;
     this.currentPalo = null;
     this.currentUser = null;
+    this.pendingPalo = null;
     
     // UI Elements
     this.paloSelect = document.getElementById('paloSelect');
@@ -184,6 +185,16 @@ class FlamencoApp {
         this.updateUserBar();
         if (session?.user) {
           this.closeAuthModal();
+          if (this.pendingPalo) {
+            const palo = this.pendingPalo;
+            this.pendingPalo = null;
+            this.paloSelect.value = palo;
+            this.updateCustomSelectDisplay(palo);
+            this.customSelectOptions.querySelectorAll('.custom-select-option').forEach(opt => {
+              opt.classList.toggle('selected', opt.dataset.value === palo);
+            });
+            this.handlePaloChange(palo);
+          }
         }
       })();
     });
@@ -333,25 +344,34 @@ class FlamencoApp {
       return;
     }
 
+    const FREE_PALO = 'Tangos';
+    if (selectedPalo !== FREE_PALO && !this.currentUser) {
+      this.pendingPalo = selectedPalo;
+      this.openAuthModal();
+      // Revert the dropdown to the previous palo visually
+      this.paloSelect.value = this.currentPalo || FREE_PALO;
+      this.updateCustomSelectDisplay(this.currentPalo || FREE_PALO);
+      this.customSelectOptions.querySelectorAll('.custom-select-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.value === (this.currentPalo || FREE_PALO));
+      });
+      return;
+    }
+
     try {
       this.playButton.disabled = true;
-      
-      // Stop current playback if any
+
       if (this.isPlaying) {
         this.audioManager.stop();
       }
-      
-      // Load new palo
+
       const trackCount = await this.audioManager.loadPalo(selectedPalo);
       this.currentPalo = selectedPalo;
-      
-      // Enable play button
+
       this.playButton.disabled = false;
-      
-      // Update track info
+
       const currentTrack = this.audioManager.getCurrentTrack();
       this.updateTrackInfo(currentTrack);
-      
+
     } catch (error) {
       console.error('Error loading palo:', error);
       this.playButton.disabled = true;
