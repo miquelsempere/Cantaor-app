@@ -1,5 +1,6 @@
 import path from 'path';
 import * as url from 'url';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
@@ -10,6 +11,23 @@ import replace from '@rollup/plugin-replace';
 dotenv.config();
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
+
+// Inject env vars into confirm.html at build time
+function injectConfirmHtml() {
+  return {
+    name: 'inject-confirm-html',
+    writeBundle() {
+      const confirmPath = path.join(__dirname, '../public/confirm.html');
+      let html = fs.readFileSync(confirmPath, 'utf8');
+      html = html
+        .replace('%%SUPABASE_URL%%', process.env.VITE_SUPABASE_URL || '')
+        .replace('%%SUPABASE_ANON_KEY%%', process.env.VITE_SUPABASE_ANON_KEY || '');
+      // Write to a dist copy so the source template is preserved
+      const distPath = path.join(__dirname, '../public/confirm.html');
+      fs.writeFileSync(distPath, html, 'utf8');
+    },
+  };
+}
 
 export default {
   input: path.join(__dirname, '../public/main.js'),
@@ -40,5 +58,6 @@ export default {
       babelHelpers: 'bundled',
       exclude: ['/node_modules/**'],
     }),
+    injectConfirmHtml(),
   ],
 };

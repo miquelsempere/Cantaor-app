@@ -10724,12 +10724,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Auth helpers
 const authAPI = {
   async signUp(email, password) {
+    const redirectTo = `${window.location.origin}/confirm.html`;
     const {
       data,
       error
     } = await supabase.auth.signUp({
       email,
-      password
+      password,
+      options: {
+        emailRedirectTo: redirectTo
+      }
     });
     if (error) throw error;
     return data;
@@ -11594,11 +11598,32 @@ class FlamencoApp {
     this.registerSubmitBtn.disabled = true;
     this.authErrorRegister.textContent = '';
     try {
-      await authAPI.signUp(email, password);
+      const data = await authAPI.signUp(email, password);
+      // If session is null, Supabase requires email confirmation
+      if (!data.session) {
+        this.showRegisterConfirmationPending(email);
+      }
+      // If session exists (autoconfirm / dev), onAuthStateChange handles it
     } catch (err) {
       this.authErrorRegister.textContent = err.message || 'Error al crear la cuenta.';
       this.registerSubmitBtn.disabled = false;
     }
+  }
+  showRegisterConfirmationPending(email) {
+    const modal = document.getElementById('authModal');
+    modal.innerHTML = `
+      <div class="auth-confirm-pending">
+        <div class="auth-confirm-icon">&#9993;</div>
+        <h2 class="auth-modal-title">Revisa tu correo</h2>
+        <p class="auth-confirm-text">
+          Hemos enviado un enlace de confirmacion a<br>
+          <strong>${email}</strong><br><br>
+          Haz clic en el enlace para activar tu cuenta y acceder a todos los palos.
+        </p>
+        <button class="auth-submit-btn" id="confirmPendingClose">Entendido</button>
+      </div>
+    `;
+    document.getElementById('confirmPendingClose').addEventListener('click', () => this.closeAuthModal());
   }
   async handleLogout() {
     try {

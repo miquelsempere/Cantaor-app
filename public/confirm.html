@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmando cuenta — Cantaor app</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+    }
+    .card {
+      background: #FDF5E6;
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+    .icon { font-size: 3rem; margin-bottom: 1rem; }
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #4A2C2C;
+      margin-bottom: 0.75rem;
+    }
+    p {
+      font-size: 0.9rem;
+      color: #8B7355;
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #C0392B, #8B0000);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #e0c9a6;
+      border-top-color: #C0392B;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.25rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Loading state -->
+    <div id="stateLoading">
+      <div class="spinner"></div>
+      <h1>Confirmando tu cuenta...</h1>
+      <p>Por favor espera un momento.</p>
+    </div>
+
+    <!-- Success state -->
+    <div id="stateSuccess" class="hidden">
+      <div class="icon">&#10003;</div>
+      <h1>Cuenta confirmada</h1>
+      <p>Tu cuenta esta activa. Ya puedes acceder a todos los palos.</p>
+      <a class="btn" href="index.html">Ir a la app</a>
+    </div>
+
+    <!-- Error state -->
+    <div id="stateError" class="hidden">
+      <div class="icon">&#9888;</div>
+      <h1>Enlace no valido</h1>
+      <p id="errorMsg">El enlace de confirmacion ha expirado o ya fue usado. Vuelve a la app e intenta registrarte de nuevo.</p>
+      <a class="btn" href="index.html">Volver</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const SUPABASE_URL = 'https://bjyfaqgwdqvgcjhssfhj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqeWZhcWd3ZHF2Z2NqaHNzZmhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTcxMDUsImV4cCI6MjA5NTI3MzEwNX0.WRuxRfZf0Yo_EZe_1uh2NKycrjk9oXJQt6JegVKltAU';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function show(id) {
+      ['stateLoading', 'stateSuccess', 'stateError'].forEach(s => {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+      });
+    }
+
+    async function confirm() {
+      // Supabase appends token_hash and type as query params for PKCE flows,
+      // or access_token / refresh_token in the hash for implicit flows.
+      const params = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+
+      const tokenHash = params.get('token_hash');
+      const type = params.get('type') || 'signup';
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+
+      try {
+        if (tokenHash) {
+          // PKCE / email OTP flow
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+          if (error) throw error;
+        } else if (accessToken) {
+          // Implicit flow — set the session directly
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) throw error;
+        } else {
+          throw new Error('No se encontro un token de confirmacion en la URL.');
+        }
+        show('stateSuccess');
+        // Redirect automatically after 2 s
+        setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      } catch (err) {
+        document.getElementById('errorMsg').textContent =
+          err.message || 'El enlace de confirmacion ha expirado o ya fue usado.';
+        show('stateError');
+      }
+    }
+
+    confirm();
+  </script>
+</body>
+</html>
