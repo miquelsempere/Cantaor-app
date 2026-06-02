@@ -133,6 +133,10 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     border-bottom: 1px solid #F7F7F7;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
 }
 
 .custom-select-option:last-child {
@@ -152,6 +156,30 @@ body {
 
 .custom-select-option.selected:hover {
     background-color: #A02020;
+}
+
+.palo-badge-free {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #2d8a4e;
+    background: #e6f7ee;
+    border: 1px solid #a8dfc0;
+    border-radius: 10px;
+    padding: 0.1rem 0.45rem;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+.custom-select-option.selected .palo-badge-free {
+    color: #d4edda;
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+}
+
+.palo-badge-lock {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    opacity: 0.5;
 }
 
 /* Disabled state styles */

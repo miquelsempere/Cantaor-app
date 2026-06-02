@@ -11617,6 +11617,15 @@ class FlamencoApp {
     } else {
       this.userBar.style.display = 'none';
     }
+    this.updatePaloBadges();
+  }
+  updatePaloBadges() {
+    this.customSelectOptions.querySelectorAll('.custom-select-option').forEach(opt => {
+      const palo = opt.dataset.value;
+      if (palo === 'Tangos') return;
+      const badge = opt.querySelector('.palo-badge-lock');
+      if (badge) badge.style.display = this.currentUser ? 'none' : '';
+    });
   }
   setupAudioManagerListeners() {
     // Listen for track changes
@@ -11648,8 +11657,12 @@ class FlamencoApp {
         // Add to custom dropdown
         const customOption = document.createElement('div');
         customOption.className = 'custom-select-option';
-        customOption.textContent = palo;
         customOption.dataset.value = palo;
+        if (palo === 'Tangos') {
+          customOption.innerHTML = `<span>${palo}</span><span class="palo-badge-free">Gratis</span>`;
+        } else {
+          customOption.innerHTML = `<span>${palo}</span><span class="palo-badge-lock">&#128274;</span>`;
+        }
         customOption.addEventListener('click', () => {
           this.selectCustomOption(palo, customOption);
         });
