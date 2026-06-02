@@ -69,23 +69,21 @@ export const canteTracksAPI = {
   },
 
   /**
-   * Get all available palos (flamenco styles)
-   * @returns {Promise<Array>} Array of unique palo names
+   * Get all available palos from the palos table (always public, ordered)
+   * @returns {Promise<Array>} Array of palo objects { nombre, free }
    */
   async getAvailablePalos() {
     const { data, error } = await supabase
-      .from('cante_tracks')
-      .select('palo')
-      .order('palo', { ascending: true });
+      .from('palos')
+      .select('nombre, free')
+      .order('orden', { ascending: true });
 
     if (error) {
       console.error('Error fetching available palos:', error);
       throw error;
     }
 
-    // Extract unique palos
-    const uniquePalos = [...new Set(data?.map(item => item.palo) || [])];
-    return uniquePalos;
+    return data || [];
   },
 
   /**

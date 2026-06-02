@@ -277,7 +277,8 @@ class FlamencoApp {
   updatePaloBadges() {
     this.customSelectOptions.querySelectorAll('.custom-select-option').forEach(opt => {
       const palo = opt.dataset.value;
-      if (palo === 'Tangos') return;
+      const isFree = this.paloFreeMap ? this.paloFreeMap[palo] : false;
+      if (isFree) return;
       const badge = opt.querySelector('.palo-badge-lock');
       if (badge) badge.style.display = this.currentUser ? 'none' : '';
     });
@@ -298,51 +299,51 @@ class FlamencoApp {
   async loadAvailablePalos() {
     try {
       const palos = await this.audioManager.getAvailablePalos();
-      
+
+      // Store free map for access checks
+      this.paloFreeMap = {};
+      palos.forEach(p => { this.paloFreeMap[p.nombre] = p.free; });
+
       // Clear existing options
       this.paloSelect.innerHTML = '';
       this.customSelectOptions.innerHTML = '';
-      
-      // Add palo options
-      palos.forEach(palo => {
+
+      palos.forEach(({ nombre, free }) => {
         // Add to native select (hidden)
         const option = document.createElement('option');
-        option.value = palo;
-        option.textContent = palo;
+        option.value = nombre;
+        option.textContent = nombre;
         this.paloSelect.appendChild(option);
 
         // Add to custom dropdown
         const customOption = document.createElement('div');
         customOption.className = 'custom-select-option';
-        customOption.dataset.value = palo;
+        customOption.dataset.value = nombre;
 
-        if (palo === 'Tangos') {
-          customOption.innerHTML = `<span>${palo}</span><span class="palo-badge-free">Gratis</span>`;
+        if (free) {
+          customOption.innerHTML = `<span>${nombre}</span><span class="palo-badge-free">Gratis</span>`;
         } else {
-          customOption.innerHTML = `<span>${palo}</span><span class="palo-badge-lock">&#128274;</span>`;
+          customOption.innerHTML = `<span>${nombre}</span><span class="palo-badge-lock">&#128274;</span>`;
         }
-        
+
         customOption.addEventListener('click', () => {
-          this.selectCustomOption(palo, customOption);
+          this.selectCustomOption(nombre, customOption);
         });
-        
+
         this.customSelectOptions.appendChild(customOption);
       });
-      
-      // Set Tangos as default if available
-      if (palos.includes('Tangos')) {
-        this.paloSelect.value = 'Tangos';
-        this.updateCustomSelectDisplay('Tangos');
-        await this.handlePaloChange('Tangos');
-      } else if (palos.length > 0) {
-        // If no Tangos, select first available palo
-        this.paloSelect.value = palos[0];
-        this.updateCustomSelectDisplay(palos[0]);
-        await this.handlePaloChange(palos[0]);
+
+      // Default to first free palo, or first palo if none are free
+      const firstFree = palos.find(p => p.free);
+      const defaultPalo = firstFree ? firstFree.nombre : (palos[0]?.nombre ?? null);
+      if (defaultPalo) {
+        this.paloSelect.value = defaultPalo;
+        this.updateCustomSelectDisplay(defaultPalo);
+        await this.handlePaloChange(defaultPalo);
       }
-      
+
       console.log(`Loaded ${palos.length} palos:`, palos);
-      
+
     } catch (error) {
       console.error('Error loading palos:', error);
       this.paloSelect.innerHTML = '<option value="">Error cargando palos</option>';
@@ -359,8 +360,8 @@ class FlamencoApp {
       return;
     }
 
-    const FREE_PALO = 'Tangos';
-    if (selectedPalo !== FREE_PALO && !this.currentUser) {
+    const isPaloFree = this.paloFreeMap ? this.paloFreeMap[selectedPalo] : false;
+    if (!isPaloFree && !this.currentUser) {
       this.pendingPalo = selectedPalo;
       this.openAuthModal();
       // Revert the dropdown to the previous palo visually
@@ -571,9 +572,9 @@ class FlamencoApp {
     try {
       const palos = await this.audioManager.getAvailablePalos();
       this.paloSuggestions.innerHTML = '';
-      palos.forEach(palo => {
+      palos.forEach(({ nombre }) => {
         const option = document.createElement('option');
-        option.value = palo;
+        option.value = nombre;
         this.paloSuggestions.appendChild(option);
       });
     } catch (e) {
