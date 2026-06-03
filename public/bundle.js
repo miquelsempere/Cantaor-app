@@ -10912,6 +10912,31 @@ const canteTracksAPI = {
       console.error('Error deleting track:', error);
       throw error;
     }
+  },
+  async triggerTranscription(trackId) {
+    const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`
+      },
+      body: JSON.stringify({
+        track_id: trackId
+      })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Transcription request failed');
+    }
+    return response.json();
+  },
+  async getLyricsStatus(trackId) {
+    const {
+      data,
+      error
+    } = await supabase.from('cante_tracks').select('lyrics, lyrics_status').eq('id', trackId).maybeSingle();
+    if (error) throw error;
+    return data;
   }
 };
 
@@ -11484,6 +11509,9 @@ class FlamencoApp {
 
       // Set up suggestions board
       this.setupSuggestionsBoard();
+
+      // Set up lyrics panel
+      this.setupLyricsPanel();
     } catch (error) {
       console.error('Error initializing app:', error);
     }
@@ -11708,6 +11736,7 @@ class FlamencoApp {
     // Listen for track changes
     this.audioManager.onTrackChange(track => {
       this.updateTrackInfo(track);
+      this.updateLyricsPanel(track);
     });
 
     // Listen for play state changes
@@ -11798,6 +11827,7 @@ class FlamencoApp {
       this.playButton.disabled = false;
       const currentTrack = this.audioManager.getCurrentTrack();
       this.updateTrackInfo(currentTrack);
+      this.updateLyricsPanel(currentTrack);
     } catch (error) {
       console.error('Error loading palo:', error);
       this.playButton.disabled = true;
@@ -12033,15 +12063,23 @@ class FlamencoApp {
       tracks.forEach(track => {
         const item = document.createElement('div');
         item.className = 'track-list-item';
+        const statusBadge = this.buildLyricsBadge(track);
         item.innerHTML = `
           <div class="track-list-item-info">
             <div class="track-list-item-palo">${track.palo}</div>
             <div class="track-list-item-title">${track.title}</div>
           </div>
-          <button class="track-list-item-delete" data-id="${track.id}" data-url="${track.audio_url}" title="Eliminar">&times;</button>
+          <div class="track-list-item-actions">
+            ${statusBadge}
+            <button class="track-list-item-delete" data-id="${track.id}" data-url="${track.audio_url}" title="Eliminar">&times;</button>
+          </div>
         `;
         const deleteBtn = item.querySelector('.track-list-item-delete');
         deleteBtn.addEventListener('click', () => this.handleDeleteTrack(track.id, track.audio_url));
+        const transcribeBtn = item.querySelector('.track-transcribe-btn');
+        if (transcribeBtn) {
+          transcribeBtn.addEventListener('click', () => this.handleTranscribe(track.id, item));
+        }
         this.trackList.appendChild(item);
       });
     } catch (error) {
@@ -12058,6 +12096,120 @@ class FlamencoApp {
     } catch (error) {
       console.error('Error deleting track:', error);
       alert('Error al eliminar la pista: ' + error.message);
+    }
+  }
+  buildLyricsBadge(track) {
+    if (track.lyrics_status === 'done') {
+      return `<span class="lyrics-badge lyrics-badge--done">Letra lista</span>`;
+    }
+    if (track.lyrics_status === 'processing') {
+      return `<span class="lyrics-badge lyrics-badge--processing">Transcribiendo...</span>`;
+    }
+    if (track.lyrics_status === 'error') {
+      return `<button class="track-transcribe-btn" title="Reintentar transcripcion">Reintentar</button>`;
+    }
+    return `<button class="track-transcribe-btn" title="Transcribir letra con IA">Transcribir letra</button>`;
+  }
+  async handleTranscribe(trackId, itemEl) {
+    const btn = itemEl.querySelector('.track-transcribe-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+    }
+    try {
+      // Fire and forget — the function runs async server-side
+      canteTracksAPI.triggerTranscription(trackId).catch(() => {});
+
+      // Optimistically show processing state
+      if (btn) {
+        btn.replaceWith(this.createBadgeEl('processing'));
+      }
+
+      // Poll until done or error (max 3 min)
+      this.pollLyricsStatus(trackId, itemEl);
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Reintentar';
+      }
+    }
+  }
+  createBadgeEl(status) {
+    const span = document.createElement('span');
+    if (status === 'processing') {
+      span.className = 'lyrics-badge lyrics-badge--processing';
+      span.textContent = 'Transcribiendo...';
+    } else if (status === 'done') {
+      span.className = 'lyrics-badge lyrics-badge--done';
+      span.textContent = 'Letra lista';
+    } else {
+      span.className = 'lyrics-badge lyrics-badge--error';
+      span.textContent = 'Error';
+    }
+    return span;
+  }
+  pollLyricsStatus(trackId, itemEl, attempts = 0) {
+    if (attempts >= 36) return; // 36 * 5s = 3 min max
+    setTimeout(async () => {
+      try {
+        const result = await canteTracksAPI.getLyricsStatus(trackId);
+        if (!result) return;
+        if (result.lyrics_status === 'done' || result.lyrics_status === 'error') {
+          const badge = itemEl.querySelector('.lyrics-badge--processing');
+          if (badge) {
+            badge.replaceWith(this.createBadgeEl(result.lyrics_status));
+          }
+          // If a track is currently loaded matching this id, update cached lyrics
+          if (this.audioManager && this.audioManager.getCurrentTrack) {
+            const ct = this.audioManager.getCurrentTrack();
+            if (ct && ct.id === trackId) {
+              ct.lyrics = result.lyrics;
+              ct.lyrics_status = result.lyrics_status;
+              this.updateLyricsPanel(ct);
+            }
+          }
+        } else {
+          this.pollLyricsStatus(trackId, itemEl, attempts + 1);
+        }
+      } catch (e) {
+        // silently ignore polling errors
+      }
+    }, 5000);
+  }
+  setupLyricsPanel() {
+    this.lyricsSection = document.getElementById('lyricsSection');
+    this.lyricsToggleBtn = document.getElementById('lyricsToggleBtn');
+    this.lyricsPanel = document.getElementById('lyricsPanel');
+    this.lyricsContent = document.getElementById('lyricsContent');
+    this.lyricsOpen = false;
+    this.lyricsToggleBtn.addEventListener('click', () => {
+      this.lyricsOpen = !this.lyricsOpen;
+      this.lyricsPanel.style.display = this.lyricsOpen ? 'block' : 'none';
+      this.lyricsToggleBtn.classList.toggle('active', this.lyricsOpen);
+      this.lyricsToggleBtn.querySelector('span') && (this.lyricsToggleBtn.querySelector('span').textContent = this.lyricsOpen ? 'Ocultar letra' : 'Ver letra');
+      const textNode = [...this.lyricsToggleBtn.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+      if (textNode) textNode.textContent = this.lyricsOpen ? ' Ocultar letra' : ' Ver letra';
+    });
+  }
+  updateLyricsPanel(track) {
+    if (!this.lyricsSection) return;
+    if (!track || !track.lyrics_status) {
+      this.lyricsSection.style.display = 'none';
+      this.lyricsPanel.style.display = 'none';
+      this.lyricsOpen = false;
+      return;
+    }
+    this.lyricsSection.style.display = 'block';
+    if (track.lyrics_status === 'processing') {
+      this.lyricsContent.innerHTML = '<div class="lyrics-processing"><div class="lyrics-spinner"></div>Transcribiendo la letra...</div>';
+      this.lyricsSection.style.display = 'block';
+    } else if (track.lyrics_status === 'done' && track.lyrics) {
+      const lines = track.lyrics.split('\n').filter(l => l.trim());
+      this.lyricsContent.innerHTML = lines.map(l => `<p class="lyrics-line">${this.escapeHtml(l)}</p>`).join('');
+    } else if (track.lyrics_status === 'error') {
+      this.lyricsContent.innerHTML = '<div class="lyrics-error">No se pudo transcribir la letra.</div>';
+    } else {
+      this.lyricsSection.style.display = 'none';
     }
   }
 

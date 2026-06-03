@@ -206,7 +206,37 @@ export const canteTracksAPI = {
       console.error('Error deleting track:', error);
       throw error;
     }
-  }
+  },
+
+  async triggerTranscription(trackId) {
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/transcribe-audio`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ track_id: trackId }),
+      }
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Transcription request failed');
+    }
+    return response.json();
+  },
+
+  async getLyricsStatus(trackId) {
+    const { data, error } = await supabase
+      .from('cante_tracks')
+      .select('lyrics, lyrics_status')
+      .eq('id', trackId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
 };
 
 // Suggestions board API
