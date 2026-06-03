@@ -12178,16 +12178,19 @@ class FlamencoApp {
         </div>
       `;
       const voteBtn = card.querySelector('.suggestion-vote-btn');
-      voteBtn.addEventListener('click', () => this.handleVote(s.id, hasVoted, card, voteBtn));
+      voteBtn.addEventListener('click', () => this.handleVote(s.id, voteBtn));
       this.suggestionsList.appendChild(card);
     });
   }
-  async handleVote(suggestionId, hasVoted, card, voteBtn) {
+  async handleVote(suggestionId, voteBtn) {
     if (!this.currentUser) {
       this.closeSuggestionsModal();
       this.openAuthModal();
       return;
     }
+    if (voteBtn.disabled) return;
+    voteBtn.disabled = true;
+    const hasVoted = this.userVotes.has(suggestionId);
     const countEl = voteBtn.querySelector('.vote-count');
     const currentCount = parseInt(countEl.textContent, 10);
     if (hasVoted) {
@@ -12217,6 +12220,7 @@ class FlamencoApp {
         this.userVotes.delete(suggestionId);
       }
     }
+    voteBtn.disabled = false;
   }
   async handleSubmitSuggestion() {
     const title = this.suggestionTitle.value.trim();
