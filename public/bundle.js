@@ -12224,8 +12224,8 @@ class FlamencoApp {
       this.lyricsContent.innerHTML = '<div class="lyrics-processing"><div class="lyrics-spinner"></div>Transcribiendo la letra...</div>';
       this.lyricsSection.style.display = 'block';
     } else if (track.lyrics_status === 'done' && track.lyrics) {
-      const lines = track.lyrics.split('\n').filter(l => l.trim());
-      this.lyricsContent.innerHTML = lines.map(l => `<p class="lyrics-line">${this.escapeHtml(l)}</p>`).join('');
+      const lines = track.lyrics.split('\n');
+      this.lyricsContent.innerHTML = lines.map(l => l.trim() ? `<p class="lyrics-line">${this.escapeHtml(l)}</p>` : `<p class="lyrics-separator"></p>`).join('');
     } else if (track.lyrics_status === 'error') {
       this.lyricsContent.innerHTML = '<div class="lyrics-error">No se pudo transcribir la letra.</div>';
     } else {
