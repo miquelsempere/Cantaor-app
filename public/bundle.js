@@ -11230,7 +11230,7 @@ class AudioManager {
   }
 
   /**
-   * Stop playback
+   * Stop playback and prepare a fresh shuffled cycle for next play
    */
   stop() {
     if (!this.isPlaying) {
@@ -11244,6 +11244,12 @@ class AudioManager {
     }
     this.isPlaying = false;
     this.notifyPlayStateChange(false);
+
+    // Regenerate shuffle so next play starts with a fresh random order
+    if (this.tracks.length > 0) {
+      this.createPlayQueue();
+      this._prepareCurrentCycleBuffer().catch(err => console.error('Error preparando siguiente ciclo:', err));
+    }
     console.log('Reproducción detenida');
   }
 
