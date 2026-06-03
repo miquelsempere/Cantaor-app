@@ -78,34 +78,34 @@ Deno.serve(async (req: Request) => {
     };
     const ext = extMap[contentType.split(";")[0].trim()] || "mp3";
 
-    // Call OpenAI Whisper API
-    const formData = new FormData();
-    formData.append("file", new File([audioBlob], `audio.${ext}`, { type: contentType }));
-    formData.append("model", "whisper-1");
-    formData.append("language", "es");
-    formData.append("response_format", "text");
-
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
+    const groqKey = Deno.env.get("GROQ_API_KEY");
+    if (!groqKey) {
       await supabase
         .from("cante_tracks")
         .update({ lyrics_status: "error" })
         .eq("id", track_id);
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
+      return new Response(JSON.stringify({ error: "Groq API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    // Call Groq Whisper API (compatible with OpenAI format)
+    const formData = new FormData();
+    formData.append("file", new File([audioBlob], `audio.${ext}`, { type: contentType }));
+    formData.append("model", "whisper-large-v3");
+    formData.append("language", "es");
+    formData.append("response_format", "text");
+
+    const whisperResponse = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${openaiKey}` },
+      headers: { Authorization: `Bearer ${groqKey}` },
       body: formData,
     });
 
     if (!whisperResponse.ok) {
       const errText = await whisperResponse.text();
-      console.error("Whisper API error:", errText);
+      console.error("Groq Whisper API error:", errText);
       await supabase
         .from("cante_tracks")
         .update({ lyrics_status: "error" })
