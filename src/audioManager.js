@@ -27,9 +27,10 @@ export default class AudioManager {
     this.currentCycle = 1;
     this.totalTracksInCycle = 0;
     
-    // Track timing for UI updates (optional for future enhancement)
+    // Track timing for UI updates
     this.trackTimings = []; // Array of {startTime, endTime, trackIndex}
-    
+    this.currentTrackIndex = -1; // Index into trackTimings of currently playing track
+
     // Event listeners
     this.onTrackChangeListeners = [];
     this.onPlayStateChangeListeners = [];
@@ -323,11 +324,24 @@ export default class AudioManager {
     
     // Connect to audio output
     this.pitchShifter.connect(this.gainNode);
-    
-    // Notify cycle start (using first track info for UI)
+
+    // Reset track tracking and notify first track immediately
+    this.currentTrackIndex = 0;
     const firstTrackIndex = this.playQueue[0];
     const firstTrack = this.tracks[firstTrackIndex];
     this.notifyTrackChange(firstTrack);
+
+    // Listen for playback position to update lyrics as each track plays
+    this.pitchShifter.on('play', ({ timePlayed }) => {
+      const idx = this.trackTimings.findIndex(
+        t => timePlayed >= t.startTime && timePlayed < t.endTime
+      );
+      if (idx !== -1 && idx !== this.currentTrackIndex) {
+        this.currentTrackIndex = idx;
+        const track = this.tracks[this.trackTimings[idx].trackIndex];
+        this.notifyTrackChange(track);
+      }
+    });
   }
 
   /**
