@@ -208,3 +208,56 @@ export const canteTracksAPI = {
     }
   }
 };
+
+// Suggestions board API
+export const suggestionsAPI = {
+  async getSuggestions(orderBy = 'votes') {
+    const column = orderBy === 'votes' ? 'vote_count' : 'created_at';
+    const { data, error } = await supabase
+      .from('suggestions')
+      .select('*')
+      .order(column, { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createSuggestion(title, description, user) {
+    const { data, error } = await supabase
+      .from('suggestions')
+      .insert([{ title, description, user_id: user.id, user_email: user.email }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getUserVotes(userId) {
+    const { data, error } = await supabase
+      .from('suggestion_votes')
+      .select('suggestion_id')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return new Set((data || []).map(v => v.suggestion_id));
+  },
+
+  async vote(suggestionId, userId) {
+    const { error } = await supabase
+      .from('suggestion_votes')
+      .insert([{ suggestion_id: suggestionId, user_id: userId }]);
+
+    if (error) throw error;
+  },
+
+  async unvote(suggestionId, userId) {
+    const { error } = await supabase
+      .from('suggestion_votes')
+      .delete()
+      .eq('suggestion_id', suggestionId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
+};

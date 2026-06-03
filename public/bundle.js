@@ -10915,6 +10915,57 @@ const canteTracksAPI = {
   }
 };
 
+// Suggestions board API
+const suggestionsAPI = {
+  async getSuggestions(orderBy = 'votes') {
+    const column = orderBy === 'votes' ? 'vote_count' : 'created_at';
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').select('*').order(column, {
+      ascending: false
+    });
+    if (error) throw error;
+    return data || [];
+  },
+  async createSuggestion(title, description, user) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').insert([{
+      title,
+      description,
+      user_id: user.id,
+      user_email: user.email
+    }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async getUserVotes(userId) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestion_votes').select('suggestion_id').eq('user_id', userId);
+    if (error) throw error;
+    return new Set((data || []).map(v => v.suggestion_id));
+  },
+  async vote(suggestionId, userId) {
+    const {
+      error
+    } = await supabase.from('suggestion_votes').insert([{
+      suggestion_id: suggestionId,
+      user_id: userId
+    }]);
+    if (error) throw error;
+  },
+  async unvote(suggestionId, userId) {
+    const {
+      error
+    } = await supabase.from('suggestion_votes').delete().eq('suggestion_id', suggestionId).eq('user_id', userId);
+    if (error) throw error;
+  }
+};
+
 /*
  * Audio Manager for Flamenco Cante Practice App
  * Handles audio loading, playback queue management, and PitchShifter integration
@@ -11430,6 +11481,9 @@ class FlamencoApp {
       // Set up admin panel
       this.setupAdminPanel();
       this.setupSecretAdminAccess();
+
+      // Set up suggestions board
+      this.setupSuggestionsBoard();
     } catch (error) {
       console.error('Error initializing app:', error);
     }
@@ -12005,6 +12059,187 @@ class FlamencoApp {
       console.error('Error deleting track:', error);
       alert('Error al eliminar la pista: ' + error.message);
     }
+  }
+
+  // Suggestions board
+  setupSuggestionsBoard() {
+    this.suggestionsOverlay = document.getElementById('suggestionsOverlay');
+    this.suggestionsFab = document.getElementById('suggestionsFab');
+    this.suggestionsModalClose = document.getElementById('suggestionsModalClose');
+    this.suggestionsList = document.getElementById('suggestionsList');
+    this.suggestionsLoading = document.getElementById('suggestionsLoading');
+    this.newSuggestionBtn = document.getElementById('newSuggestionBtn');
+    this.newSuggestionForm = document.getElementById('newSuggestionForm');
+    this.cancelSuggestionBtn = document.getElementById('cancelSuggestionBtn');
+    this.submitSuggestionBtn = document.getElementById('submitSuggestionBtn');
+    this.suggestionTitle = document.getElementById('suggestionTitle');
+    this.suggestionDescription = document.getElementById('suggestionDescription');
+    this.suggestionFormError = document.getElementById('suggestionFormError');
+    this.sortByVotesBtn = document.getElementById('sortByVotes');
+    this.sortByDateBtn = document.getElementById('sortByDate');
+    this.currentSortOrder = 'votes';
+    this.userVotes = new Set();
+    this.suggestionsFab.addEventListener('click', () => this.openSuggestionsModal());
+    this.suggestionsModalClose.addEventListener('click', () => this.closeSuggestionsModal());
+    this.suggestionsOverlay.addEventListener('click', e => {
+      if (e.target === this.suggestionsOverlay) this.closeSuggestionsModal();
+    });
+    this.newSuggestionBtn.addEventListener('click', () => {
+      if (!this.currentUser) {
+        this.closeSuggestionsModal();
+        this.openAuthModal();
+        return;
+      }
+      this.newSuggestionForm.style.display = 'block';
+      this.newSuggestionBtn.style.display = 'none';
+      setTimeout(() => this.suggestionTitle.focus(), 50);
+    });
+    this.cancelSuggestionBtn.addEventListener('click', () => this.hideSuggestionForm());
+    this.submitSuggestionBtn.addEventListener('click', () => this.handleSubmitSuggestion());
+    this.suggestionTitle.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this.handleSubmitSuggestion();
+    });
+    this.sortByVotesBtn.addEventListener('click', () => {
+      this.currentSortOrder = 'votes';
+      this.sortByVotesBtn.classList.add('active');
+      this.sortByDateBtn.classList.remove('active');
+      this.renderSuggestions();
+    });
+    this.sortByDateBtn.addEventListener('click', () => {
+      this.currentSortOrder = 'date';
+      this.sortByDateBtn.classList.add('active');
+      this.sortByVotesBtn.classList.remove('active');
+      this.renderSuggestions();
+    });
+  }
+  openSuggestionsModal() {
+    this.suggestionsOverlay.classList.add('open');
+    this.loadSuggestions();
+  }
+  closeSuggestionsModal() {
+    this.suggestionsOverlay.classList.remove('open');
+    this.hideSuggestionForm();
+  }
+  hideSuggestionForm() {
+    this.newSuggestionForm.style.display = 'none';
+    this.newSuggestionBtn.style.display = '';
+    this.suggestionTitle.value = '';
+    this.suggestionDescription.value = '';
+    this.suggestionFormError.textContent = '';
+  }
+  async loadSuggestions() {
+    this.suggestionsList.innerHTML = '<div class="suggestions-loading">Cargando sugerencias...</div>';
+    try {
+      this.cachedSuggestions = await suggestionsAPI.getSuggestions('votes');
+      if (this.currentUser) {
+        this.userVotes = await suggestionsAPI.getUserVotes(this.currentUser.id);
+      } else {
+        this.userVotes = new Set();
+      }
+      this.renderSuggestions();
+    } catch (err) {
+      this.suggestionsList.innerHTML = '<div class="suggestions-empty">Error cargando sugerencias.</div>';
+    }
+  }
+  renderSuggestions() {
+    const suggestions = [...(this.cachedSuggestions || [])];
+    if (this.currentSortOrder === 'date') {
+      suggestions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else {
+      suggestions.sort((a, b) => b.vote_count - a.vote_count);
+    }
+    if (suggestions.length === 0) {
+      this.suggestionsList.innerHTML = '<div class="suggestions-empty">No hay sugerencias aun. Se el primero en proponer algo!</div>';
+      return;
+    }
+    this.suggestionsList.innerHTML = '';
+    suggestions.forEach(s => {
+      const hasVoted = this.userVotes.has(s.id);
+      const card = document.createElement('div');
+      card.className = 'suggestion-card';
+      card.dataset.id = s.id;
+      const date = new Date(s.created_at).toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      const email = s.user_email ? s.user_email.split('@')[0] : 'anonimo';
+      card.innerHTML = `
+        <button class="suggestion-vote-btn${hasVoted ? ' voted' : ''}" data-id="${s.id}" aria-label="Votar">
+          <svg class="vote-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"/>
+          </svg>
+          <span class="vote-count">${s.vote_count}</span>
+        </button>
+        <div class="suggestion-body">
+          <div class="suggestion-title">${this.escapeHtml(s.title)}</div>
+          ${s.description ? `<div class="suggestion-description">${this.escapeHtml(s.description)}</div>` : ''}
+          <div class="suggestion-meta">${email} &middot; ${date}</div>
+        </div>
+      `;
+      const voteBtn = card.querySelector('.suggestion-vote-btn');
+      voteBtn.addEventListener('click', () => this.handleVote(s.id, hasVoted, card, voteBtn));
+      this.suggestionsList.appendChild(card);
+    });
+  }
+  async handleVote(suggestionId, hasVoted, card, voteBtn) {
+    if (!this.currentUser) {
+      this.closeSuggestionsModal();
+      this.openAuthModal();
+      return;
+    }
+    const countEl = voteBtn.querySelector('.vote-count');
+    const currentCount = parseInt(countEl.textContent, 10);
+    if (hasVoted) {
+      voteBtn.classList.remove('voted');
+      countEl.textContent = currentCount - 1;
+      this.userVotes.delete(suggestionId);
+      const s = this.cachedSuggestions.find(x => x.id === suggestionId);
+      if (s) s.vote_count = Math.max(0, s.vote_count - 1);
+      try {
+        await suggestionsAPI.unvote(suggestionId, this.currentUser.id);
+      } catch (err) {
+        voteBtn.classList.add('voted');
+        countEl.textContent = currentCount;
+        this.userVotes.add(suggestionId);
+      }
+    } else {
+      voteBtn.classList.add('voted');
+      countEl.textContent = currentCount + 1;
+      this.userVotes.add(suggestionId);
+      const s = this.cachedSuggestions.find(x => x.id === suggestionId);
+      if (s) s.vote_count = s.vote_count + 1;
+      try {
+        await suggestionsAPI.vote(suggestionId, this.currentUser.id);
+      } catch (err) {
+        voteBtn.classList.remove('voted');
+        countEl.textContent = currentCount;
+        this.userVotes.delete(suggestionId);
+      }
+    }
+  }
+  async handleSubmitSuggestion() {
+    const title = this.suggestionTitle.value.trim();
+    const description = this.suggestionDescription.value.trim();
+    if (!title || title.length < 5) {
+      this.suggestionFormError.textContent = 'El titulo debe tener al menos 5 caracteres.';
+      return;
+    }
+    this.submitSuggestionBtn.disabled = true;
+    this.suggestionFormError.textContent = '';
+    try {
+      const newSuggestion = await suggestionsAPI.createSuggestion(title, description, this.currentUser);
+      this.cachedSuggestions = [newSuggestion, ...(this.cachedSuggestions || [])];
+      this.hideSuggestionForm();
+      this.renderSuggestions();
+    } catch (err) {
+      this.suggestionFormError.textContent = 'Error al enviar la sugerencia. Intentalo de nuevo.';
+    } finally {
+      this.submitSuggestionBtn.disabled = false;
+    }
+  }
+  escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 }
 

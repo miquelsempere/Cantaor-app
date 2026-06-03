@@ -154,6 +154,59 @@
         </div>
     </div>
 
+    <!-- Suggestions button (fixed bottom-left) -->
+    <button class="suggestions-fab" id="suggestionsFab" title="Sugerencias">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>Sugerencias</span>
+    </button>
+
+    <!-- Suggestions Modal -->
+    <div class="suggestions-overlay" id="suggestionsOverlay">
+        <div class="suggestions-modal" id="suggestionsModal">
+            <div class="suggestions-modal-header">
+                <div>
+                    <h2 class="suggestions-modal-title">Tablero de sugerencias</h2>
+                    <p class="suggestions-modal-subtitle">Propone y vota las mejoras que quieres ver</p>
+                </div>
+                <button class="suggestions-modal-close" id="suggestionsModalClose" aria-label="Cerrar">&times;</button>
+            </div>
+
+            <div class="suggestions-toolbar">
+                <div class="suggestions-sort">
+                    <button class="sort-btn active" id="sortByVotes" data-sort="votes">Mas votadas</button>
+                    <button class="sort-btn" id="sortByDate" data-sort="date">Mas recientes</button>
+                </div>
+                <button class="new-suggestion-btn" id="newSuggestionBtn">+ Nueva sugerencia</button>
+            </div>
+
+            <!-- New suggestion form (hidden by default) -->
+            <div class="new-suggestion-form" id="newSuggestionForm" style="display:none">
+                <div class="form-group">
+                    <label for="suggestionTitle">Titulo *</label>
+                    <input type="text" id="suggestionTitle" class="form-input" placeholder="Ej: Añadir palo de Soleares" maxlength="120">
+                </div>
+                <div class="form-group">
+                    <label for="suggestionDescription">Descripcion (opcional)</label>
+                    <textarea id="suggestionDescription" class="form-input suggestion-textarea" placeholder="Explica tu idea con mas detalle..." maxlength="500" rows="3"></textarea>
+                </div>
+                <div id="suggestionFormError" class="auth-error"></div>
+                <div class="new-suggestion-form-actions">
+                    <button class="suggestion-cancel-btn" id="cancelSuggestionBtn">Cancelar</button>
+                    <button class="auth-submit-btn suggestion-submit-btn" id="submitSuggestionBtn">Enviar sugerencia</button>
+                </div>
+            </div>
+
+            <!-- Suggestions list -->
+            <div class="suggestions-list" id="suggestionsList">
+                <div class="suggestions-loading" id="suggestionsLoading">Cargando sugerencias...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- User bar -->
     <div class="user-bar" id="userBar" style="display:none">
         <span class="user-bar-email" id="userBarEmail"></span>
