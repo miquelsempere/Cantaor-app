@@ -27,9 +27,9 @@ Instrucciones:
 2. Si encuentras la letra correcta online, úsala para corregir las palabras que Whisper no ha transcrito bien
 3. Corrige también errores ortográficos, palabras del argot flamenco, vocablos en caló o gitano que puedan estar mal escritos
 4. Si no encuentras la letra exacta online, corrige igualmente usando tu conocimiento del flamenco
-5. Formatea el resultado dividiendo el texto en versos, con cada verso en una línea separada
+5. Formatea el resultado así: cada verso en una línea separada, y una línea en blanco entre cada copla o estrofa
 6. Respeta la estructura natural del cante (coplas, estribillos, etc.)
-7. Devuelve ÚNICAMENTE el texto de la letra corregida y formateada por versos, sin explicaciones ni comentarios adicionales`;
+7. Devuelve ÚNICAMENTE el texto de la letra corregida y formateada, sin explicaciones ni comentarios adicionales`;
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

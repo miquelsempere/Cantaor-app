@@ -1343,6 +1343,12 @@ body {
     display: none;
 }
 
+.lyrics-separator {
+    height: 0.6rem;
+    margin: 0;
+    padding: 0;
+}
+
 .lyrics-processing {
     display: flex;
     align-items: center;
