@@ -47,7 +47,6 @@ Instrucciones:
   if (!response.ok) {
     const errText = await response.text();
     console.error("Groq correction API error:", errText);
-    // Fall back to raw lyrics if correction fails
     return rawLyrics;
   }
 
@@ -62,13 +61,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { track_id } = await req.json();
+    const { track_id, target_table } = await req.json();
     if (!track_id) {
       return new Response(JSON.stringify({ error: "track_id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Supports 'cante_tracks' (default) and 'cante_voices'
+    const table = target_table === "cante_voices" ? "cante_voices" : "cante_tracks";
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -77,23 +79,23 @@ Deno.serve(async (req: Request) => {
 
     // Mark as processing
     await supabase
-      .from("cante_tracks")
+      .from(table)
       .update({ lyrics_status: "processing" })
       .eq("id", track_id);
 
-    // Fetch track to get audio_url, title and palo
+    // Fetch record to get audio_url, title and palo
     const { data: track, error: trackError } = await supabase
-      .from("cante_tracks")
+      .from(table)
       .select("audio_url, title, palo")
       .eq("id", track_id)
       .maybeSingle();
 
     if (trackError || !track) {
       await supabase
-        .from("cante_tracks")
+        .from(table)
         .update({ lyrics_status: "error" })
         .eq("id", track_id);
-      return new Response(JSON.stringify({ error: "Track not found" }), {
+      return new Response(JSON.stringify({ error: "Record not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -103,7 +105,7 @@ Deno.serve(async (req: Request) => {
     const audioResponse = await fetch(track.audio_url);
     if (!audioResponse.ok) {
       await supabase
-        .from("cante_tracks")
+        .from(table)
         .update({ lyrics_status: "error" })
         .eq("id", track_id);
       return new Response(JSON.stringify({ error: "Failed to fetch audio file" }), {
@@ -115,7 +117,6 @@ Deno.serve(async (req: Request) => {
     const audioBlob = await audioResponse.blob();
     const contentType = audioResponse.headers.get("content-type") || "audio/mpeg";
 
-    // Determine extension from content-type
     const extMap: Record<string, string> = {
       "audio/mpeg": "mp3",
       "audio/mp3": "mp3",
@@ -131,7 +132,7 @@ Deno.serve(async (req: Request) => {
     const groqKey = Deno.env.get("GROQ_API_KEY");
     if (!groqKey) {
       await supabase
-        .from("cante_tracks")
+        .from(table)
         .update({ lyrics_status: "error" })
         .eq("id", track_id);
       return new Response(JSON.stringify({ error: "Groq API key not configured" }), {
@@ -140,12 +141,13 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Step 1: Transcribe with Groq Whisper
+    // Step 1: Transcribe with Groq Whisper (verbose_json for word timestamps)
     const formData = new FormData();
     formData.append("file", new File([audioBlob], `audio.${ext}`, { type: contentType }));
     formData.append("model", "whisper-large-v3");
     formData.append("language", "es");
-    formData.append("response_format", "text");
+    formData.append("response_format", "verbose_json");
+    formData.append("timestamp_granularities[]", "word");
 
     const whisperResponse = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
@@ -157,7 +159,7 @@ Deno.serve(async (req: Request) => {
       const errText = await whisperResponse.text();
       console.error("Groq Whisper API error:", errText);
       await supabase
-        .from("cante_tracks")
+        .from(table)
         .update({ lyrics_status: "error" })
         .eq("id", track_id);
       return new Response(JSON.stringify({ error: "Transcription failed" }), {
@@ -166,9 +168,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const rawLyrics = await whisperResponse.text();
+    const whisperData = await whisperResponse.json();
 
-    // Step 2: Correct and format lyrics using compound-beta (web search + LLM)
+    // Extract plain text and word-level timestamps
+    const rawLyrics: string = whisperData.text || "";
+
+    // Build flat word array from segments[].words[]
+    type WordEntry = { start: number; end: number; word: string };
+    const wordsArray: WordEntry[] = [];
+    for (const segment of (whisperData.segments || [])) {
+      for (const w of (segment.words || [])) {
+        wordsArray.push({ start: w.start, end: w.end, word: w.word });
+      }
+    }
+
+    // Step 2: Correct and format lyrics using compound-beta
     const lyrics = await correctLyricsWithWebSearch(
       rawLyrics.trim(),
       track.title,
@@ -176,13 +190,17 @@ Deno.serve(async (req: Request) => {
       groqKey
     );
 
-    // Save corrected lyrics to DB
+    // Save corrected lyrics and word timestamps
     await supabase
-      .from("cante_tracks")
-      .update({ lyrics: lyrics, lyrics_status: "done" })
+      .from(table)
+      .update({
+        lyrics,
+        lyrics_status: "done",
+        lyrics_json: wordsArray.length > 0 ? wordsArray : null,
+      })
       .eq("id", track_id);
 
-    return new Response(JSON.stringify({ lyrics }), {
+    return new Response(JSON.stringify({ lyrics, words: wordsArray.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

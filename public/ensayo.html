@@ -130,7 +130,46 @@
             font-style: italic;
         }
 
-        /* ── Controls antes del play ── */
+        /* ── Karaoke panel ── */
+        .karaoke-panel {
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #FFF8F0;
+            border: 1px solid #E8D5B7;
+            border-radius: 10px;
+            max-height: 5.5rem;
+            overflow: hidden;
+            position: relative;
+        }
+        .karaoke-panel-label {
+            font-size: 0.62rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #8B7355;
+            margin-bottom: 0.45rem;
+        }
+        .karaoke-words {
+            font-size: 0.88rem;
+            line-height: 1.65;
+            color: #C4A882;
+            word-break: break-word;
+        }
+        .karaoke-word {
+            display: inline;
+            transition: color 0.12s ease, font-weight 0.12s ease;
+        }
+        .karaoke-word.active {
+            color: #8B2020;
+            font-weight: 700;
+        }
+
+        /* ── Lyrics action in admin voice list ── */
+        .voice-lyrics-action {
+            margin-top: 0.3rem;
+        }
+
+        /* ── Controls antes del play ──*/
         .ensayo-preplay {
             margin-bottom: 1.5rem;
         }
@@ -485,6 +524,11 @@
         <div class="ensayo-cante-info">
             <div class="ensayo-cante-label">Sonando ahora</div>
             <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
+            <!-- Karaoke panel: hidden until a voice with lyrics_json is active -->
+            <div class="karaoke-panel" id="karaokePanel" style="display:none">
+                <div class="karaoke-panel-label">Letra</div>
+                <div class="karaoke-words" id="karaokeWords"></div>
+            </div>
         </div>
 
         <!-- Boton principal play/stop -->
