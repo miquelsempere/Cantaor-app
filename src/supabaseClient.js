@@ -239,6 +239,139 @@ export const canteTracksAPI = {
   },
 };
 
+// Ensayo mode API (dual-stream practice mode)
+export const ensayoAPI = {
+  async getPalmasBaseByPalo(palo) {
+    const { data, error } = await supabase
+      .from('palmas_bases')
+      .select('*')
+      .eq('palo', palo)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getCanteVoicesByPalo(palo) {
+    const { data, error } = await supabase
+      .from('cante_voices')
+      .select('*')
+      .eq('palo', palo)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAllPalmasBases() {
+    const { data, error } = await supabase
+      .from('palmas_bases')
+      .select('*')
+      .order('palo', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAllCanteVoices() {
+    const { data, error } = await supabase
+      .from('cante_voices')
+      .select('*')
+      .order('palo', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async uploadAndCreatePalmasBase(file, palo, title, bpm, beatsPerCompas) {
+    const ext = file.name.split('.').pop();
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `palmas/${palo}/${timestamp}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('cante-audio')
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('cante-audio')
+      .getPublicUrl(filePath);
+
+    const { data, error } = await supabase
+      .from('palmas_bases')
+      .insert([{
+        palo,
+        title,
+        audio_url: urlData.publicUrl,
+        bpm: parseInt(bpm, 10),
+        beats_per_compas: parseInt(beatsPerCompas, 10),
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async uploadAndCreateCanteVoice(file, palo, title) {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `voices/${palo}/${timestamp}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('cante-audio')
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('cante-audio')
+      .getPublicUrl(filePath);
+
+    const { data, error } = await supabase
+      .from('cante_voices')
+      .insert([{ palo, title, audio_url: urlData.publicUrl }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deletePalmasBase(id, audioUrl) {
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('cante-audio').remove([pathParts[1]]);
+      }
+    } catch (e) {
+      console.warn('Could not delete audio file:', e);
+    }
+    const { error } = await supabase.from('palmas_bases').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteCanteVoice(id, audioUrl) {
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('cante-audio').remove([pathParts[1]]);
+      }
+    } catch (e) {
+      console.warn('Could not delete audio file:', e);
+    }
+    const { error } = await supabase.from('cante_voices').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
 // Suggestions board API
 export const suggestionsAPI = {
   async getSuggestions(orderBy = 'votes') {

@@ -1,0 +1,637 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Modo Ensayo - Cantaor app</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ── Ensayo-specific overrides ── */
+        .ensayo-container {
+            max-width: 460px;
+        }
+
+        .ensayo-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: #8B7355;
+            font-size: 0.82rem;
+            text-decoration: none;
+            margin-bottom: 1.2rem;
+            transition: color 0.2s;
+        }
+        .ensayo-back:hover { color: #C0392B; }
+
+        .ensayo-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #C0392B, #8B0000);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.55rem;
+            border-radius: 20px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        /* ── Status bar ── */
+        .ensayo-status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #FFF8F0;
+            border: 1px solid #E8D5B7;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            min-height: 52px;
+        }
+
+        .status-mode {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #4A2C2C;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .status-dot.cante   { background: #27AE60; }
+        .status-dot.falseta { background: #E67E22; animation: pulse-dot 1.2s infinite; }
+        .status-dot.stopped { background: #ccc; }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.4; }
+        }
+
+        .status-voice {
+            font-size: 0.75rem;
+            color: #8B7355;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .voice-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: background 0.3s;
+        }
+        .voice-dot.on      { background: #E74C3C; animation: blink 1s infinite; }
+        .voice-dot.falseta { background: #E67E22; }
+        .voice-dot.error   { background: #E74C3C; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        /* ── Cante actual ── */
+        .ensayo-cante-info {
+            background: #FFF8F0;
+            border: 1px solid #E8D5B7;
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            margin-bottom: 1.5rem;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .ensayo-cante-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8B7355;
+            margin-bottom: 0.3rem;
+        }
+        .ensayo-cante-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4A2C2C;
+        }
+        .ensayo-cante-title.empty {
+            color: #C4A882;
+            font-weight: 400;
+            font-style: italic;
+        }
+
+        /* ── Controls antes del play ── */
+        .ensayo-preplay {
+            margin-bottom: 1.5rem;
+        }
+        .ensayo-preplay-label {
+            font-size: 0.75rem;
+            color: #8B7355;
+            margin-bottom: 0.6rem;
+            font-weight: 500;
+        }
+        .ensayo-preplay.locked .control-slider,
+        .ensayo-preplay.locked .ensayo-preplay-label {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .locked-note {
+            display: none;
+            font-size: 0.68rem;
+            color: #C0392B;
+            margin-top: 0.3rem;
+        }
+        .ensayo-preplay.locked .locked-note { display: block; }
+
+        /* ── Botones de accion ── */
+        .ensayo-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 0.7rem 1rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-falseta {
+            background: #FEF3E2;
+            color: #E67E22;
+            border: 1.5px solid #E67E22;
+        }
+        .btn-falseta:hover:not(:disabled) {
+            background: #E67E22;
+            color: #fff;
+        }
+        .btn-falseta.active {
+            background: #E67E22;
+            color: #fff;
+        }
+
+        .btn-vamos {
+            background: #EAF7EE;
+            color: #27AE60;
+            border: 1.5px solid #27AE60;
+        }
+        .btn-vamos:hover:not(:disabled) {
+            background: #27AE60;
+            color: #fff;
+        }
+        .btn-vamos:disabled {
+            opacity: 0.3;
+        }
+
+        /* ── Voice toggle ── */
+        .ensayo-voice-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #FFF8F0;
+            border: 1px solid #E8D5B7;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .voice-label {
+            font-size: 0.85rem;
+            color: #4A2C2C;
+            font-weight: 500;
+        }
+        .voice-sublabel {
+            font-size: 0.72rem;
+            color: #8B7355;
+            margin-top: 0.15rem;
+        }
+        .voice-unsupported {
+            font-size: 0.72rem;
+            color: #C0392B;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: #D1D5DB;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.25s;
+        }
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.25s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-switch input:checked + .toggle-track {
+            background: #C0392B;
+        }
+        .toggle-switch input:checked + .toggle-track::after {
+            transform: translateX(20px);
+        }
+        .toggle-switch input:disabled + .toggle-track {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ── Comando flash ── */
+        .command-flash {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(44, 24, 24, 0.92);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.6rem 1.4rem;
+            border-radius: 30px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 999;
+            white-space: nowrap;
+        }
+        .command-flash.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ── Admin panel ensayo ── */
+        .ensayo-admin-section {
+            border-top: 1px solid #E8D5B7;
+            margin-top: 1.5rem;
+            padding-top: 1.2rem;
+        }
+        .ensayo-admin-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #4A2C2C;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .ensayo-admin-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .admin-tab-btn {
+            flex: 1;
+            padding: 0.45rem;
+            border: 1.5px solid #E8D5B7;
+            border-radius: 8px;
+            background: transparent;
+            color: #8B7355;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .admin-tab-btn.active {
+            background: #C0392B;
+            color: #fff;
+            border-color: #C0392B;
+        }
+        .admin-tab-panel { display: none; }
+        .admin-tab-panel.active { display: block; }
+
+        .no-data-msg {
+            text-align: center;
+            color: #C4A882;
+            font-size: 0.8rem;
+            padding: 1rem 0;
+            font-style: italic;
+        }
+
+        .ensayo-track-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
+            background: #FFF8F0;
+            border: 1px solid #E8D5B7;
+            margin-bottom: 0.5rem;
+            font-size: 0.82rem;
+        }
+        .ensayo-track-meta {
+            color: #8B7355;
+            font-size: 0.72rem;
+            margin-top: 0.15rem;
+        }
+        .ensayo-track-delete {
+            background: none;
+            border: none;
+            color: #C0392B;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 0 0.25rem;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .ensayo-track-delete:hover { opacity: 1; }
+
+        /* Cargando */
+        .ensayo-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1.5rem 0;
+        }
+        .ensayo-loading-text {
+            color: #8B7355;
+            font-size: 0.85rem;
+        }
+        .loading-spinner-small {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #E8D5B7;
+            border-top-color: #C0392B;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .ensayo-error-msg {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #C0392B;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container ensayo-container">
+
+        <a href="index.html" class="ensayo-back">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Volver al reproductor
+        </a>
+
+        <h1 class="app-title">
+            Modo Ensayo
+            <span class="ensayo-badge">Beta</span>
+        </h1>
+        <p class="app-subtitle">Practica con base de palmas y cante separados</p>
+
+        <!-- Selector de palo -->
+        <div class="palo-selector" style="margin-bottom:1.2rem">
+            <div class="custom-select-wrapper" id="ensayoSelectWrapper">
+                <div class="custom-select-display" id="ensayoSelectDisplay">
+                    <span class="custom-select-text" id="ensayoSelectText">Selecciona un palo...</span>
+                    <div class="custom-select-arrow">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M7 10l5 5 5-5z" fill="currentColor"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="custom-select-options" id="ensayoSelectOptions"></div>
+            </div>
+        </div>
+
+        <!-- Error / info -->
+        <div id="ensayoError" class="ensayo-error-msg" style="display:none"></div>
+
+        <!-- Loading -->
+        <div id="ensayoLoading" class="ensayo-loading" style="display:none">
+            <div class="loading-spinner-small"></div>
+            <div class="ensayo-loading-text" id="ensayoLoadingText">Cargando audio...</div>
+        </div>
+
+        <!-- Configuracion pre-play -->
+        <div class="ensayo-preplay" id="ensayoPreplay">
+            <div class="ensayo-preplay-label">Configura antes de iniciar</div>
+            <div class="controls-section" style="margin-bottom:0.5rem">
+                <div class="control-group">
+                    <label class="control-label">Compas</label>
+                    <input type="range" id="ensayoTempoSlider" class="control-slider"
+                           min="0.5" max="1.5" step="0.05" value="1.0">
+                    <div class="control-value" id="ensayoTempoValue">1.00x</div>
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Cejilla</label>
+                    <input type="range" id="ensayoPitchSlider" class="control-slider"
+                           min="-5" max="5" step="1" value="0">
+                    <div class="control-value" id="ensayoPitchValue">Traste 5</div>
+                </div>
+            </div>
+            <div class="locked-note" id="ensayoLockedNote">Ajusta compas y cejilla antes de reproducir</div>
+        </div>
+
+        <!-- Barra de estado -->
+        <div class="ensayo-status-bar">
+            <div class="status-mode">
+                <span class="status-dot stopped" id="statusDot"></span>
+                <span id="statusText">Listo para empezar</span>
+            </div>
+            <div class="status-voice">
+                <span class="voice-dot" id="voiceDot"></span>
+                <span id="voiceStatusText">Voz desactivada</span>
+            </div>
+        </div>
+
+        <!-- Info letra en curso -->
+        <div class="ensayo-cante-info">
+            <div class="ensayo-cante-label">Sonando ahora</div>
+            <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
+        </div>
+
+        <!-- Boton principal play/stop -->
+        <div class="player-section" style="margin-bottom:1.2rem">
+            <button id="ensayoPlayBtn" class="play-button" disabled>
+                <div class="play-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M8 5v14l11-7z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="pause-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
+                    </svg>
+                </div>
+            </button>
+        </div>
+
+        <!-- Visualizador -->
+        <div class="visualizer" id="ensayoVisualizer">
+            <div class="visualizer-bars">
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+                <div class="visualizer-bar"></div>
+            </div>
+        </div>
+
+        <!-- Botones de control falseta -->
+        <div class="ensayo-actions">
+            <button class="action-btn btn-falseta" id="btnFalseta" disabled>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                </svg>
+                Falseta
+            </button>
+            <button class="action-btn btn-vamos" id="btnVamos" disabled>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Vamos alla
+            </button>
+        </div>
+
+        <!-- Control de voz -->
+        <div class="ensayo-voice-section" id="ensayoVoiceSection">
+            <div>
+                <div class="voice-label">Control por voz</div>
+                <div class="voice-sublabel" id="voiceSublabel">
+                    Di "falseta" o "vamos alla" mientras tocas
+                </div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="voiceToggle" disabled>
+                <span class="toggle-track"></span>
+            </label>
+        </div>
+
+        <!-- Panel admin (oculto por defecto) -->
+        <div id="ensayoAdminSection" style="display:none">
+            <div class="ensayo-admin-section">
+                <div class="ensayo-admin-title">Gestion de contenido</div>
+
+                <div class="ensayo-admin-tabs">
+                    <button class="admin-tab-btn active" data-tab="palmas">Bases de palmas</button>
+                    <button class="admin-tab-btn" data-tab="voces">Voces de cante</button>
+                </div>
+
+                <!-- Tab: palmas -->
+                <div class="admin-tab-panel active" id="tabPalmas">
+                    <div class="admin-form" style="margin-bottom:1rem">
+                        <div class="form-group">
+                            <label>Palo</label>
+                            <input type="text" id="palmasPalo" class="form-input" placeholder="Ej: Tangos" list="ensayoPaloSuggestions">
+                            <datalist id="ensayoPaloSuggestions"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label>Titulo</label>
+                            <input type="text" id="palmasTitle" class="form-input" placeholder="Ej: Base Tangos 140 BPM">
+                        </div>
+                        <div class="form-group">
+                            <label>BPM</label>
+                            <input type="number" id="palmasBpm" class="form-input" value="140" min="40" max="300">
+                        </div>
+                        <div class="form-group">
+                            <label>Tiempos por compas</label>
+                            <input type="number" id="palmasBeats" class="form-input" value="8" min="1" max="24">
+                        </div>
+                        <div class="form-group">
+                            <label>Archivo de audio</label>
+                            <div class="file-input-wrapper">
+                                <button type="button" id="palmasFileBtn" class="file-input-btn">Seleccionar</button>
+                                <span id="palmasFileName" class="file-input-name">Ningun archivo</span>
+                                <input type="file" id="palmasAudioInput" accept="audio/*" class="file-input-hidden">
+                            </div>
+                        </div>
+                        <button id="palmasUploadBtn" class="upload-btn" disabled>Subir base de palmas</button>
+                        <div id="palmasUploadStatus" class="upload-status"></div>
+                    </div>
+                    <div id="palmasList"></div>
+                </div>
+
+                <!-- Tab: voces -->
+                <div class="admin-tab-panel" id="tabVoces">
+                    <div class="admin-form" style="margin-bottom:1rem">
+                        <div class="form-group">
+                            <label>Palo</label>
+                            <input type="text" id="vocesPalo" class="form-input" placeholder="Ej: Tangos" list="ensayoPaloSuggestions">
+                        </div>
+                        <div class="form-group">
+                            <label>Titulo de la letra</label>
+                            <input type="text" id="vocesTitle" class="form-input" placeholder="Ej: Tangos - Los cuatro muleros">
+                        </div>
+                        <div class="form-group">
+                            <label>Archivo de audio (solo voz)</label>
+                            <div class="file-input-wrapper">
+                                <button type="button" id="vocesFileBtn" class="file-input-btn">Seleccionar</button>
+                                <span id="vocesFileName" class="file-input-name">Ningun archivo</span>
+                                <input type="file" id="vocesAudioInput" accept="audio/*" class="file-input-hidden">
+                            </div>
+                        </div>
+                        <button id="vocesUploadBtn" class="upload-btn" disabled>Subir voz de cante</button>
+                        <div id="vocesUploadStatus" class="upload-status"></div>
+                    </div>
+                    <div id="vocesList"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Flash de comando -->
+    <div class="command-flash" id="commandFlash"></div>
+
+    <!-- User bar -->
+    <div class="user-bar" id="userBar" style="display:none">
+        <span class="user-bar-email" id="userBarEmail"></span>
+        <button class="user-bar-logout" id="userBarLogout">Salir</button>
+    </div>
+
+    <script type="module" src="ensayo-bundle.js"></script>
+</body>
+</html>
