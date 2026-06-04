@@ -195,7 +195,7 @@ export default class DualStreamEngine {
 
     // Tiempo de anticipacion: empezamos a reproducir el cante 50ms antes para
     // que el PitchShifter haya procesado suficientes frames.
-    const PRELOAD_SEC = 0.05;
+    const PRELOAD_SEC = 0;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
 

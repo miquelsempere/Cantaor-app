@@ -100,7 +100,7 @@ class EnsayoApp {
   _setupEnsayoListeners() {
     this.ensayo.onCommand(cmd => {
       if (cmd === 'falseta') {
-        this._showCommandFlash('Falseta');
+        this._showCommandFlash('Ole');
       } else if (cmd === 'vamos_alla') {
         this._showCommandFlash('Vamos alla');
       }
@@ -320,7 +320,7 @@ class EnsayoApp {
     if (falseta) {
       this.btnFalseta.classList.add('active');
       this.statusDot.className = 'status-dot falseta';
-      this.statusText.textContent = 'Modo falseta - solo palmas';
+      this.statusText.textContent = 'Modo ole - solo palmas';
       this.canteTitle.textContent = 'Solo palmas';
       this.canteTitle.classList.add('empty');
     } else {
@@ -342,7 +342,7 @@ class EnsayoApp {
       txt.textContent = 'Escuchando...';
     } else if (status === 'falseta') {
       dot.classList.add('falseta');
-      txt.textContent = 'Falseta detectada';
+      txt.textContent = 'Ole detectado';
     } else if (status === 'error') {
       dot.classList.add('error');
       txt.textContent = 'Error de microfono';
