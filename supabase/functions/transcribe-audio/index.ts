@@ -173,14 +173,13 @@ Deno.serve(async (req: Request) => {
     // Extract plain text and word-level timestamps
     const rawLyrics: string = whisperData.text || "";
 
-    // Build flat word array from segments[].words[]
+    // Groq returns word timestamps as a top-level `words` array, not nested inside segments
     type WordEntry = { start: number; end: number; word: string };
-    const wordsArray: WordEntry[] = [];
-    for (const segment of (whisperData.segments || [])) {
-      for (const w of (segment.words || [])) {
-        wordsArray.push({ start: w.start, end: w.end, word: w.word });
-      }
-    }
+    const wordsArray: WordEntry[] = (whisperData.words || []).map((w: WordEntry) => ({
+      start: w.start,
+      end: w.end,
+      word: w.word,
+    }));
 
     // Step 2: Correct and format lyrics using compound-beta
     const lyrics = await correctLyricsWithWebSearch(
