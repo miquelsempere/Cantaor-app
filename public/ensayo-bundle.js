@@ -1462,6 +1462,7 @@ class DualStreamEngine {
     this.falseta = false; // true = no entrar cante
     this.tempo = 1.0;
     this.pitchSemitones = 0;
+    this.traste_groups = new Map(); // traste_number -> voice_id[]
 
     // Callbacks
     this.onCanteEnterListeners = [];
@@ -1497,6 +1498,15 @@ class DualStreamEngine {
     this.palmasBuffer = palmasBuffer;
     canteVoicesMeta.forEach((v, i) => {
       this.canteBuffers.set(v.id, voiceBuffers[i]);
+    });
+
+    // Agrupar voces que tienen traste nativo grabado
+    this.traste_groups = new Map();
+    canteVoicesMeta.forEach(v => {
+      if (v.traste != null) {
+        if (!this.traste_groups.has(v.traste)) this.traste_groups.set(v.traste, []);
+        this.traste_groups.get(v.traste).push(v.id);
+      }
     });
 
     // Intentar cargar sampler si se proporcionaron samples
@@ -1535,14 +1545,7 @@ class DualStreamEngine {
     return this.audioContext.decodeAudioData(arrayBuffer);
   }
   _reshuffleQueue() {
-    const activeIndices = this.selectedVoiceIds ? this.canteVoices.map((v, i) => ({
-      v,
-      i
-    })).filter(({
-      v
-    }) => this.selectedVoiceIds.has(v.id)).map(({
-      i
-    }) => i) : this.canteVoices.map((_, i) => i);
+    const activeIndices = this._getActiveVoicePool();
     const indices = activeIndices.slice();
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -1550,6 +1553,30 @@ class DualStreamEngine {
     }
     this.canteQueue = indices;
     this.canteQueuePos = 0;
+  }
+  _getActiveVoicePool() {
+    if (this.traste_groups.size === 0) {
+      return this.selectedVoiceIds ? this.canteVoices.map((v, i) => ({
+        v,
+        i
+      })).filter(({
+        v
+      }) => this.selectedVoiceIds.has(v.id)).map(({
+        i
+      }) => i) : this.canteVoices.map((_, i) => i);
+    }
+    const targetTraste = this.pitchSemitones + 5;
+    const available = Array.from(this.traste_groups.keys()).sort((a, b) => a - b);
+    const nearest = available.reduce((prev, curr) => Math.abs(curr - targetTraste) < Math.abs(prev - targetTraste) ? curr : prev);
+    const groupIds = this.traste_groups.get(nearest);
+    return this.canteVoices.map((v, i) => ({
+      v,
+      i
+    })).filter(({
+      v
+    }) => groupIds.includes(v.id)).map(({
+      i
+    }) => i);
   }
 
   // ─── Playback ────────────────────────────────────────────────────────────────
@@ -1677,7 +1704,7 @@ class DualStreamEngine {
       this._scheduleNextCante(next);
     });
     this.canteShifter.tempo = this.tempo;
-    this.canteShifter.pitchSemitones = this.pitchSemitones;
+    this.canteShifter.pitchSemitones = voice.traste != null ? this.pitchSemitones + 5 - voice.traste : this.pitchSemitones;
     this.canteShifter.connect(this.masterGain);
     this._notifyCanteEnter(voice);
   }
@@ -1734,6 +1761,9 @@ class DualStreamEngine {
   }
   setPitchSemitones(semitones) {
     this.pitchSemitones = semitones;
+    if (this.traste_groups.size > 0) {
+      this._reshuffleQueue();
+    }
   }
 
   /**
