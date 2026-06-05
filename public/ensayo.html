@@ -407,6 +407,78 @@
             font-size: 0.85rem;
             margin-bottom: 1rem;
         }
+
+        /* ── Debug panel ── */
+        #debugPanel { margin-top: 1.5rem; }
+        .debug-panel {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            border-radius: 12px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        .debug-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .debug-title {
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #ff6b35;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .debug-close {
+            background: none; border: none;
+            color: #666; cursor: pointer;
+            font-size: 1.1rem; padding: 0; line-height: 1;
+        }
+        .debug-close:hover { color: #fff; }
+        .debug-metrics {
+            display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;
+        }
+        .debug-metric { display: flex; flex-direction: column; gap: 0.1rem; min-width: 80px; }
+        .debug-label { font-size: 0.6rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+        .debug-val { font-size: 0.9rem; color: #fff; font-weight: 700; }
+        .debug-val.ok   { color: #4CAF50; }
+        .debug-val.warn { color: #FF9800; }
+        .debug-val.bad  { color: #F44336; }
+        .debug-beat-grid {
+            display: flex; gap: 0.4rem; margin-bottom: 0.75rem;
+            flex-wrap: wrap; min-height: 56px; align-items: center;
+        }
+        .debug-beat-cell {
+            width: 52px; height: 52px;
+            border: 1.5px solid #333; border-radius: 6px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: #222;
+            transition: background 0.05s, border-color 0.05s;
+        }
+        .debug-beat-cell.strong { border-color: #555; }
+        .debug-beat-cell.flash { background: #ff6b35 !important; border-color: #ff6b35 !important; }
+        .debug-beat-cell.strong.flash { background: #e63000 !important; border-color: #e63000 !important; }
+        .dbc-label { font-size: 0.65rem; color: #aaa; font-weight: 700; }
+        .dbc-type  { font-size: 0.55rem; color: #666; margin-top: 1px; }
+        .debug-beat-cell.flash .dbc-label,
+        .debug-beat-cell.flash .dbc-type { color: #fff; }
+        .debug-divider { border: none; border-top: 1px solid #2a2a2a; margin: 0.6rem 0; }
+        .debug-section-title {
+            font-size: 0.6rem; color: #888; text-transform: uppercase;
+            letter-spacing: 0.05em; margin-bottom: 0.4rem;
+        }
+        .debug-log {
+            display: flex; flex-direction: column; gap: 0.15rem;
+            max-height: 100px; overflow-y: auto;
+        }
+        .debug-log-entry {
+            font-size: 0.72rem; color: #ccc;
+            padding: 0.15rem 0; border-bottom: 1px solid #222;
+        }
+        .debug-hint { font-size: 0.62rem; color: #555; margin-top: 0.5rem; }
     </style>
 </head>
 <body>
@@ -653,6 +725,49 @@
                     </div>
                     <div id="samplesList"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Debug panel de timing (activa escribiendo "debug") -->
+        <div id="debugPanel" style="display:none">
+            <div class="debug-panel">
+                <div class="debug-header">
+                    <span class="debug-title">Debug Timing</span>
+                    <button id="debugClose" class="debug-close">&times;</button>
+                </div>
+                <div class="debug-metrics">
+                    <div class="debug-metric">
+                        <span class="debug-label">BPM config</span>
+                        <span class="debug-val" id="dbgBpmConfig">-</span>
+                    </div>
+                    <div class="debug-metric">
+                        <span class="debug-label">BPM medido</span>
+                        <span class="debug-val" id="dbgBpmMeasured">-</span>
+                    </div>
+                    <div class="debug-metric">
+                        <span class="debug-label">Tempo</span>
+                        <span class="debug-val" id="dbgTempo">-</span>
+                    </div>
+                    <div class="debug-metric">
+                        <span class="debug-label">Sync interval</span>
+                        <span class="debug-val" id="dbgSyncInterval">-</span>
+                    </div>
+                    <div class="debug-metric">
+                        <span class="debug-label">Proxima entrada</span>
+                        <span class="debug-val" id="dbgNextCante">-</span>
+                    </div>
+                </div>
+                <hr class="debug-divider">
+                <div class="debug-section-title">Grid de palmas (sampler)</div>
+                <div class="debug-beat-grid" id="dbgBeatGrid">
+                    <span style="color:#555;font-size:0.75rem">Carga un palo primero</span>
+                </div>
+                <hr class="debug-divider">
+                <div class="debug-section-title">Ultimas entradas de cante</div>
+                <div class="debug-log" id="dbgCanteLog">
+                    <span style="color:#555;font-size:0.72rem;font-style:italic">Sin entradas aun</span>
+                </div>
+                <div class="debug-hint">Activa/oculta escribiendo "debug" en el teclado</div>
             </div>
         </div>
 

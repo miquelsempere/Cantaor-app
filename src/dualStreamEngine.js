@@ -383,6 +383,20 @@ export default class DualStreamEngine {
     return { isPlaying: this.isPlaying, falseta: this.falseta };
   }
 
+  getDebugInfo() {
+    return {
+      currentTime: this.audioContext ? this.audioContext.currentTime : 0,
+      nextSyncAt: this.nextCanteScheduledAt,
+      syncInterval: this.syncInterval,
+      palmasStartTime: this.palmasStartContextTime,
+      bpm: this.palmasMeta ? this.palmasMeta.bpm : 0,
+      beatsPerCompas: this.palmasMeta ? this.palmasMeta.beats_per_compas : 0,
+      compassBeats: (this.useSampler && this.palmasSampler) ? this.palmasSampler.compassBeats : null,
+      tempo: this.tempo,
+      usingSampler: this.useSampler,
+    };
+  }
+
   destroy() {
     this.stop();
     if (this.palmasSampler) {

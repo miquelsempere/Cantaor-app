@@ -1297,6 +1297,7 @@ class PalmasSampler {
     this._scheduledSources = [];
     this._scheduleTimer = null;
     this._nextCompasTime = 0;
+    this.onBeat = null; // ({ hitType, hitIndex, time }) => void
   }
 
   /**
@@ -1358,20 +1359,32 @@ class PalmasSampler {
       this.hits.forEach(({
         offset,
         hitType
-      }) => {
-        this._scheduleBeat(compassStart + offset * this.beatInterval, hitType);
+      }, hitIndex) => {
+        this._scheduleBeat(compassStart + offset * this.beatInterval, hitType, hitIndex);
       });
       this._nextCompasTime += this.compassBeats * this.beatInterval;
     }
     this._scheduleTimer = setTimeout(() => this._scheduleAhead(), SCHEDULE_INTERVAL_MS);
   }
-  _scheduleBeat(time, hitType) {
+  _scheduleBeat(time, hitType, hitIndex = 0) {
     const buffer = this._resolveBuffer(hitType);
     if (!buffer) return;
     const src = this.audioContext.createBufferSource();
     src.buffer = buffer;
     src.connect(this.outputNode);
     src.start(time);
+    if (typeof this.onBeat === 'function') {
+      const delay = (time - this.audioContext.currentTime) * 1000;
+      setTimeout(() => {
+        if (this.isPlaying && typeof this.onBeat === 'function') {
+          this.onBeat({
+            time,
+            hitType,
+            hitIndex
+          });
+        }
+      }, Math.max(0, delay));
+    }
     this._scheduledSources.push(src);
     src.onended = () => {
       const idx = this._scheduledSources.indexOf(src);
@@ -1748,6 +1761,19 @@ class DualStreamEngine {
     return {
       isPlaying: this.isPlaying,
       falseta: this.falseta
+    };
+  }
+  getDebugInfo() {
+    return {
+      currentTime: this.audioContext ? this.audioContext.currentTime : 0,
+      nextSyncAt: this.nextCanteScheduledAt,
+      syncInterval: this.syncInterval,
+      palmasStartTime: this.palmasStartContextTime,
+      bpm: this.palmasMeta ? this.palmasMeta.bpm : 0,
+      beatsPerCompas: this.palmasMeta ? this.palmasMeta.beats_per_compas : 0,
+      compassBeats: this.useSampler && this.palmasSampler ? this.palmasSampler.compassBeats : null,
+      tempo: this.tempo,
+      usingSampler: this.useSampler
     };
   }
   destroy() {
@@ -11917,6 +11943,7 @@ class EnsayoApp {
     this._setupEnsayoListeners();
     this._setupControls();
     this._setupAdminSecretAccess();
+    this._setupDebugPanel();
     await this._loadPalos();
   }
 
@@ -11957,6 +11984,7 @@ class EnsayoApp {
     this.engine.onCanteEnter(voice => {
       this.canteTitle.textContent = voice.title;
       this.canteTitle.classList.remove('empty');
+      this._recordCanteEntry(voice);
     });
   }
 
@@ -12136,6 +12164,9 @@ class EnsayoApp {
       this.isLoaded = true;
       this._hideLoading();
       this.playBtn.disabled = false;
+      this._buildDebugBeatGrid();
+      this._attachSamplerCallbacks();
+      this._updateDebugStatic();
       if (result.usingSampler) {
         this._showCommandFlash('Sampler activo');
       }
@@ -12158,6 +12189,7 @@ class EnsayoApp {
       this.preplay.classList.add('locked');
       this.statusDot.className = 'status-dot cante';
       this.statusText.textContent = 'Reproduciendo cante';
+      if (this._debugVisible) this._startDebugRaf();
     } else {
       this.playBtn.classList.remove('is-playing');
       this.visualizer.classList.remove('playing');
@@ -12168,6 +12200,7 @@ class EnsayoApp {
       this.preplay.classList.remove('locked');
       this.statusDot.className = 'status-dot stopped';
       this.statusText.textContent = 'Listo para empezar';
+      this._stopDebugRaf();
     }
   }
   _updateFalsetaUI(falseta) {
@@ -12227,6 +12260,172 @@ class EnsayoApp {
     this._flashTimer = setTimeout(() => {
       this.commandFlash.classList.remove('show');
     }, 2500);
+  }
+  _showCommandFlash(text) {
+    this.commandFlash.textContent = text;
+    this.commandFlash.classList.add('show');
+    clearTimeout(this._flashTimer);
+    this._flashTimer = setTimeout(() => {
+      this.commandFlash.classList.remove('show');
+    }, 2500);
+  }
+
+  // ─── Debug panel ──────────────────────────────────────────────────────────
+
+  _setupDebugPanel() {
+    this._debugVisible = false;
+    this._debugRaf = null;
+    this._fuerte1Timestamps = []; // performance.now() of last fuerte1 hits
+    this._canteLog = []; // { title, actualTime, devMs }
+
+    let typed = '';
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      typed += e.key.toLowerCase();
+      if (typed.length > 5) typed = typed.slice(-5);
+      if (typed === 'debug') {
+        this._toggleDebugPanel();
+        typed = '';
+      }
+    });
+    document.getElementById('debugClose').addEventListener('click', () => {
+      document.getElementById('debugPanel').style.display = 'none';
+      this._debugVisible = false;
+      this._stopDebugRaf();
+    });
+  }
+  _toggleDebugPanel() {
+    this._debugVisible = !this._debugVisible;
+    document.getElementById('debugPanel').style.display = this._debugVisible ? 'block' : 'none';
+    if (this._debugVisible) {
+      this._updateDebugStatic();
+      this._renderCanteLog();
+      if (this.engine.isPlaying) this._startDebugRaf();
+    } else {
+      this._stopDebugRaf();
+    }
+  }
+  _updateDebugStatic() {
+    if (!this._debugVisible) return;
+    const info = this.engine.getDebugInfo();
+    document.getElementById('dbgBpmConfig').textContent = info.bpm || '-';
+    document.getElementById('dbgTempo').textContent = info.tempo ? `${info.tempo.toFixed(2)}x` : '-';
+    document.getElementById('dbgSyncInterval').textContent = info.syncInterval ? `${info.syncInterval.toFixed(3)}s` : '-';
+  }
+  _buildDebugBeatGrid() {
+    const grid = document.getElementById('dbgBeatGrid');
+    if (!this.engine.useSampler || !this.engine.palmasSampler) {
+      grid.innerHTML = '<span style="color:#8B7355;font-size:0.75rem">Sampler no activo — usando pista de audio</span>';
+      return;
+    }
+    grid.innerHTML = '';
+    this.engine.palmasSampler.hits.forEach(({
+      offset,
+      hitType
+    }, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'debug-beat-cell' + (hitType.startsWith('fuerte') ? ' strong' : '');
+      cell.id = `dbgBeat${i}`;
+      const beat = offset % 1 === 0 ? `T${offset + 1}` : `T${Math.floor(offset) + 1}½`;
+      cell.innerHTML = `<div class="dbc-label">${beat}</div><div class="dbc-type">${hitType}</div>`;
+      grid.appendChild(cell);
+    });
+  }
+  _attachSamplerCallbacks() {
+    if (!this.engine.useSampler || !this.engine.palmasSampler) return;
+    this.engine.palmasSampler.onBeat = ({
+      hitType,
+      hitIndex
+    }) => {
+      if (this._debugVisible) {
+        const cell = document.getElementById(`dbgBeat${hitIndex}`);
+        if (cell) {
+          cell.classList.add('flash');
+          setTimeout(() => cell.classList.remove('flash'), 140);
+        }
+      }
+      if (hitType === 'fuerte1') {
+        this._fuerte1Timestamps.push(performance.now());
+        if (this._fuerte1Timestamps.length > 8) this._fuerte1Timestamps.shift();
+        if (this._debugVisible) this._updateMeasuredBpm();
+      }
+    };
+  }
+  _updateMeasuredBpm() {
+    const ts = this._fuerte1Timestamps;
+    const el = document.getElementById('dbgBpmMeasured');
+    if (ts.length < 2) {
+      el.textContent = '-';
+      el.className = 'debug-val';
+      return;
+    }
+    const avgIntervalMs = (ts[ts.length - 1] - ts[0]) / (ts.length - 1);
+    const compassBeats = this.engine.palmasSampler ? this.engine.palmasSampler.compassBeats : 4;
+    const measured = (60000 * compassBeats / avgIntervalMs).toFixed(1);
+    const configured = this.engine.getDebugInfo().bpm;
+    const diff = Math.abs(parseFloat(measured) - configured);
+    el.textContent = measured;
+    el.className = 'debug-val ' + (diff < 1 ? 'ok' : diff < 3 ? 'warn' : 'bad');
+  }
+  _recordCanteEntry(voice) {
+    const info = this.engine.getDebugInfo();
+    const actual = info.currentTime;
+    let devMs = null;
+    if (info.palmasStartTime && info.syncInterval) {
+      const elapsed = actual - info.palmasStartTime;
+      const n = Math.round(elapsed / info.syncInterval);
+      const expected = info.palmasStartTime + n * info.syncInterval;
+      devMs = Math.round((actual - expected) * 1000);
+    }
+    const now = new Date();
+    const ts = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    this._canteLog.push({
+      title: voice.title,
+      actualTime: actual.toFixed(3),
+      devMs,
+      ts
+    });
+    if (this._canteLog.length > 5) this._canteLog.shift();
+    if (this._debugVisible) this._renderCanteLog();
+  }
+  _renderCanteLog() {
+    const container = document.getElementById('dbgCanteLog');
+    if (this._canteLog.length === 0) {
+      container.innerHTML = '<span style="color:#555;font-size:0.72rem;font-style:italic">Sin entradas aun</span>';
+      return;
+    }
+    container.innerHTML = this._canteLog.slice().reverse().map(entry => {
+      let devHtml = '';
+      if (entry.devMs !== null) {
+        const cls = Math.abs(entry.devMs) < 10 ? 'dev-ok' : Math.abs(entry.devMs) < 30 ? 'dev-warn' : 'dev-bad';
+        const sign = entry.devMs >= 0 ? '+' : '';
+        devHtml = ` <span class="${cls}">${sign}${entry.devMs}ms</span>`;
+      }
+      return `<div class="debug-log-entry">${entry.ts} [t=${entry.actualTime}s]${devHtml} — ${entry.title}</div>`;
+    }).join('');
+  }
+  _startDebugRaf() {
+    const tick = () => {
+      if (!this._debugVisible || !this.engine.isPlaying) {
+        this._debugRaf = null;
+        document.getElementById('dbgNextCante').textContent = '-';
+        return;
+      }
+      const info = this.engine.getDebugInfo();
+      if (info.nextSyncAt) {
+        const rem = info.nextSyncAt - info.currentTime;
+        document.getElementById('dbgNextCante').textContent = rem > 0 ? `${rem.toFixed(2)}s` : '0.00s';
+      }
+      this._debugRaf = requestAnimationFrame(tick);
+    };
+    if (this._debugRaf) cancelAnimationFrame(this._debugRaf);
+    this._debugRaf = requestAnimationFrame(tick);
+  }
+  _stopDebugRaf() {
+    if (this._debugRaf) {
+      cancelAnimationFrame(this._debugRaf);
+      this._debugRaf = null;
+    }
   }
 
   // ─── Admin panel ──────────────────────────────────────────────────────────

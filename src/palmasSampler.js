@@ -77,6 +77,7 @@ export default class PalmasSampler {
     this._scheduledSources = [];
     this._scheduleTimer = null;
     this._nextCompasTime = 0;
+    this.onBeat = null; // ({ hitType, hitIndex, time }) => void
   }
 
   /**
@@ -136,8 +137,8 @@ export default class PalmasSampler {
     const horizon = this.audioContext.currentTime + LOOK_AHEAD_SEC;
     while (this._nextCompasTime < horizon) {
       const compassStart = this._nextCompasTime;
-      this.hits.forEach(({ offset, hitType }) => {
-        this._scheduleBeat(compassStart + offset * this.beatInterval, hitType);
+      this.hits.forEach(({ offset, hitType }, hitIndex) => {
+        this._scheduleBeat(compassStart + offset * this.beatInterval, hitType, hitIndex);
       });
       this._nextCompasTime += this.compassBeats * this.beatInterval;
     }
@@ -145,7 +146,7 @@ export default class PalmasSampler {
     this._scheduleTimer = setTimeout(() => this._scheduleAhead(), SCHEDULE_INTERVAL_MS);
   }
 
-  _scheduleBeat(time, hitType) {
+  _scheduleBeat(time, hitType, hitIndex = 0) {
     const buffer = this._resolveBuffer(hitType);
     if (!buffer) return;
 
@@ -153,6 +154,15 @@ export default class PalmasSampler {
     src.buffer = buffer;
     src.connect(this.outputNode);
     src.start(time);
+
+    if (typeof this.onBeat === 'function') {
+      const delay = (time - this.audioContext.currentTime) * 1000;
+      setTimeout(() => {
+        if (this.isPlaying && typeof this.onBeat === 'function') {
+          this.onBeat({ time, hitType, hitIndex });
+        }
+      }, Math.max(0, delay));
+    }
 
     this._scheduledSources.push(src);
     src.onended = () => {
