@@ -370,36 +370,6 @@ export const ensayoAPI = {
     const { error } = await supabase.from('cante_voices').delete().eq('id', id);
     if (error) throw error;
   },
-
-  async triggerVoiceTranscription(voiceId) {
-    const response = await fetch(
-      `${supabaseUrl}/functions/v1/transcribe-audio`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({ track_id: voiceId, target_table: 'cante_voices' }),
-      }
-    );
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Transcription request failed');
-    }
-    return response.json();
-  },
-
-  async getVoiceLyricsStatus(voiceId) {
-    const { data, error } = await supabase
-      .from('cante_voices')
-      .select('lyrics_status, lyrics_json')
-      .eq('id', voiceId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  },
 };
 
 // Suggestions board API

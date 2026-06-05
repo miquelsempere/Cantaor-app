@@ -1246,7 +1246,6 @@ class DualStreamEngine {
 
     // Callbacks
     this.onCanteEnterListeners = [];
-    this.onCanteTickListeners = [];
     this.onStateChangeListeners = [];
     this._initAudioContext();
   }
@@ -1367,7 +1366,7 @@ class DualStreamEngine {
 
     // Tiempo de anticipacion: empezamos a reproducir el cante 50ms antes para
     // que el PitchShifter haya procesado suficientes frames.
-    const PRELOAD_SEC = 0;
+    const PRELOAD_SEC = 0.05;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
     this.nextCanteScheduledAt = whenContextTime;
@@ -1417,13 +1416,6 @@ class DualStreamEngine {
     this.canteShifter.tempo = this.tempo;
     this.canteShifter.pitchSemitones = this.pitchSemitones;
     this.canteShifter.connect(this.masterGain);
-
-    // Forward timePlayed ticks so karaoke can sync to position within this voice
-    this.canteShifter.on('play', ({
-      timePlayed
-    }) => {
-      this._notifyCanteTick(timePlayed);
-    });
     this._notifyCanteEnter(voice);
   }
 
@@ -1481,9 +1473,6 @@ class DualStreamEngine {
   onCanteEnter(cb) {
     this.onCanteEnterListeners.push(cb);
   }
-  onCanteTick(cb) {
-    this.onCanteTickListeners.push(cb);
-  }
   onStateChange(cb) {
     this.onStateChangeListeners.push(cb);
   }
@@ -1491,13 +1480,6 @@ class DualStreamEngine {
     this.onCanteEnterListeners.forEach(cb => {
       try {
         cb(voice);
-      } catch (e) {/* silencio */}
-    });
-  }
-  _notifyCanteTick(timePlayed) {
-    this.onCanteTickListeners.forEach(cb => {
-      try {
-        cb(timePlayed);
       } catch (e) {/* silencio */}
     });
   }
@@ -1526,7 +1508,6 @@ class DualStreamEngine {
     if (this.audioContext) this.audioContext.close();
     this.canteBuffers.clear();
     this.onCanteEnterListeners = [];
-    this.onCanteTickListeners = [];
     this.onStateChangeListeners = [];
   }
 }
@@ -1637,7 +1618,7 @@ class EnsayoMode {
     };
   }
   _matchFalseta(text) {
-    return text.includes('ole') || text.includes('olé');
+    return text.includes('falseta') || text.includes('falsetas');
   }
   _matchVamosAlla(text) {
     return text.includes('vamos allá') || text.includes('vamos alla') || text.includes('vamos aya') || text.includes('vamos ayá') || text.includes('vamos ya') || text.includes('vamos ahí') || text.includes('a cantar');
@@ -11572,32 +11553,6 @@ const ensayoAPI = {
       error
     } = await supabase.from('cante_voices').delete().eq('id', id);
     if (error) throw error;
-  },
-  async triggerVoiceTranscription(voiceId) {
-    const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseAnonKey}`
-      },
-      body: JSON.stringify({
-        track_id: voiceId,
-        target_table: 'cante_voices'
-      })
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Transcription request failed');
-    }
-    return response.json();
-  },
-  async getVoiceLyricsStatus(voiceId) {
-    const {
-      data,
-      error
-    } = await supabase.from('cante_voices').select('lyrics_status, lyrics_json').eq('id', voiceId).maybeSingle();
-    if (error) throw error;
-    return data;
   }
 };
 
@@ -11606,41 +11561,10 @@ const ensayoAPI = {
  * Conecta la UI con DualStreamEngine y EnsayoMode
  */
 
-
-// ─── KaraokeSync ─────────────────────────────────────────────────────────────
-// Matches timePlayed (source seconds) against word timestamps from lyrics_json.
-class KaraokeSync {
-  constructor() {
-    this._words = []; // [{ start, end, word }]
-    this._activeIdx = -1;
-  }
-  load(wordsArray) {
-    this._words = Array.isArray(wordsArray) ? wordsArray : [];
-    this._activeIdx = -1;
-  }
-
-  /** Returns the index of the active word, or -1. */
-  tick(timePlayed) {
-    if (this._words.length === 0) return -1;
-    for (let i = 0; i < this._words.length; i++) {
-      const w = this._words[i];
-      if (timePlayed >= w.start && timePlayed < w.end) return i;
-    }
-    // Past last word end
-    if (timePlayed >= this._words[this._words.length - 1].end) {
-      return this._words.length; // sentinel: all done
-    }
-    return -1;
-  }
-  get words() {
-    return this._words;
-  }
-}
 class EnsayoApp {
   constructor() {
     this.engine = new DualStreamEngine();
     this.ensayo = new EnsayoMode(this.engine);
-    this.karaoke = new KaraokeSync();
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
@@ -11660,8 +11584,6 @@ class EnsayoApp {
     this.voiceDot = document.getElementById('voiceDot');
     this.voiceStatusTxt = document.getElementById('voiceStatusText');
     this.canteTitle = document.getElementById('canteTitle');
-    this.karaokePanel = document.getElementById('karaokePanel');
-    this.karaokeWords = document.getElementById('karaokeWords');
     this.ensayoError = document.getElementById('ensayoError');
     this.ensayoLoading = document.getElementById('ensayoLoading');
     this.loadingText = document.getElementById('ensayoLoadingText');
@@ -11722,10 +11644,6 @@ class EnsayoApp {
     this.engine.onCanteEnter(voice => {
       this.canteTitle.textContent = voice.title;
       this.canteTitle.classList.remove('empty');
-      this._loadKaraoke(voice.lyrics_json || null);
-    });
-    this.engine.onCanteTick(timePlayed => {
-      this._tickKaraoke(timePlayed);
     });
   }
 
@@ -11734,7 +11652,7 @@ class EnsayoApp {
   _setupEnsayoListeners() {
     this.ensayo.onCommand(cmd => {
       if (cmd === 'falseta') {
-        this._showCommandFlash('Ole');
+        this._showCommandFlash('Falseta');
       } else if (cmd === 'vamos_alla') {
         this._showCommandFlash('Vamos alla');
       }
@@ -11930,7 +11848,7 @@ class EnsayoApp {
     if (falseta) {
       this.btnFalseta.classList.add('active');
       this.statusDot.className = 'status-dot falseta';
-      this.statusText.textContent = 'Modo ole - solo palmas';
+      this.statusText.textContent = 'Modo falseta - solo palmas';
       this.canteTitle.textContent = 'Solo palmas';
       this.canteTitle.classList.add('empty');
     } else {
@@ -11950,7 +11868,7 @@ class EnsayoApp {
       txt.textContent = 'Escuchando...';
     } else if (status === 'falseta') {
       dot.classList.add('falseta');
-      txt.textContent = 'Ole detectado';
+      txt.textContent = 'Falseta detectada';
     } else if (status === 'error') {
       dot.classList.add('error');
       txt.textContent = 'Error de microfono';
@@ -11961,40 +11879,6 @@ class EnsayoApp {
   _resetCanteInfo() {
     this.canteTitle.textContent = 'Esperando inicio...';
     this.canteTitle.classList.add('empty');
-    this._loadKaraoke(null);
-  }
-  _loadKaraoke(wordsArray) {
-    this.karaoke.load(wordsArray);
-    if (!this.karaokePanel) return;
-    if (!wordsArray || wordsArray.length === 0) {
-      this.karaokePanel.style.display = 'none';
-      return;
-    }
-    this.karaokePanel.style.display = '';
-    this._renderKaraokeWords(-1);
-  }
-  _renderKaraokeWords(activeIdx) {
-    if (!this.karaokeWords) return;
-    const words = this.karaoke.words;
-    this.karaokeWords.innerHTML = words.map((w, i) => {
-      const cls = i === activeIdx ? 'karaoke-word active' : 'karaoke-word';
-      return `<span class="${cls}">${this._esc(w.word)}</span>`;
-    }).join(' ');
-  }
-  _tickKaraoke(timePlayed) {
-    const idx = this.karaoke.tick(timePlayed);
-    if (idx === this.karaoke._activeIdx) return;
-    this.karaoke._activeIdx = idx;
-    this._renderKaraokeWords(idx);
-    // Scroll active word into view
-    if (this.karaokeWords && idx >= 0) {
-      const activeEl = this.karaokeWords.querySelector('.karaoke-word.active');
-      if (activeEl) activeEl.scrollIntoView({
-        block: 'nearest',
-        inline: 'center',
-        behavior: 'smooth'
-      });
-    }
   }
   _showLoading(msg) {
     this.loadingText.textContent = msg;
@@ -12190,21 +12074,12 @@ class EnsayoApp {
       items.forEach(item => {
         const el = document.createElement('div');
         el.className = 'ensayo-track-item';
-        const badgeHtml = this._voiceLyricsBadge(item);
         el.innerHTML = `
-          <div style="flex:1;min-width:0">
+          <div>
             <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.title)}</div>
-            <div class="voice-lyrics-action">${badgeHtml}</div>
           </div>
           <button class="ensayo-track-delete" title="Eliminar">&times;</button>
         `;
-        const actionEl = el.querySelector('.voice-lyrics-action');
-        if (item.lyrics_status !== 'done' && item.lyrics_status !== 'processing') {
-          const btn = actionEl.querySelector('.track-transcribe-btn');
-          if (btn) {
-            btn.addEventListener('click', () => this._handleVoiceTranscribe(item.id, actionEl));
-          }
-        }
         el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
           if (!confirm('Eliminar esta voz de cante?')) return;
           await ensayoAPI.deleteCanteVoice(item.id, item.audio_url).catch(() => {});
@@ -12215,59 +12090,6 @@ class EnsayoApp {
     } catch (e) {
       container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
     }
-  }
-  _voiceLyricsBadge(item) {
-    if (item.lyrics_status === 'done') {
-      return '<span class="lyrics-badge lyrics-badge--done">Letra lista</span>';
-    }
-    if (item.lyrics_status === 'processing') {
-      return '<span class="lyrics-badge lyrics-badge--processing">Transcribiendo...</span>';
-    }
-    return '<button class="track-transcribe-btn">Transcribir letra</button>';
-  }
-  async _handleVoiceTranscribe(voiceId, actionEl) {
-    const btn = actionEl.querySelector('.track-transcribe-btn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Enviando...';
-    }
-    try {
-      await ensayoAPI.triggerVoiceTranscription(voiceId);
-    } catch (err) {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Transcribir letra';
-      }
-      return;
-    }
-    actionEl.innerHTML = '<span class="lyrics-badge lyrics-badge--processing">Transcribiendo...</span>';
-    this._pollVoiceLyrics(voiceId, actionEl);
-  }
-  _pollVoiceLyrics(voiceId, actionEl, attempt = 0) {
-    const MAX = 36;
-    if (attempt >= MAX) {
-      actionEl.innerHTML = '<button class="track-transcribe-btn">Reintentar</button>';
-      actionEl.querySelector('.track-transcribe-btn').addEventListener('click', () => this._handleVoiceTranscribe(voiceId, actionEl));
-      return;
-    }
-    setTimeout(async () => {
-      try {
-        const result = await ensayoAPI.getVoiceLyricsStatus(voiceId);
-        if (result?.lyrics_status === 'done') {
-          actionEl.innerHTML = '<span class="lyrics-badge lyrics-badge--done">Letra lista</span>';
-          // Update the in-memory voice object so karaoke loads immediately on next play
-          const voice = this.engine.canteVoices.find(v => v.id === voiceId);
-          if (voice && result.lyrics_json) voice.lyrics_json = result.lyrics_json;
-        } else if (result?.lyrics_status === 'error') {
-          actionEl.innerHTML = '<button class="track-transcribe-btn">Reintentar</button>';
-          actionEl.querySelector('.track-transcribe-btn').addEventListener('click', () => this._handleVoiceTranscribe(voiceId, actionEl));
-        } else {
-          this._pollVoiceLyrics(voiceId, actionEl, attempt + 1);
-        }
-      } catch {
-        this._pollVoiceLyrics(voiceId, actionEl, attempt + 1);
-      }
-    }, 5000);
   }
   _esc(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

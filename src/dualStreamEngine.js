@@ -55,7 +55,6 @@ export default class DualStreamEngine {
 
     // Callbacks
     this.onCanteEnterListeners = [];
-    this.onCanteTickListeners = [];
     this.onStateChangeListeners = [];
 
     this._initAudioContext();
@@ -196,7 +195,7 @@ export default class DualStreamEngine {
 
     // Tiempo de anticipacion: empezamos a reproducir el cante 50ms antes para
     // que el PitchShifter haya procesado suficientes frames.
-    const PRELOAD_SEC = 0;
+    const PRELOAD_SEC = 0.05;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
 
@@ -259,11 +258,6 @@ export default class DualStreamEngine {
     this.canteShifter.pitchSemitones = this.pitchSemitones;
     this.canteShifter.connect(this.masterGain);
 
-    // Forward timePlayed ticks so karaoke can sync to position within this voice
-    this.canteShifter.on('play', ({ timePlayed }) => {
-      this._notifyCanteTick(timePlayed);
-    });
-
     this._notifyCanteEnter(voice);
   }
 
@@ -322,18 +316,11 @@ export default class DualStreamEngine {
   // ─── Eventos ─────────────────────────────────────────────────────────────────
 
   onCanteEnter(cb) { this.onCanteEnterListeners.push(cb); }
-  onCanteTick(cb) { this.onCanteTickListeners.push(cb); }
   onStateChange(cb) { this.onStateChangeListeners.push(cb); }
 
   _notifyCanteEnter(voice) {
     this.onCanteEnterListeners.forEach(cb => {
       try { cb(voice); } catch (e) { /* silencio */ }
-    });
-  }
-
-  _notifyCanteTick(timePlayed) {
-    this.onCanteTickListeners.forEach(cb => {
-      try { cb(timePlayed); } catch (e) { /* silencio */ }
     });
   }
 
@@ -355,7 +342,6 @@ export default class DualStreamEngine {
     if (this.audioContext) this.audioContext.close();
     this.canteBuffers.clear();
     this.onCanteEnterListeners = [];
-    this.onCanteTickListeners = [];
     this.onStateChangeListeners = [];
   }
 }

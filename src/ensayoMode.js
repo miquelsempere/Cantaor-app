@@ -113,7 +113,7 @@ export default class EnsayoMode {
   }
 
   _matchFalseta(text) {
-    return text.includes('ole') || text.includes('olé');
+    return text.includes('falseta') || text.includes('falsetas');
   }
 
   _matchVamosAlla(text) {
