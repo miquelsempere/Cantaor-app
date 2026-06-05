@@ -42,8 +42,9 @@ export default class DualStreamEngine {
     // Cante stream
     this.canteVoices = []; // Metadatos de pistas de voz
     this.canteBuffers = new Map(); // id -> AudioBuffer
-    this.canteQueue = []; // Indices barajados de canteVoices
+    this.canteQueue = []; // Indices barajados de canteVoices (filtrados por seleccion)
     this.canteQueuePos = 0;
+    this.selectedVoiceIds = null; // null = todas; Set<id> = subconjunto elegido
     this.canteShifter = null;
     this.nextCanteScheduledAt = null; // audioContext.currentTime cuando entra la proxima pista
     this.canteScheduleTimer = null;
@@ -82,6 +83,7 @@ export default class DualStreamEngine {
   async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
+    this.selectedVoiceIds = null; // reset al cargar un palo nuevo
     this.useSampler = false;
 
     // Calcular intervalo de sync points aplicando el ratio de tempo
@@ -133,7 +135,14 @@ export default class DualStreamEngine {
   }
 
   _reshuffleQueue() {
-    const indices = this.canteVoices.map((_, i) => i);
+    const activeIndices = this.selectedVoiceIds
+      ? this.canteVoices
+          .map((v, i) => ({ v, i }))
+          .filter(({ v }) => this.selectedVoiceIds.has(v.id))
+          .map(({ i }) => i)
+      : this.canteVoices.map((_, i) => i);
+
+    const indices = activeIndices.slice();
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -348,6 +357,19 @@ export default class DualStreamEngine {
 
   setPitchSemitones(semitones) {
     this.pitchSemitones = semitones;
+  }
+
+  /**
+   * Restringe la rotacion de cante a los IDs indicados.
+   * Pasar null o un array vacio restaura "todas las pistas".
+   */
+  setSelectedVoices(ids) {
+    if (!ids || ids.length === 0) {
+      this.selectedVoiceIds = null;
+    } else {
+      this.selectedVoiceIds = new Set(ids);
+    }
+    this._reshuffleQueue();
   }
 
   setVolume(vol) {

@@ -1446,8 +1446,9 @@ class DualStreamEngine {
     // Cante stream
     this.canteVoices = []; // Metadatos de pistas de voz
     this.canteBuffers = new Map(); // id -> AudioBuffer
-    this.canteQueue = []; // Indices barajados de canteVoices
+    this.canteQueue = []; // Indices barajados de canteVoices (filtrados por seleccion)
     this.canteQueuePos = 0;
+    this.selectedVoiceIds = null; // null = todas; Set<id> = subconjunto elegido
     this.canteShifter = null;
     this.nextCanteScheduledAt = null; // audioContext.currentTime cuando entra la proxima pista
     this.canteScheduleTimer = null;
@@ -1484,6 +1485,7 @@ class DualStreamEngine {
   async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
+    this.selectedVoiceIds = null; // reset al cargar un palo nuevo
     this.useSampler = false;
 
     // Calcular intervalo de sync points aplicando el ratio de tempo
@@ -1533,7 +1535,15 @@ class DualStreamEngine {
     return this.audioContext.decodeAudioData(arrayBuffer);
   }
   _reshuffleQueue() {
-    const indices = this.canteVoices.map((_, i) => i);
+    const activeIndices = this.selectedVoiceIds ? this.canteVoices.map((v, i) => ({
+      v,
+      i
+    })).filter(({
+      v
+    }) => this.selectedVoiceIds.has(v.id)).map(({
+      i
+    }) => i) : this.canteVoices.map((_, i) => i);
+    const indices = activeIndices.slice();
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -1619,7 +1629,7 @@ class DualStreamEngine {
 
     // Tiempo de anticipacion: compensa la latencia del ScriptProcessorNode (bufferSize=4096)
     // que introduce ~2-3 frames antes de que salga audio = ~279ms a 44100Hz.
-    const PRELOAD_SEC = 0.0;
+    const PRELOAD_SEC = 0.15;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
     this.nextCanteScheduledAt = whenContextTime;
@@ -1717,6 +1727,19 @@ class DualStreamEngine {
   }
   setPitchSemitones(semitones) {
     this.pitchSemitones = semitones;
+  }
+
+  /**
+   * Restringe la rotacion de cante a los IDs indicados.
+   * Pasar null o un array vacio restaura "todas las pistas".
+   */
+  setSelectedVoices(ids) {
+    if (!ids || ids.length === 0) {
+      this.selectedVoiceIds = null;
+    } else {
+      this.selectedVoiceIds = new Set(ids);
+    }
+    this._reshuffleQueue();
   }
   setVolume(vol) {
     if (this.masterGain) {
@@ -11931,6 +11954,8 @@ class EnsayoApp {
     this.userBar = document.getElementById('userBar');
     this.userBarEmail = document.getElementById('userBarEmail');
     this.userBarLogout = document.getElementById('userBarLogout');
+    this.trackSelector = document.getElementById('trackSelector');
+    this.trackSelList = document.getElementById('trackSelectorList');
     this.init();
   }
   async init() {
@@ -11938,6 +11963,7 @@ class EnsayoApp {
     this._setupEngineListeners();
     this._setupEnsayoListeners();
     this._setupControls();
+    this._setupTrackSelector();
     this._setupAdminSecretAccess();
     this._setupDebugPanel();
     await this._loadPalos();
@@ -12047,6 +12073,67 @@ class EnsayoApp {
 
   // ─── Playback ──────────────────────────────────────────────────────────────
 
+  // ─── Selector de pistas ────────────────────────────────────────────────────
+
+  _setupTrackSelector() {
+    document.getElementById('trackSelAll').addEventListener('click', () => {
+      this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = true;
+        cb.closest('.track-check-item').classList.add('checked');
+      });
+      this._applyTrackSelection();
+    });
+    document.getElementById('trackSelNone').addEventListener('click', () => {
+      const checkboxes = [...this.trackSelList.querySelectorAll('input[type="checkbox"]')];
+      checkboxes.forEach((cb, i) => {
+        // Keep at least the first one checked
+        cb.checked = i === 0;
+        cb.closest('.track-check-item').classList.toggle('checked', i === 0);
+      });
+      this._applyTrackSelection();
+    });
+  }
+  _renderTrackSelector(voices) {
+    this.trackSelList.innerHTML = '';
+    if (!voices || voices.length === 0) {
+      this.trackSelector.style.display = 'none';
+      return;
+    }
+    this.trackSelector.style.display = '';
+    voices.forEach(voice => {
+      const item = document.createElement('label');
+      item.className = 'track-check-item checked';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.dataset.id = voice.id;
+      const title = document.createElement('span');
+      title.className = 'track-check-title';
+      title.textContent = voice.title;
+      item.appendChild(cb);
+      item.appendChild(title);
+      cb.addEventListener('change', () => {
+        item.classList.toggle('checked', cb.checked);
+        // Ensure at least one stays checked
+        const checked = [...this.trackSelList.querySelectorAll('input:checked')];
+        if (checked.length === 0) {
+          cb.checked = true;
+          item.classList.add('checked');
+        }
+        this._applyTrackSelection();
+      });
+      this.trackSelList.appendChild(item);
+    });
+  }
+  _applyTrackSelection() {
+    const checked = [...this.trackSelList.querySelectorAll('input:checked')];
+    const allCount = this.trackSelList.querySelectorAll('input').length;
+    if (checked.length === allCount) {
+      this.engine.setSelectedVoices(null);
+    } else {
+      this.engine.setSelectedVoices(checked.map(cb => Number(cb.dataset.id)));
+    }
+  }
   async _handlePlayClick() {
     if (this.engine.isPlaying) {
       this.engine.stop();
@@ -12125,6 +12212,8 @@ class EnsayoApp {
     this.playBtn.disabled = true;
     this._hideError();
     this._resetCanteInfo();
+    this.trackSelector.style.display = 'none';
+    this.trackSelList.innerHTML = '';
     await this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
@@ -12160,6 +12249,7 @@ class EnsayoApp {
       this.isLoaded = true;
       this._hideLoading();
       this.playBtn.disabled = false;
+      this._renderTrackSelector(canteVoices);
       this._buildDebugBeatGrid();
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
@@ -12183,6 +12273,7 @@ class EnsayoApp {
       this.btnVamos.disabled = false;
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.add('locked');
+      this.trackSelector.classList.add('locked');
       this.statusDot.className = 'status-dot cante';
       this.statusText.textContent = 'Reproduciendo cante';
       if (this._debugVisible) this._startDebugRaf();
@@ -12194,6 +12285,7 @@ class EnsayoApp {
       this.btnVamos.disabled = true;
       this.voiceToggle.disabled = true;
       this.preplay.classList.remove('locked');
+      this.trackSelector.classList.remove('locked');
       this.statusDot.className = 'status-dot stopped';
       this.statusText.textContent = 'Listo para empezar';
       this._stopDebugRaf();
