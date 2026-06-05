@@ -235,7 +235,7 @@ export default class DualStreamEngine {
 
     // Tiempo de anticipacion: compensa la latencia del ScriptProcessorNode (bufferSize=4096)
     // que introduce ~2-3 frames antes de que salga audio = ~279ms a 44100Hz.
-    const PRELOAD_SEC = 0.28;
+    const PRELOAD_SEC = 0.23;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
 
