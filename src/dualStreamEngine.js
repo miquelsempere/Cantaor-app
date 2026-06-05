@@ -337,6 +337,9 @@ export default class DualStreamEngine {
       const rawInterval = (this.palmasMeta.beats_per_compas / this.palmasMeta.bpm) * 60;
       this.syncInterval = rawInterval / tempo;
     }
+    if (this.useSampler && this.palmasSampler && this.palmasMeta) {
+      this.palmasSampler.beatInterval = (60 / this.palmasMeta.bpm) / tempo;
+    }
   }
 
   setPitchSemitones(semitones) {
