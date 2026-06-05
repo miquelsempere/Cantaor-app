@@ -1194,19 +1194,14 @@ class PitchShifter {
 /*
  * PalmasSampler - Motor de palmas basado en samples individuales
  *
- * Reemplaza el PitchShifter para la pista de palmas. En lugar de estirar
- * un audio largo (que distorsiona los ataques percusivos), dispara samples
- * cortos de golpes individuales usando AudioBufferSourceNode nativo.
+ * Cada palo define un compas con hits en posiciones absolutas (offset en beats
+ * dentro del compas). Esto permite subdivisiones irregulares como el 2.5 de Tangos.
  *
- * Cada golpe se programa con audioContext.currentTime + offset para precision
- * sample-accurate, sin necesidad de SoundTouch.
+ * beatInterval = segundos por beat (60/bpm/tempo)
+ * Cada hit se programa en: compassStartTime + offset * beatInterval
  *
  * Hay 4 tipos de golpe: fuerte1, fuerte2, floja1, floja2.
- * El patron alterna entre variantes del mismo tipo para evitar el efecto
- * "metrónomo de muñeca" (mismo sample dos veces seguidas).
- *
- * Si una variante no esta subida, el sampler hace fallback automatico:
- *   fuerte2 -> fuerte1 | floja1 -> fuerte1 | floja2 -> floja1 ?? fuerte1
+ * Si una variante no esta subida, el sampler hace fallback automatico.
  *
  * Uso:
  *   const sampler = new PalmasSampler(audioContext, masterGainNode);
@@ -1216,34 +1211,92 @@ class PitchShifter {
  *   sampler.stop();
  */
 
-// Patron de tiempos por palo. Cada elemento es un hit_type o null (silencio).
-// La alternancia fuerte1/fuerte2 y floja1/floja2 humaniza el ritmo.
+// Cada palo define compassBeats (duracion total del compas en beats) y un array
+// de hits con { offset, hitType }. offset es 0-indexed en beats desde el inicio
+// del compas; puede ser decimal para subdivisiones.
 const PATTERNS = {
-  Tangos: ['fuerte1', 'floja1', 'fuerte2', 'floja2', 'fuerte1', 'floja1', 'fuerte2', 'floja2'],
-  Bulerias: ['fuerte1', null, 'floja1', 'fuerte2', null, 'floja2', 'fuerte1', null, 'floja1', 'fuerte2', null, 'floja2'],
-  Rumba: ['fuerte1', 'floja1', 'fuerte2', 'floja2']
+  Tangos: {
+    compassBeats: 4,
+    hits: [{
+      offset: 1,
+      hitType: 'fuerte1'
+    }, {
+      offset: 1.5,
+      hitType: 'floja1'
+    }, {
+      offset: 2,
+      hitType: 'floja2'
+    }, {
+      offset: 3,
+      hitType: 'fuerte2'
+    }]
+  },
+  Bulerias: {
+    compassBeats: 12,
+    hits: [{
+      offset: 0,
+      hitType: 'fuerte1'
+    }, {
+      offset: 2,
+      hitType: 'floja1'
+    }, {
+      offset: 3,
+      hitType: 'fuerte2'
+    }, {
+      offset: 5,
+      hitType: 'floja2'
+    }, {
+      offset: 6,
+      hitType: 'fuerte1'
+    }, {
+      offset: 8,
+      hitType: 'floja1'
+    }, {
+      offset: 9,
+      hitType: 'fuerte2'
+    }, {
+      offset: 11,
+      hitType: 'floja2'
+    }]
+  },
+  Rumba: {
+    compassBeats: 4,
+    hits: [{
+      offset: 0,
+      hitType: 'fuerte1'
+    }, {
+      offset: 1,
+      hitType: 'floja1'
+    }, {
+      offset: 2,
+      hitType: 'fuerte2'
+    }, {
+      offset: 3,
+      hitType: 'floja2'
+    }]
+  }
 };
 
 // Orden de fallback: si un tipo no tiene sample, usar el siguiente de esta lista
 const FALLBACK_ORDER = ['fuerte1', 'fuerte2', 'floja1', 'floja2'];
 
-// Cuantos segundos por delante programamos golpes
+// Cuantos segundos por delante programamos compases
 const LOOK_AHEAD_SEC = 0.25;
-// Con que frecuencia revisamos si hay que programar mas golpes (ms)
+// Con que frecuencia revisamos si hay que programar mas compases (ms)
 const SCHEDULE_INTERVAL_MS = 100;
 class PalmasSampler {
   constructor(audioContext, outputNode) {
     this.audioContext = audioContext;
     this.outputNode = outputNode;
     this.samples = {}; // hit_type -> AudioBuffer
-    this.pattern = []; // array de hit_type strings o null
-    this.beatInterval = 0; // segundos entre golpes
+    this.hits = []; // array de { offset, hitType }
+    this.compassBeats = 4; // duracion del compas en beats
+    this.beatInterval = 0; // segundos por beat
 
     this.isPlaying = false;
     this._scheduledSources = [];
     this._scheduleTimer = null;
-    this._nextBeatTime = 0;
-    this._beatIndex = 0;
+    this._nextCompasTime = 0;
   }
 
   /**
@@ -1261,7 +1314,9 @@ class PalmasSampler {
    * @param {number} tempo   Ratio de velocidad (1.0 = normal, 0.8 = 20% mas lento)
    */
   configure(palo, bpm, tempo) {
-    this.pattern = PATTERNS[palo] || PATTERNS.Tangos;
+    const pattern = PATTERNS[palo] || PATTERNS.Tangos;
+    this.hits = pattern.hits;
+    this.compassBeats = pattern.compassBeats;
     this.beatInterval = 60 / bpm / tempo;
   }
 
@@ -1272,10 +1327,9 @@ class PalmasSampler {
     return samples && samples.fuerte1 instanceof AudioBuffer;
   }
   start() {
-    if (this.isPlaying || this.pattern.length === 0 || !this.samples.fuerte1) return;
+    if (this.isPlaying || this.hits.length === 0 || !this.samples.fuerte1) return;
     this.isPlaying = true;
-    this._beatIndex = 0;
-    this._nextBeatTime = this.audioContext.currentTime;
+    this._nextCompasTime = this.audioContext.currentTime;
     this._scheduleAhead();
   }
   stop() {
@@ -1298,15 +1352,19 @@ class PalmasSampler {
   _scheduleAhead() {
     if (!this.isPlaying) return;
     const horizon = this.audioContext.currentTime + LOOK_AHEAD_SEC;
-    while (this._nextBeatTime < horizon) {
-      this._scheduleBeat(this._nextBeatTime, this.pattern[this._beatIndex]);
-      this._beatIndex = (this._beatIndex + 1) % this.pattern.length;
-      this._nextBeatTime += this.beatInterval;
+    while (this._nextCompasTime < horizon) {
+      const compassStart = this._nextCompasTime;
+      this.hits.forEach(({
+        offset,
+        hitType
+      }) => {
+        this._scheduleBeat(compassStart + offset * this.beatInterval, hitType);
+      });
+      this._nextCompasTime += this.compassBeats * this.beatInterval;
     }
     this._scheduleTimer = setTimeout(() => this._scheduleAhead(), SCHEDULE_INTERVAL_MS);
   }
   _scheduleBeat(time, hitType) {
-    if (!hitType) return;
     const buffer = this._resolveBuffer(hitType);
     if (!buffer) return;
     const src = this.audioContext.createBufferSource();
@@ -1325,12 +1383,10 @@ class PalmasSampler {
   // a partir del tipo pedido.
   _resolveBuffer(hitType) {
     if (this.samples[hitType]) return this.samples[hitType];
-    // Fallback: recorrer el orden de fallback desde la posicion del tipo pedido
     const start = FALLBACK_ORDER.indexOf(hitType);
     for (let i = start + 1; i < FALLBACK_ORDER.length; i++) {
       if (this.samples[FALLBACK_ORDER[i]]) return this.samples[FALLBACK_ORDER[i]];
     }
-    // Ultimo recurso: fuerte1
     return this.samples.fuerte1 || null;
   }
 }
