@@ -110,7 +110,8 @@ export default class PalmasSampler {
   start() {
     if (this.isPlaying || this.hits.length === 0 || !this.samples.fuerte1) return;
     this.isPlaying = true;
-    this._nextCompasTime = this.audioContext.currentTime;
+    this.startedAt = this.audioContext.currentTime;
+    this._nextCompasTime = this.startedAt;
     this._scheduleAhead();
   }
 

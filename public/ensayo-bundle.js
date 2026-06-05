@@ -1329,7 +1329,8 @@ class PalmasSampler {
   start() {
     if (this.isPlaying || this.hits.length === 0 || !this.samples.fuerte1) return;
     this.isPlaying = true;
-    this._nextCompasTime = this.audioContext.currentTime;
+    this.startedAt = this.audioContext.currentTime;
+    this._nextCompasTime = this.startedAt;
     this._scheduleAhead();
   }
   stop() {
@@ -1542,6 +1543,13 @@ class DualStreamEngine {
 
     // Arrancar palmas en loop
     this._startPalmasLoop();
+
+    // Con el sampler, anclar palmasStartContextTime al instante exacto que
+    // registró el sampler, para que los sync points del cante estén alineados
+    // con los compases generados.
+    if (this.useSampler && this.palmasSampler) {
+      this.palmasStartContextTime = this.palmasSampler.startedAt;
+    }
 
     // Programar primera entrada de cante
     if (this.canteVoices.length > 0) {
