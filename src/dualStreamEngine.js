@@ -296,7 +296,7 @@ export default class DualStreamEngine {
       () => {
         // La pista ha terminado. Programar la siguiente en el proximo sync point
         // que venga despues de que acabe esta pista.
-        if (!this.isPlaying) return;
+        if (!this.isPlaying || this.falseta) return;
         const endTime = startContextTime + adjustedDuration;
         const next = this._nextSyncPointAfter(endTime);
         this._scheduleNextCante(next);
@@ -323,9 +323,16 @@ export default class DualStreamEngine {
 
   // ─── Comandos de voz ─────────────────────────────────────────────────────────
 
-  /** Activar modo falseta: el cante no entra hasta que se llame a reanudarCante() */
+  /** Activar modo falseta: para el cante inmediatamente y no entra hasta reanudarCante() */
   activarFalseta() {
     this.falseta = true;
+    if (this.canteShifter) {
+      this.canteShifter.disconnect();
+      this.canteShifter = null;
+    }
+    clearTimeout(this.canteScheduleTimer);
+    const next = this._nextSyncPointAfter(this.audioContext.currentTime);
+    this._scheduleNextCante(next);
     this._notifyState();
   }
 
