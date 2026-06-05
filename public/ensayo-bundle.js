@@ -12031,10 +12031,12 @@ class EnsayoApp {
       this._updateVoiceIndicator(status);
     });
 
-    // Si el navegador no soporta voz, deshabilitar toggle
+    // Si el navegador no soporta voz, deshabilitar toggle permanentemente
     if (!this.ensayo.supported) {
       this.voiceToggle.disabled = true;
       document.getElementById('voiceSublabel').innerHTML = '<span class="voice-unsupported">No disponible en este navegador (usa Chrome)</span>';
+    } else {
+      this.voiceToggle.disabled = false;
     }
   }
 
@@ -12145,13 +12147,15 @@ class EnsayoApp {
     if (this.engine.isPlaying) {
       this.engine.stop();
       this.ensayo.stopVoice();
-      this.voiceToggle.checked = false;
       this._updateVoiceIndicator('off');
       this._resetCanteInfo();
     } else {
       if (!this.isLoaded) return;
       try {
         await this.engine.play();
+        if (this.voiceToggle.checked) {
+          this.ensayo.startVoice();
+        }
       } catch (err) {
         this._showError('Error al iniciar: ' + err.message);
       }
@@ -12290,7 +12294,7 @@ class EnsayoApp {
       this.selectWrapper.classList.remove('disabled');
       this.btnFalseta.disabled = true;
       this.btnVamos.disabled = true;
-      this.voiceToggle.disabled = true;
+      this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.remove('locked');
       this.trackSelector.classList.remove('locked');
       this.statusDot.className = 'status-dot stopped';
