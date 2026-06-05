@@ -599,6 +599,26 @@
             margin-bottom: 0.75rem;
         }
 
+        /* ── Falseta card: internal spacing ── */
+        .ensayo-falseta-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .ensayo-falseta-card .ensayo-status-bar {
+            background: #F5EDE0;
+            border: 1px solid #E0CDB3;
+            margin: 0;
+        }
+        .ensayo-falseta-card .ensayo-cante-info {
+            background: #F5EDE0;
+            border: 1px solid #E0CDB3;
+            margin: 0;
+        }
+        .ensayo-falseta-card .ensayo-actions {
+            margin: 0;
+        }
+
         /* ── Play button centered ── */
         .player-section {
             display: flex;
@@ -730,24 +750,6 @@
             <!-- ─── Columna derecha: reproduccion ─── -->
             <div class="ensayo-col-right">
 
-                <!-- Barra de estado -->
-                <div class="ensayo-status-bar">
-                    <div class="status-mode">
-                        <span class="status-dot stopped" id="statusDot"></span>
-                        <span id="statusText">Listo para empezar</span>
-                    </div>
-                    <div class="status-voice">
-                        <span class="voice-dot" id="voiceDot"></span>
-                        <span id="voiceStatusText">Voz desactivada</span>
-                    </div>
-                </div>
-
-                <!-- Info cante en curso -->
-                <div class="ensayo-cante-info">
-                    <div class="ensayo-cante-label">Sonando ahora</div>
-                    <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
-                </div>
-
                 <!-- Boton play + visualizador -->
                 <div class="player-section" style="margin-bottom:0">
                     <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
@@ -778,21 +780,44 @@
                     </div>
                 </div>
 
-                <!-- Botones falseta / vamos alla -->
-                <div class="ensayo-actions">
-                    <button class="action-btn btn-falseta" id="btnFalseta" disabled>
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 18V5l12-2v13"/>
-                            <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-                        </svg>
-                        Falseta
-                    </button>
-                    <button class="action-btn btn-vamos" id="btnVamos" disabled>
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
-                        </svg>
-                        Vamos alla
-                    </button>
+                <!-- Card de falseta: estado + cante en curso + acciones -->
+                <div class="ensayo-card ensayo-falseta-card">
+                    <div class="ensayo-card-label">Modo falseta</div>
+
+                    <!-- Barra de estado -->
+                    <div class="ensayo-status-bar">
+                        <div class="status-mode">
+                            <span class="status-dot stopped" id="statusDot"></span>
+                            <span id="statusText">Listo para empezar</span>
+                        </div>
+                        <div class="status-voice">
+                            <span class="voice-dot" id="voiceDot"></span>
+                            <span id="voiceStatusText">Voz desactivada</span>
+                        </div>
+                    </div>
+
+                    <!-- Info cante en curso -->
+                    <div class="ensayo-cante-info">
+                        <div class="ensayo-cante-label">Sonando ahora</div>
+                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
+                    </div>
+
+                    <!-- Botones falseta / vamos alla -->
+                    <div class="ensayo-actions">
+                        <button class="action-btn btn-falseta" id="btnFalseta" disabled>
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                            </svg>
+                            Falseta
+                        </button>
+                        <button class="action-btn btn-vamos" id="btnVamos" disabled>
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Vamos alla
+                        </button>
+                    </div>
                 </div>
 
             </div>
