@@ -1557,11 +1557,13 @@ class DualStreamEngine {
     // Arrancar palmas en loop
     this._startPalmasLoop();
 
-    // Con el sampler, anclar palmasStartContextTime al instante exacto que
-    // registró el sampler, para que los sync points del cante estén alineados
-    // con los compases generados.
+    // Con el sampler, anclar palmasStartContextTime al primer golpe real (fuerte1)
+    // del patron, no al inicio del compas. El audio de palmas original empezaba
+    // directamente en fuerte1 (offset 0 del archivo), por lo que el ancla debe
+    // apuntar al mismo instante para que los sync points del cante cuadren.
     if (this.useSampler && this.palmasSampler) {
-      this.palmasStartContextTime = this.palmasSampler.startedAt;
+      const firstHitOffset = this.palmasSampler.hits.length > 0 ? this.palmasSampler.hits[0].offset : 0;
+      this.palmasStartContextTime = this.palmasSampler.startedAt + firstHitOffset * this.palmasSampler.beatInterval;
     }
 
     // Programar primera entrada de cante
