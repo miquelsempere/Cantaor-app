@@ -12131,7 +12131,7 @@ class EnsayoApp {
     if (checked.length === allCount) {
       this.engine.setSelectedVoices(null);
     } else {
-      this.engine.setSelectedVoices(checked.map(cb => Number(cb.dataset.id)));
+      this.engine.setSelectedVoices(checked.map(cb => cb.dataset.id));
     }
   }
   async _handlePlayClick() {
