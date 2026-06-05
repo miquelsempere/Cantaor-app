@@ -100,7 +100,7 @@ export default class DualStreamEngine {
     });
 
     // Intentar cargar sampler si se proporcionaron samples
-    if (samplesMeta && samplesMeta.fuerte) {
+    if (samplesMeta && samplesMeta.fuerte1) {
       try {
         const entries = Object.entries(samplesMeta).filter(([, v]) => v);
         const decoded = await Promise.all(entries.map(([, url]) => this._fetchAndDecode(url)));
