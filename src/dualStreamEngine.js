@@ -233,9 +233,9 @@ export default class DualStreamEngine {
   _scheduleNextCante(whenContextTime) {
     if (!this.isPlaying) return;
 
-    // Tiempo de anticipacion: empezamos a reproducir el cante 50ms antes para
-    // que el PitchShifter haya procesado suficientes frames.
-    const PRELOAD_SEC = 0.05;
+    // Tiempo de anticipacion: compensa la latencia del ScriptProcessorNode (bufferSize=4096)
+    // que introduce ~2-3 frames antes de que salga audio = ~279ms a 44100Hz.
+    const PRELOAD_SEC = 0.28;
     const now = this.audioContext.currentTime;
     const delay = (whenContextTime - PRELOAD_SEC - now) * 1000;
 
