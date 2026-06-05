@@ -1201,23 +1201,31 @@ class PitchShifter {
  * Cada golpe se programa con audioContext.currentTime + offset para precision
  * sample-accurate, sin necesidad de SoundTouch.
  *
- * El patron de cada palo define que tipo de golpe va en cada tiempo del compas.
- * El intervalo entre golpes se calcula como: (60 / bpm) / tempo
+ * Hay 4 tipos de golpe: fuerte1, fuerte2, floja1, floja2.
+ * El patron alterna entre variantes del mismo tipo para evitar el efecto
+ * "metrónomo de muñeca" (mismo sample dos veces seguidas).
+ *
+ * Si una variante no esta subida, el sampler hace fallback automatico:
+ *   fuerte2 -> fuerte1 | floja1 -> fuerte1 | floja2 -> floja1 ?? fuerte1
  *
  * Uso:
  *   const sampler = new PalmasSampler(audioContext, masterGainNode);
- *   sampler.loadSamples({ fuerte: AudioBuffer, suave: AudioBuffer });
+ *   sampler.loadSamples({ fuerte1: AudioBuffer, fuerte2: AudioBuffer, ... });
  *   sampler.configure('Tangos', bpm, tempo);
  *   sampler.start();
  *   sampler.stop();
  */
 
 // Patron de tiempos por palo. Cada elemento es un hit_type o null (silencio).
+// La alternancia fuerte1/fuerte2 y floja1/floja2 humaniza el ritmo.
 const PATTERNS = {
-  Tangos: ['fuerte', 'suave', 'fuerte', 'suave', 'fuerte', 'suave', 'fuerte', 'suave'],
-  Bulerias: ['fuerte', null, 'suave', 'fuerte', null, 'suave', 'fuerte', null, 'suave', 'fuerte', null, 'suave'],
-  Rumba: ['fuerte', 'suave', 'fuerte', 'suave']
+  Tangos: ['fuerte1', 'floja1', 'fuerte2', 'floja2', 'fuerte1', 'floja1', 'fuerte2', 'floja2'],
+  Bulerias: ['fuerte1', null, 'floja1', 'fuerte2', null, 'floja2', 'fuerte1', null, 'floja1', 'fuerte2', null, 'floja2'],
+  Rumba: ['fuerte1', 'floja1', 'fuerte2', 'floja2']
 };
+
+// Orden de fallback: si un tipo no tiene sample, usar el siguiente de esta lista
+const FALLBACK_ORDER = ['fuerte1', 'fuerte2', 'floja1', 'floja2'];
 
 // Cuantos segundos por delante programamos golpes
 const LOOK_AHEAD_SEC = 0.25;
@@ -1240,7 +1248,7 @@ class PalmasSampler {
 
   /**
    * Carga los AudioBuffers decodificados de los samples.
-   * @param {Object} samples  { fuerte: AudioBuffer, suave: AudioBuffer, sorda: AudioBuffer }
+   * @param {Object} samples  { fuerte1: AudioBuffer, fuerte2: AudioBuffer, floja1: AudioBuffer, floja2: AudioBuffer }
    */
   loadSamples(samples) {
     this.samples = samples;
@@ -1258,15 +1266,13 @@ class PalmasSampler {
   }
 
   /**
-   * Devuelve true si este sampler tiene los samples minimos para el palo dado.
-   * Se necesita al menos el sample 'fuerte'. Suave y sorda son opcionales
-   * (si faltan, se usa 'fuerte' como fallback para ese tiempo).
+   * Devuelve true si hay al menos fuerte1 disponible para arrancar el sampler.
    */
-  static hasMinimumSamples(samples, palo) {
-    return samples && samples.fuerte instanceof AudioBuffer;
+  static hasMinimumSamples(samples) {
+    return samples && samples.fuerte1 instanceof AudioBuffer;
   }
   start() {
-    if (this.isPlaying || this.pattern.length === 0 || !this.samples.fuerte) return;
+    if (this.isPlaying || this.pattern.length === 0 || !this.samples.fuerte1) return;
     this.isPlaying = true;
     this._beatIndex = 0;
     this._nextBeatTime = this.audioContext.currentTime;
@@ -1301,8 +1307,7 @@ class PalmasSampler {
   }
   _scheduleBeat(time, hitType) {
     if (!hitType) return;
-    // Fallback: si el sample especifico no esta disponible, usar 'fuerte'
-    const buffer = this.samples[hitType] || this.samples.fuerte;
+    const buffer = this._resolveBuffer(hitType);
     if (!buffer) return;
     const src = this.audioContext.createBufferSource();
     src.buffer = buffer;
@@ -1314,6 +1319,19 @@ class PalmasSampler {
       if (idx !== -1) this._scheduledSources.splice(idx, 1);
       src.disconnect();
     };
+  }
+
+  // Resuelve el buffer con fallback: busca el primer tipo disponible en FALLBACK_ORDER
+  // a partir del tipo pedido.
+  _resolveBuffer(hitType) {
+    if (this.samples[hitType]) return this.samples[hitType];
+    // Fallback: recorrer el orden de fallback desde la posicion del tipo pedido
+    const start = FALLBACK_ORDER.indexOf(hitType);
+    for (let i = start + 1; i < FALLBACK_ORDER.length; i++) {
+      if (this.samples[FALLBACK_ORDER[i]]) return this.samples[FALLBACK_ORDER[i]];
+    }
+    // Ultimo recurso: fuerte1
+    return this.samples.fuerte1 || null;
   }
 }
 
@@ -1423,7 +1441,7 @@ class DualStreamEngine {
         }
         this.palmasSampler.loadSamples(sampleBuffers);
         this.palmasSampler.configure(palmasMeta.palo || palmasMeta.title, palmasMeta.bpm, this.tempo);
-        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers, palmasMeta.palo);
+        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers);
       } catch (e) {
         console.warn('PalmasSampler: error cargando samples, usando audio base:', e);
         this.useSampler = false;

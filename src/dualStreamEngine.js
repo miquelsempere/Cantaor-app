@@ -112,7 +112,7 @@ export default class DualStreamEngine {
         }
         this.palmasSampler.loadSamples(sampleBuffers);
         this.palmasSampler.configure(palmasMeta.palo || palmasMeta.title, palmasMeta.bpm, this.tempo);
-        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers, palmasMeta.palo);
+        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers);
       } catch (e) {
         console.warn('PalmasSampler: error cargando samples, usando audio base:', e);
         this.useSampler = false;
