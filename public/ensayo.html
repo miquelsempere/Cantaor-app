@@ -610,12 +610,10 @@
             border: 1px solid #E0CDB3;
             margin: 0;
         }
-        .ensayo-falseta-card .ensayo-cante-info {
-            background: #F5EDE0;
-            border: 1px solid #E0CDB3;
+        .ensayo-falseta-card .ensayo-actions {
             margin: 0;
         }
-        .ensayo-falseta-card .ensayo-actions {
+        .ensayo-falseta-card .ensayo-voice-section {
             margin: 0;
         }
 
@@ -730,27 +728,13 @@
                     <div class="locked-note" id="ensayoLockedNote">Ajusta compas y cejilla antes de reproducir</div>
                 </div>
 
-                <!-- Control de voz -->
-                <div class="ensayo-voice-section" id="ensayoVoiceSection">
-                    <div>
-                        <div class="voice-label">Control por voz</div>
-                        <div class="voice-sublabel" id="voiceSublabel">
-                            Di "falseta" o "vamos alla" mientras tocas
-                        </div>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="voiceToggle" disabled>
-                        <span class="toggle-track"></span>
-                    </label>
-                </div>
-
             </div>
             <!-- /col-left -->
 
             <!-- ─── Columna derecha: reproduccion ─── -->
             <div class="ensayo-col-right">
 
-                <!-- Boton play + visualizador -->
+                <!-- Boton play + visualizador + sonando ahora -->
                 <div class="player-section" style="margin-bottom:0">
                     <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
                         <div class="play-icon">
@@ -778,9 +762,14 @@
                             <div class="visualizer-bar"></div>
                         </div>
                     </div>
+                    <!-- Info cante en curso -->
+                    <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
+                        <div class="ensayo-cante-label">Sonando ahora</div>
+                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
+                    </div>
                 </div>
 
-                <!-- Card de falseta: estado + cante en curso + acciones -->
+                <!-- Card de falseta: estado + acciones + voz -->
                 <div class="ensayo-card ensayo-falseta-card">
                     <div class="ensayo-card-label">Modo falseta</div>
 
@@ -794,12 +783,6 @@
                             <span class="voice-dot" id="voiceDot"></span>
                             <span id="voiceStatusText">Voz desactivada</span>
                         </div>
-                    </div>
-
-                    <!-- Info cante en curso -->
-                    <div class="ensayo-cante-info">
-                        <div class="ensayo-cante-label">Sonando ahora</div>
-                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
                     </div>
 
                     <!-- Botones falseta / vamos alla -->
@@ -817,6 +800,20 @@
                             </svg>
                             Vamos alla
                         </button>
+                    </div>
+
+                    <!-- Control de voz -->
+                    <div class="ensayo-voice-section" id="ensayoVoiceSection" style="margin:0;border-radius:8px">
+                        <div>
+                            <div class="voice-label">Control por voz</div>
+                            <div class="voice-sublabel" id="voiceSublabel">
+                                Di "falseta" o "vamos alla" mientras tocas
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="voiceToggle" disabled>
+                            <span class="toggle-track"></span>
+                        </label>
                     </div>
                 </div>
 
