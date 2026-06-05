@@ -1192,6 +1192,132 @@ class PitchShifter {
 }
 
 /*
+ * PalmasSampler - Motor de palmas basado en samples individuales
+ *
+ * Reemplaza el PitchShifter para la pista de palmas. En lugar de estirar
+ * un audio largo (que distorsiona los ataques percusivos), dispara samples
+ * cortos de golpes individuales usando AudioBufferSourceNode nativo.
+ *
+ * Cada golpe se programa con audioContext.currentTime + offset para precision
+ * sample-accurate, sin necesidad de SoundTouch.
+ *
+ * El patron de cada palo define que tipo de golpe va en cada tiempo del compas.
+ * El intervalo entre golpes se calcula como: (60 / bpm) / tempo
+ *
+ * Uso:
+ *   const sampler = new PalmasSampler(audioContext, masterGainNode);
+ *   sampler.loadSamples({ fuerte: AudioBuffer, suave: AudioBuffer });
+ *   sampler.configure('Tangos', bpm, tempo);
+ *   sampler.start();
+ *   sampler.stop();
+ */
+
+// Patron de tiempos por palo. Cada elemento es un hit_type o null (silencio).
+const PATTERNS = {
+  Tangos: ['fuerte', 'suave', 'fuerte', 'suave', 'fuerte', 'suave', 'fuerte', 'suave'],
+  Bulerias: ['fuerte', null, 'suave', 'fuerte', null, 'suave', 'fuerte', null, 'suave', 'fuerte', null, 'suave'],
+  Rumba: ['fuerte', 'suave', 'fuerte', 'suave']
+};
+
+// Cuantos segundos por delante programamos golpes
+const LOOK_AHEAD_SEC = 0.25;
+// Con que frecuencia revisamos si hay que programar mas golpes (ms)
+const SCHEDULE_INTERVAL_MS = 100;
+class PalmasSampler {
+  constructor(audioContext, outputNode) {
+    this.audioContext = audioContext;
+    this.outputNode = outputNode;
+    this.samples = {}; // hit_type -> AudioBuffer
+    this.pattern = []; // array de hit_type strings o null
+    this.beatInterval = 0; // segundos entre golpes
+
+    this.isPlaying = false;
+    this._scheduledSources = [];
+    this._scheduleTimer = null;
+    this._nextBeatTime = 0;
+    this._beatIndex = 0;
+  }
+
+  /**
+   * Carga los AudioBuffers decodificados de los samples.
+   * @param {Object} samples  { fuerte: AudioBuffer, suave: AudioBuffer, sorda: AudioBuffer }
+   */
+  loadSamples(samples) {
+    this.samples = samples;
+  }
+
+  /**
+   * Configura el palo, BPM y ratio de tempo antes de arrancar.
+   * @param {string} palo    Nombre del palo (debe coincidir con las claves de PATTERNS)
+   * @param {number} bpm     Pulsos por minuto de la pista de palmas
+   * @param {number} tempo   Ratio de velocidad (1.0 = normal, 0.8 = 20% mas lento)
+   */
+  configure(palo, bpm, tempo) {
+    this.pattern = PATTERNS[palo] || PATTERNS.Tangos;
+    this.beatInterval = 60 / bpm / tempo;
+  }
+
+  /**
+   * Devuelve true si este sampler tiene los samples minimos para el palo dado.
+   * Se necesita al menos el sample 'fuerte'. Suave y sorda son opcionales
+   * (si faltan, se usa 'fuerte' como fallback para ese tiempo).
+   */
+  static hasMinimumSamples(samples, palo) {
+    return samples && samples.fuerte instanceof AudioBuffer;
+  }
+  start() {
+    if (this.isPlaying || this.pattern.length === 0 || !this.samples.fuerte) return;
+    this.isPlaying = true;
+    this._beatIndex = 0;
+    this._nextBeatTime = this.audioContext.currentTime;
+    this._scheduleAhead();
+  }
+  stop() {
+    this.isPlaying = false;
+    clearTimeout(this._scheduleTimer);
+    this._scheduledSources.forEach(src => {
+      try {
+        src.stop();
+        src.disconnect();
+      } catch (_) {}
+    });
+    this._scheduledSources = [];
+  }
+  destroy() {
+    this.stop();
+  }
+
+  // ─── Scheduler interno ────────────────────────────────────────────────────
+
+  _scheduleAhead() {
+    if (!this.isPlaying) return;
+    const horizon = this.audioContext.currentTime + LOOK_AHEAD_SEC;
+    while (this._nextBeatTime < horizon) {
+      this._scheduleBeat(this._nextBeatTime, this.pattern[this._beatIndex]);
+      this._beatIndex = (this._beatIndex + 1) % this.pattern.length;
+      this._nextBeatTime += this.beatInterval;
+    }
+    this._scheduleTimer = setTimeout(() => this._scheduleAhead(), SCHEDULE_INTERVAL_MS);
+  }
+  _scheduleBeat(time, hitType) {
+    if (!hitType) return;
+    // Fallback: si el sample especifico no esta disponible, usar 'fuerte'
+    const buffer = this.samples[hitType] || this.samples.fuerte;
+    if (!buffer) return;
+    const src = this.audioContext.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.outputNode);
+    src.start(time);
+    this._scheduledSources.push(src);
+    src.onended = () => {
+      const idx = this._scheduledSources.indexOf(src);
+      if (idx !== -1) this._scheduledSources.splice(idx, 1);
+      src.disconnect();
+    };
+  }
+}
+
+/*
  * DualStreamEngine - Motor de audio dual para el Modo Ensayo
  *
  * Gestiona dos streams de audio simultaneos y sincronizados:
@@ -1224,6 +1350,10 @@ class DualStreamEngine {
     this.palmasBuffer = null;
     this.palmasShifter = null;
     this.palmasMeta = null; // { bpm, beats_per_compas, duration }
+
+    // Sampler (reemplaza palmasShifter cuando hay samples disponibles)
+    this.palmasSampler = null;
+    this.useSampler = false;
 
     // Cante stream
     this.canteVoices = []; // Metadatos de pistas de voz
@@ -1259,28 +1389,53 @@ class DualStreamEngine {
 
   /**
    * Carga y decodifica la pista de palmas y todas las voces del palo.
-   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount }.
+   * Acepta opcionalmente samplesMeta ({ fuerte, suave, sorda } con audio_url) para
+   * activar el motor sampler en lugar del PitchShifter.
+   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount, usingsampler }.
    */
-  async load(palmasMeta, palmasUrl, canteVoicesMeta) {
+  async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
+    this.useSampler = false;
 
     // Calcular intervalo de sync points aplicando el ratio de tempo
     const rawInterval = palmasMeta.beats_per_compas / palmasMeta.bpm * 60;
     this.syncInterval = rawInterval / this.tempo;
 
-    // Decodificar todo en paralelo
+    // Decodificar voces y palmas base en paralelo
     const [palmasBuffer, ...voiceBuffers] = await Promise.all([this._fetchAndDecode(palmasUrl), ...canteVoicesMeta.map(v => this._fetchAndDecode(v.audio_url))]);
     this.palmasBuffer = palmasBuffer;
     canteVoicesMeta.forEach((v, i) => {
       this.canteBuffers.set(v.id, voiceBuffers[i]);
     });
 
+    // Intentar cargar sampler si se proporcionaron samples
+    if (samplesMeta && samplesMeta.fuerte) {
+      try {
+        const entries = Object.entries(samplesMeta).filter(([, v]) => v);
+        const decoded = await Promise.all(entries.map(([, url]) => this._fetchAndDecode(url)));
+        const sampleBuffers = {};
+        entries.forEach(([hitType], i) => {
+          sampleBuffers[hitType] = decoded[i];
+        });
+        if (!this.palmasSampler) {
+          this.palmasSampler = new PalmasSampler(this.audioContext, this.masterGain);
+        }
+        this.palmasSampler.loadSamples(sampleBuffers);
+        this.palmasSampler.configure(palmasMeta.palo || palmasMeta.title, palmasMeta.bpm, this.tempo);
+        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers, palmasMeta.palo);
+      } catch (e) {
+        console.warn('PalmasSampler: error cargando samples, usando audio base:', e);
+        this.useSampler = false;
+      }
+    }
+
     // Crear cola barajada de voces
     this._reshuffleQueue();
     return {
       palmasOk: !!palmasBuffer,
-      voicesCount: canteVoicesMeta.length
+      voicesCount: canteVoicesMeta.length,
+      usingSampler: this.useSampler
     };
   }
   async _fetchAndDecode(url) {
@@ -1325,6 +1480,9 @@ class DualStreamEngine {
     this.isPlaying = false;
     clearTimeout(this.canteScheduleTimer);
     this.canteScheduleTimer = null;
+    if (this.palmasSampler) {
+      this.palmasSampler.stop();
+    }
     if (this.palmasShifter) {
       this.palmasShifter.disconnect();
       this.palmasShifter = null;
@@ -1341,6 +1499,10 @@ class DualStreamEngine {
   // ─── Palmas loop ─────────────────────────────────────────────────────────────
 
   _startPalmasLoop() {
+    if (this.useSampler && this.palmasSampler) {
+      this.palmasSampler.start();
+      return;
+    }
     if (this.palmasShifter) {
       this.palmasShifter.disconnect();
     }
@@ -1505,6 +1667,10 @@ class DualStreamEngine {
   }
   destroy() {
     this.stop();
+    if (this.palmasSampler) {
+      this.palmasSampler.destroy();
+      this.palmasSampler = null;
+    }
     if (this.audioContext) this.audioContext.close();
     this.canteBuffers.clear();
     this.onCanteEnterListeners = [];
@@ -11553,6 +11719,68 @@ const ensayoAPI = {
       error
     } = await supabase.from('cante_voices').delete().eq('id', id);
     if (error) throw error;
+  },
+  async getSamplesByPalo(palo) {
+    const {
+      data,
+      error
+    } = await supabase.from('palmas_samples').select('*').eq('palo', palo);
+    if (error) throw error;
+    return data || [];
+  },
+  async getAllPalmasSamples() {
+    const {
+      data,
+      error
+    } = await supabase.from('palmas_samples').select('*').order('palo', {
+      ascending: true
+    }).order('hit_type', {
+      ascending: true
+    });
+    if (error) throw error;
+    return data || [];
+  },
+  async uploadAndCreatePalmaSample(file, palo, hitType) {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `samples/${palo}/${hitType}_${timestamp}_${safeName}`;
+    const {
+      error: uploadError
+    } = await supabase.storage.from('cante-audio').upload(filePath, file, {
+      contentType: file.type,
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const {
+      data: urlData
+    } = supabase.storage.from('cante-audio').getPublicUrl(filePath);
+    const {
+      data,
+      error
+    } = await supabase.from('palmas_samples').upsert([{
+      palo,
+      hit_type: hitType,
+      audio_url: urlData.publicUrl
+    }], {
+      onConflict: 'palo,hit_type'
+    }).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async deletePalmaSample(id, audioUrl) {
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('cante-audio').remove([pathParts[1]]);
+      }
+    } catch (e) {
+      console.warn('Could not delete sample audio file:', e);
+    }
+    const {
+      error
+    } = await supabase.from('palmas_samples').delete().eq('id', id);
+    if (error) throw error;
   }
 };
 
@@ -11793,7 +12021,7 @@ class EnsayoApp {
   async _loadPaloContent(palo) {
     this._showLoading('Buscando contenido para ' + palo + '...');
     try {
-      const [palmasBase, canteVoices] = await Promise.all([ensayoAPI.getPalmasBaseByPalo(palo), ensayoAPI.getCanteVoicesByPalo(palo)]);
+      const [palmasBase, canteVoices, samplesRows] = await Promise.all([ensayoAPI.getPalmasBaseByPalo(palo), ensayoAPI.getCanteVoicesByPalo(palo), ensayoAPI.getSamplesByPalo(palo).catch(() => [])]);
       if (!palmasBase) {
         this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
@@ -11808,11 +12036,24 @@ class EnsayoApp {
       // Configurar tempo/pitch actuales antes de cargar
       this.engine.setTempo(parseFloat(this.tempoSlider.value));
       this.engine.setPitchSemitones(parseInt(this.pitchSlider.value, 10));
-      this._showLoading(`Cargando ${canteVoices.length} letras + palmas...`);
-      await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices);
+
+      // Construir mapa de samples por hit_type si estan disponibles
+      let samplesMeta = null;
+      if (samplesRows.length > 0) {
+        samplesMeta = {};
+        samplesRows.forEach(s => {
+          samplesMeta[s.hit_type] = s.audio_url;
+        });
+      }
+      const loadingMsg = samplesMeta ? `Cargando ${canteVoices.length} letras + palmas + samples...` : `Cargando ${canteVoices.length} letras + palmas...`;
+      this._showLoading(loadingMsg);
+      const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
       this.isLoaded = true;
       this._hideLoading();
       this.playBtn.disabled = false;
+      if (result.usingSampler) {
+        this._showCommandFlash('Sampler activo');
+      }
     } catch (err) {
       this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
@@ -11962,6 +12203,20 @@ class EnsayoApp {
     });
     vocesUploadBtn.addEventListener('click', () => this._handleVocesUpload());
 
+    // Samples upload
+    const samplesFileBtn = document.getElementById('samplesFileBtn');
+    const samplesAudioInput = document.getElementById('samplesAudioInput');
+    const samplesFileName = document.getElementById('samplesFileName');
+    const samplesUploadBtn = document.getElementById('samplesUploadBtn');
+    samplesFileBtn.addEventListener('click', () => samplesAudioInput.click());
+    samplesAudioInput.addEventListener('change', () => {
+      const f = samplesAudioInput.files[0];
+      samplesFileName.textContent = f ? f.name : 'Ningun archivo';
+      this._validateSamplesForm();
+    });
+    document.getElementById('samplesPalo').addEventListener('input', () => this._validateSamplesForm());
+    samplesUploadBtn.addEventListener('click', () => this._handleSamplesUpload());
+
     // Cargar listas
     this._loadAdminLists();
   }
@@ -12030,7 +12285,7 @@ class EnsayoApp {
     }
   }
   async _loadAdminLists() {
-    await Promise.all([this._renderPalmasList(), this._renderVocesList()]);
+    await Promise.all([this._renderPalmasList(), this._renderVocesList(), this._renderSamplesList()]);
   }
   async _renderPalmasList() {
     const container = document.getElementById('palmasList');
@@ -12084,6 +12339,66 @@ class EnsayoApp {
           if (!confirm('Eliminar esta voz de cante?')) return;
           await ensayoAPI.deleteCanteVoice(item.id, item.audio_url).catch(() => {});
           this._renderVocesList();
+        });
+        container.appendChild(el);
+      });
+    } catch (e) {
+      container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
+    }
+  }
+  _validateSamplesForm() {
+    const ok = document.getElementById('samplesPalo').value.trim() && document.getElementById('samplesAudioInput').files.length > 0;
+    document.getElementById('samplesUploadBtn').disabled = !ok;
+  }
+  async _handleSamplesUpload() {
+    const palo = document.getElementById('samplesPalo').value.trim();
+    const hitType = document.getElementById('samplesHitType').value;
+    const file = document.getElementById('samplesAudioInput').files[0];
+    const statusEl = document.getElementById('samplesUploadStatus');
+    document.getElementById('samplesUploadBtn').disabled = true;
+    statusEl.textContent = 'Subiendo...';
+    statusEl.className = 'upload-status uploading';
+    try {
+      await ensayoAPI.uploadAndCreatePalmaSample(file, palo, hitType);
+      statusEl.textContent = `Sample "${hitType}" para ${palo} subido correctamente`;
+      statusEl.className = 'upload-status success';
+      document.getElementById('samplesPalo').value = '';
+      document.getElementById('samplesAudioInput').value = '';
+      document.getElementById('samplesFileName').textContent = 'Ningun archivo';
+      this._renderSamplesList();
+      setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl.className = 'upload-status';
+      }, 3000);
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'upload-status error';
+      document.getElementById('samplesUploadBtn').disabled = false;
+    }
+  }
+  async _renderSamplesList() {
+    const container = document.getElementById('samplesList');
+    if (!container) return;
+    try {
+      const items = await ensayoAPI.getAllPalmasSamples();
+      if (items.length === 0) {
+        container.innerHTML = '<div class="no-data-msg">No hay samples subidos aun</div>';
+        return;
+      }
+      container.innerHTML = '';
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'ensayo-track-item';
+        el.innerHTML = `
+          <div>
+            <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.hit_type)}</div>
+          </div>
+          <button class="ensayo-track-delete" title="Eliminar">&times;</button>
+        `;
+        el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
+          if (!confirm('Eliminar este sample?')) return;
+          await ensayoAPI.deletePalmaSample(item.id, item.audio_url).catch(() => {});
+          this._renderSamplesList();
         });
         container.appendChild(el);
       });

@@ -370,6 +370,68 @@ export const ensayoAPI = {
     const { error } = await supabase.from('cante_voices').delete().eq('id', id);
     if (error) throw error;
   },
+
+  async getSamplesByPalo(palo) {
+    const { data, error } = await supabase
+      .from('palmas_samples')
+      .select('*')
+      .eq('palo', palo);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAllPalmasSamples() {
+    const { data, error } = await supabase
+      .from('palmas_samples')
+      .select('*')
+      .order('palo', { ascending: true })
+      .order('hit_type', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async uploadAndCreatePalmaSample(file, palo, hitType) {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `samples/${palo}/${hitType}_${timestamp}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('cante-audio')
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('cante-audio')
+      .getPublicUrl(filePath);
+
+    const { data, error } = await supabase
+      .from('palmas_samples')
+      .upsert([{ palo, hit_type: hitType, audio_url: urlData.publicUrl }], {
+        onConflict: 'palo,hit_type',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deletePalmaSample(id, audioUrl) {
+    try {
+      const url = new URL(audioUrl);
+      const pathParts = url.pathname.split('/object/public/cante-audio/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('cante-audio').remove([pathParts[1]]);
+      }
+    } catch (e) {
+      console.warn('Could not delete sample audio file:', e);
+    }
+    const { error } = await supabase.from('palmas_samples').delete().eq('id', id);
+    if (error) throw error;
+  },
 };
 
 // Suggestions board API

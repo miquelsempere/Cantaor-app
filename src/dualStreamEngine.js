@@ -23,6 +23,7 @@
  */
 
 import { PitchShifter } from './index.js';
+import PalmasSampler from './palmasSampler.js';
 
 export default class DualStreamEngine {
   constructor() {
@@ -33,6 +34,10 @@ export default class DualStreamEngine {
     this.palmasBuffer = null;
     this.palmasShifter = null;
     this.palmasMeta = null; // { bpm, beats_per_compas, duration }
+
+    // Sampler (reemplaza palmasShifter cuando hay samples disponibles)
+    this.palmasSampler = null;
+    this.useSampler = false;
 
     // Cante stream
     this.canteVoices = []; // Metadatos de pistas de voz
@@ -70,17 +75,20 @@ export default class DualStreamEngine {
 
   /**
    * Carga y decodifica la pista de palmas y todas las voces del palo.
-   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount }.
+   * Acepta opcionalmente samplesMeta ({ fuerte, suave, sorda } con audio_url) para
+   * activar el motor sampler en lugar del PitchShifter.
+   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount, usingsampler }.
    */
-  async load(palmasMeta, palmasUrl, canteVoicesMeta) {
+  async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
+    this.useSampler = false;
 
     // Calcular intervalo de sync points aplicando el ratio de tempo
     const rawInterval = (palmasMeta.beats_per_compas / palmasMeta.bpm) * 60;
     this.syncInterval = rawInterval / this.tempo;
 
-    // Decodificar todo en paralelo
+    // Decodificar voces y palmas base en paralelo
     const [palmasBuffer, ...voiceBuffers] = await Promise.all([
       this._fetchAndDecode(palmasUrl),
       ...canteVoicesMeta.map(v => this._fetchAndDecode(v.audio_url)),
@@ -91,10 +99,30 @@ export default class DualStreamEngine {
       this.canteBuffers.set(v.id, voiceBuffers[i]);
     });
 
+    // Intentar cargar sampler si se proporcionaron samples
+    if (samplesMeta && samplesMeta.fuerte) {
+      try {
+        const entries = Object.entries(samplesMeta).filter(([, v]) => v);
+        const decoded = await Promise.all(entries.map(([, url]) => this._fetchAndDecode(url)));
+        const sampleBuffers = {};
+        entries.forEach(([hitType], i) => { sampleBuffers[hitType] = decoded[i]; });
+
+        if (!this.palmasSampler) {
+          this.palmasSampler = new PalmasSampler(this.audioContext, this.masterGain);
+        }
+        this.palmasSampler.loadSamples(sampleBuffers);
+        this.palmasSampler.configure(palmasMeta.palo || palmasMeta.title, palmasMeta.bpm, this.tempo);
+        this.useSampler = PalmasSampler.hasMinimumSamples(sampleBuffers, palmasMeta.palo);
+      } catch (e) {
+        console.warn('PalmasSampler: error cargando samples, usando audio base:', e);
+        this.useSampler = false;
+      }
+    }
+
     // Crear cola barajada de voces
     this._reshuffleQueue();
 
-    return { palmasOk: !!palmasBuffer, voicesCount: canteVoicesMeta.length };
+    return { palmasOk: !!palmasBuffer, voicesCount: canteVoicesMeta.length, usingSampler: this.useSampler };
   }
 
   async _fetchAndDecode(url) {
@@ -146,6 +174,9 @@ export default class DualStreamEngine {
     clearTimeout(this.canteScheduleTimer);
     this.canteScheduleTimer = null;
 
+    if (this.palmasSampler) {
+      this.palmasSampler.stop();
+    }
     if (this.palmasShifter) {
       this.palmasShifter.disconnect();
       this.palmasShifter = null;
@@ -163,6 +194,11 @@ export default class DualStreamEngine {
   // ─── Palmas loop ─────────────────────────────────────────────────────────────
 
   _startPalmasLoop() {
+    if (this.useSampler && this.palmasSampler) {
+      this.palmasSampler.start();
+      return;
+    }
+
     if (this.palmasShifter) {
       this.palmasShifter.disconnect();
     }
@@ -339,6 +375,10 @@ export default class DualStreamEngine {
 
   destroy() {
     this.stop();
+    if (this.palmasSampler) {
+      this.palmasSampler.destroy();
+      this.palmasSampler = null;
+    }
     if (this.audioContext) this.audioContext.close();
     this.canteBuffers.clear();
     this.onCanteEnterListeners = [];

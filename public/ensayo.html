@@ -558,6 +558,7 @@
                 <div class="ensayo-admin-tabs">
                     <button class="admin-tab-btn active" data-tab="palmas">Bases de palmas</button>
                     <button class="admin-tab-btn" data-tab="voces">Voces de cante</button>
+                    <button class="admin-tab-btn" data-tab="samples">Samples</button>
                 </div>
 
                 <!-- Tab: palmas -->
@@ -617,6 +618,39 @@
                         <div id="vocesUploadStatus" class="upload-status"></div>
                     </div>
                     <div id="vocesList"></div>
+                </div>
+
+                <!-- Tab: samples -->
+                <div class="admin-tab-panel" id="tabSamples">
+                    <p style="font-size:0.78rem;color:#8B7355;margin-bottom:0.8rem">
+                        Sube un sample de golpe individual por tipo. El sampler los usara en lugar
+                        del audio de palmas, eliminando la distorsion al cambiar el compas.
+                    </p>
+                    <div class="admin-form" style="margin-bottom:1rem">
+                        <div class="form-group">
+                            <label>Palo</label>
+                            <input type="text" id="samplesPalo" class="form-input" placeholder="Ej: Tangos" list="ensayoPaloSuggestions">
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de golpe</label>
+                            <select id="samplesHitType" class="form-input">
+                                <option value="fuerte">Fuerte (palma abierta fuerte)</option>
+                                <option value="suave">Suave (palma abierta suave)</option>
+                                <option value="sorda">Sorda (palma cerrada)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Archivo de audio (golpe corto, WAV recomendado)</label>
+                            <div class="file-input-wrapper">
+                                <button type="button" id="samplesFileBtn" class="file-input-btn">Seleccionar</button>
+                                <span id="samplesFileName" class="file-input-name">Ningun archivo</span>
+                                <input type="file" id="samplesAudioInput" accept="audio/*" class="file-input-hidden">
+                            </div>
+                        </div>
+                        <button id="samplesUploadBtn" class="upload-btn" disabled>Subir sample</button>
+                        <div id="samplesUploadStatus" class="upload-status"></div>
+                    </div>
+                    <div id="samplesList"></div>
                 </div>
             </div>
         </div>

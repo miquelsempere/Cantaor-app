@@ -249,9 +249,10 @@ class EnsayoApp {
     this._showLoading('Buscando contenido para ' + palo + '...');
 
     try {
-      const [palmasBase, canteVoices] = await Promise.all([
+      const [palmasBase, canteVoices, samplesRows] = await Promise.all([
         ensayoAPI.getPalmasBaseByPalo(palo),
         ensayoAPI.getCanteVoicesByPalo(palo),
+        ensayoAPI.getSamplesByPalo(palo).catch(() => []),
       ]);
 
       if (!palmasBase) {
@@ -274,15 +275,27 @@ class EnsayoApp {
       this.engine.setTempo(parseFloat(this.tempoSlider.value));
       this.engine.setPitchSemitones(parseInt(this.pitchSlider.value, 10));
 
-      this._showLoading(
-        `Cargando ${canteVoices.length} letras + palmas...`
-      );
+      // Construir mapa de samples por hit_type si estan disponibles
+      let samplesMeta = null;
+      if (samplesRows.length > 0) {
+        samplesMeta = {};
+        samplesRows.forEach(s => { samplesMeta[s.hit_type] = s.audio_url; });
+      }
 
-      await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices);
+      const loadingMsg = samplesMeta
+        ? `Cargando ${canteVoices.length} letras + palmas + samples...`
+        : `Cargando ${canteVoices.length} letras + palmas...`;
+      this._showLoading(loadingMsg);
+
+      const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
 
       this.isLoaded = true;
       this._hideLoading();
       this.playBtn.disabled = false;
+
+      if (result.usingSampler) {
+        this._showCommandFlash('Sampler activo');
+      }
 
     } catch (err) {
       this._hideLoading();
@@ -445,6 +458,21 @@ class EnsayoApp {
     });
     vocesUploadBtn.addEventListener('click', () => this._handleVocesUpload());
 
+    // Samples upload
+    const samplesFileBtn = document.getElementById('samplesFileBtn');
+    const samplesAudioInput = document.getElementById('samplesAudioInput');
+    const samplesFileName = document.getElementById('samplesFileName');
+    const samplesUploadBtn = document.getElementById('samplesUploadBtn');
+
+    samplesFileBtn.addEventListener('click', () => samplesAudioInput.click());
+    samplesAudioInput.addEventListener('change', () => {
+      const f = samplesAudioInput.files[0];
+      samplesFileName.textContent = f ? f.name : 'Ningun archivo';
+      this._validateSamplesForm();
+    });
+    document.getElementById('samplesPalo').addEventListener('input', () => this._validateSamplesForm());
+    samplesUploadBtn.addEventListener('click', () => this._handleSamplesUpload());
+
     // Cargar listas
     this._loadAdminLists();
   }
@@ -524,7 +552,7 @@ class EnsayoApp {
   }
 
   async _loadAdminLists() {
-    await Promise.all([this._renderPalmasList(), this._renderVocesList()]);
+    await Promise.all([this._renderPalmasList(), this._renderVocesList(), this._renderSamplesList()]);
   }
 
   async _renderPalmasList() {
@@ -580,6 +608,70 @@ class EnsayoApp {
           if (!confirm('Eliminar esta voz de cante?')) return;
           await ensayoAPI.deleteCanteVoice(item.id, item.audio_url).catch(() => {});
           this._renderVocesList();
+        });
+        container.appendChild(el);
+      });
+    } catch (e) {
+      container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
+    }
+  }
+
+  _validateSamplesForm() {
+    const ok =
+      document.getElementById('samplesPalo').value.trim() &&
+      document.getElementById('samplesAudioInput').files.length > 0;
+    document.getElementById('samplesUploadBtn').disabled = !ok;
+  }
+
+  async _handleSamplesUpload() {
+    const palo = document.getElementById('samplesPalo').value.trim();
+    const hitType = document.getElementById('samplesHitType').value;
+    const file = document.getElementById('samplesAudioInput').files[0];
+    const statusEl = document.getElementById('samplesUploadStatus');
+
+    document.getElementById('samplesUploadBtn').disabled = true;
+    statusEl.textContent = 'Subiendo...';
+    statusEl.className = 'upload-status uploading';
+
+    try {
+      await ensayoAPI.uploadAndCreatePalmaSample(file, palo, hitType);
+      statusEl.textContent = `Sample "${hitType}" para ${palo} subido correctamente`;
+      statusEl.className = 'upload-status success';
+      document.getElementById('samplesPalo').value = '';
+      document.getElementById('samplesAudioInput').value = '';
+      document.getElementById('samplesFileName').textContent = 'Ningun archivo';
+      this._renderSamplesList();
+      setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'upload-status'; }, 3000);
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'upload-status error';
+      document.getElementById('samplesUploadBtn').disabled = false;
+    }
+  }
+
+  async _renderSamplesList() {
+    const container = document.getElementById('samplesList');
+    if (!container) return;
+    try {
+      const items = await ensayoAPI.getAllPalmasSamples();
+      if (items.length === 0) {
+        container.innerHTML = '<div class="no-data-msg">No hay samples subidos aun</div>';
+        return;
+      }
+      container.innerHTML = '';
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'ensayo-track-item';
+        el.innerHTML = `
+          <div>
+            <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.hit_type)}</div>
+          </div>
+          <button class="ensayo-track-delete" title="Eliminar">&times;</button>
+        `;
+        el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
+          if (!confirm('Eliminar este sample?')) return;
+          await ensayoAPI.deletePalmaSample(item.id, item.audio_url).catch(() => {});
+          this._renderSamplesList();
         });
         container.appendChild(el);
       });
