@@ -59,6 +59,7 @@ export default class DualStreamEngine {
     this.tempo = 1.0;
     this.pitchSemitones = 0;
     this.traste_groups = new Map(); // traste_number -> voice_id[]
+    this.has_recorded_tempos = false;
 
     // Callbacks
     this.onCanteEnterListeners = [];
@@ -104,11 +105,13 @@ export default class DualStreamEngine {
 
     // Agrupar voces que tienen traste nativo grabado
     this.traste_groups = new Map();
+    this.has_recorded_tempos = false;
     canteVoicesMeta.forEach(v => {
       if (v.traste != null) {
         if (!this.traste_groups.has(v.traste)) this.traste_groups.set(v.traste, []);
         this.traste_groups.get(v.traste).push(v.id);
       }
+      if (v.recorded_tempo != null) this.has_recorded_tempos = true;
     });
 
     // Intentar cargar sampler si se proporcionaron samples
@@ -172,10 +175,23 @@ export default class DualStreamEngine {
       Math.abs(curr - targetTraste) < Math.abs(prev - targetTraste) ? curr : prev
     );
     const groupIds = this.traste_groups.get(nearest);
-    return this.canteVoices
+    const groupVoices = this.canteVoices
       .map((v, i) => ({ v, i }))
-      .filter(({ v }) => groupIds.includes(v.id))
-      .map(({ i }) => i);
+      .filter(({ v }) => groupIds.includes(v.id));
+
+    if (this.has_recorded_tempos) {
+      const tempos = [...new Set(groupVoices.map(({ v }) => v.recorded_tempo).filter(t => t != null))];
+      if (tempos.length > 0) {
+        const nearestTempo = tempos.reduce((prev, curr) =>
+          Math.abs(curr - this.tempo) < Math.abs(prev - this.tempo) ? curr : prev
+        );
+        return groupVoices
+          .filter(({ v }) => v.recorded_tempo === nearestTempo)
+          .map(({ i }) => i);
+      }
+    }
+
+    return groupVoices.map(({ i }) => i);
   }
 
   // ─── Playback ────────────────────────────────────────────────────────────────
@@ -313,8 +329,9 @@ export default class DualStreamEngine {
     }
 
     // Crear nuevo PitchShifter para esta voz
-    // La duracion real de la pista en tiempo ajustado por tempo
-    const adjustedDuration = buffer.duration / this.tempo;
+    // tempoRatio: velocidad real a aplicar al buffer para alcanzar this.tempo
+    const tempoRatio = voice.recorded_tempo != null ? this.tempo / voice.recorded_tempo : this.tempo;
+    const adjustedDuration = buffer.duration / tempoRatio;
 
     this.canteShifter = new PitchShifter(
       this.audioContext,
@@ -330,7 +347,7 @@ export default class DualStreamEngine {
       }
     );
 
-    this.canteShifter.tempo = this.tempo;
+    this.canteShifter.tempo = tempoRatio;
     this.canteShifter.pitchSemitones = voice.traste != null
       ? (this.pitchSemitones + 5) - voice.traste
       : this.pitchSemitones;
@@ -388,6 +405,9 @@ export default class DualStreamEngine {
     }
     if (this.useSampler && this.palmasSampler && this.palmasMeta) {
       this.palmasSampler.beatInterval = (60 / this.palmasMeta.bpm) / tempo;
+    }
+    if (this.has_recorded_tempos) {
+      this._reshuffleQueue();
     }
   }
 
