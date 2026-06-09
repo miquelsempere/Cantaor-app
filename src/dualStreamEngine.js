@@ -61,6 +61,11 @@ export default class DualStreamEngine {
     this.traste_groups = new Map(); // traste_number -> voice_id[]
     this.has_recorded_tempos = false;
 
+    // Carga en background
+    this._onVoiceLoadedCb = null;
+    this._loadGen = 0;
+    this.loadedVoicesCount = 0;
+
     // Callbacks
     this.onCanteEnterListeners = [];
     this.onStateChangeListeners = [];
@@ -77,33 +82,26 @@ export default class DualStreamEngine {
   // ─── Carga ───────────────────────────────────────────────────────────────────
 
   /**
-   * Carga y decodifica la pista de palmas y todas las voces del palo.
-   * Acepta opcionalmente samplesMeta ({ fuerte, suave, sorda } con audio_url) para
-   * activar el motor sampler en lugar del PitchShifter.
-   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount, usingsampler }.
+   * Carga en dos fases:
+   *   Fase 1 (critica): decodifica solo los samples (o la base de palmas si no hay samples).
+   *                     Devuelve en cuanto el play puede habilitarse.
+   *   Fase 2 (fondo):   carga las voces de cante una a una; llama _onVoiceLoadedCb por progreso.
    */
   async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
+    this._loadGen += 1;
+    const gen = this._loadGen;
+
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
-    this.selectedVoiceIds = null; // reset al cargar un palo nuevo
+    this.selectedVoiceIds = null;
     this.useSampler = false;
+    this.canteBuffers.clear();
+    this.loadedVoicesCount = 0;
 
-    // Calcular intervalo de sync points aplicando el ratio de tempo
     const rawInterval = (palmasMeta.beats_per_compas / palmasMeta.bpm) * 60;
     this.syncInterval = rawInterval / this.tempo;
 
-    // Decodificar voces y palmas base en paralelo
-    const [palmasBuffer, ...voiceBuffers] = await Promise.all([
-      this._fetchAndDecode(palmasUrl),
-      ...canteVoicesMeta.map(v => this._fetchAndDecode(v.audio_url)),
-    ]);
-
-    this.palmasBuffer = palmasBuffer;
-    canteVoicesMeta.forEach((v, i) => {
-      this.canteBuffers.set(v.id, voiceBuffers[i]);
-    });
-
-    // Agrupar voces que tienen traste nativo grabado
+    // Agrupar voces por traste/tempo (solo metadatos, sin buffers aun)
     this.traste_groups = new Map();
     this.has_recorded_tempos = false;
     canteVoicesMeta.forEach(v => {
@@ -114,11 +112,12 @@ export default class DualStreamEngine {
       if (v.recorded_tempo != null) this.has_recorded_tempos = true;
     });
 
-    // Intentar cargar sampler si se proporcionaron samples
+    // ── Fase critica ──────────────────────────────────────────────────────────
     if (samplesMeta && samplesMeta.fuerte1) {
       try {
         const entries = Object.entries(samplesMeta).filter(([, v]) => v);
         const decoded = await Promise.all(entries.map(([, url]) => this._fetchAndDecode(url)));
+        if (gen !== this._loadGen) return { palmasOk: false, voicesCount: 0, usingSampler: false };
         const sampleBuffers = {};
         entries.forEach(([hitType], i) => { sampleBuffers[hitType] = decoded[i]; });
 
@@ -134,10 +133,39 @@ export default class DualStreamEngine {
       }
     }
 
-    // Crear cola barajada de voces
+    if (!this.useSampler) {
+      this.palmasBuffer = await this._fetchAndDecode(palmasUrl);
+      if (gen !== this._loadGen) return { palmasOk: false, voicesCount: 0, usingSampler: false };
+    }
+
     this._reshuffleQueue();
 
-    return { palmasOk: !!palmasBuffer, voicesCount: canteVoicesMeta.length, usingSampler: this.useSampler };
+    // ── Fase fondo ────────────────────────────────────────────────────────────
+    this._loadInBackground(this.useSampler ? null : palmasUrl, canteVoicesMeta, gen);
+
+    return { palmasOk: true, voicesCount: 0, usingSampler: this.useSampler };
+  }
+
+  async _loadInBackground(palmasUrl, canteVoicesMeta, gen) {
+    for (let i = 0; i < canteVoicesMeta.length; i++) {
+      if (gen !== this._loadGen) return;
+      const v = canteVoicesMeta[i];
+      try {
+        const buf = await this._fetchAndDecode(v.audio_url);
+        if (gen !== this._loadGen) return;
+        this.canteBuffers.set(v.id, buf);
+        this.loadedVoicesCount++;
+        if (this._onVoiceLoadedCb) {
+          this._onVoiceLoadedCb(this.loadedVoicesCount, canteVoicesMeta.length);
+        }
+      } catch (e) {
+        console.warn(`Voz ${v.id} no pudo cargarse:`, e);
+      }
+    }
+  }
+
+  onVoiceLoadProgress(cb) {
+    this._onVoiceLoadedCb = cb;
   }
 
   async _fetchAndDecode(url) {
@@ -198,7 +226,7 @@ export default class DualStreamEngine {
 
   async play() {
     if (this.isPlaying) return;
-    if (!this.palmasBuffer) throw new Error('Carga el audio antes de reproducir.');
+    if (!this.useSampler && !this.palmasBuffer) throw new Error('Carga el audio antes de reproducir.');
 
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();

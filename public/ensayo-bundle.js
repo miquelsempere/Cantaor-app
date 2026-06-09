@@ -1465,6 +1465,11 @@ class DualStreamEngine {
     this.traste_groups = new Map(); // traste_number -> voice_id[]
     this.has_recorded_tempos = false;
 
+    // Carga en background
+    this._onVoiceLoadedCb = null;
+    this._loadGen = 0;
+    this.loadedVoicesCount = 0;
+
     // Callbacks
     this.onCanteEnterListeners = [];
     this.onStateChangeListeners = [];
@@ -1479,29 +1484,24 @@ class DualStreamEngine {
   // ─── Carga ───────────────────────────────────────────────────────────────────
 
   /**
-   * Carga y decodifica la pista de palmas y todas las voces del palo.
-   * Acepta opcionalmente samplesMeta ({ fuerte, suave, sorda } con audio_url) para
-   * activar el motor sampler en lugar del PitchShifter.
-   * Llama a esto antes de play(). Devuelve { palmasOk, voicesCount, usingsampler }.
+   * Carga en dos fases:
+   *   Fase 1 (critica): decodifica solo los samples (o la base de palmas si no hay samples).
+   *                     Devuelve en cuanto el play puede habilitarse.
+   *   Fase 2 (fondo):   carga las voces de cante una a una; llama _onVoiceLoadedCb por progreso.
    */
   async load(palmasMeta, palmasUrl, canteVoicesMeta, samplesMeta) {
+    this._loadGen += 1;
+    const gen = this._loadGen;
     this.palmasMeta = palmasMeta;
     this.canteVoices = canteVoicesMeta;
-    this.selectedVoiceIds = null; // reset al cargar un palo nuevo
+    this.selectedVoiceIds = null;
     this.useSampler = false;
-
-    // Calcular intervalo de sync points aplicando el ratio de tempo
+    this.canteBuffers.clear();
+    this.loadedVoicesCount = 0;
     const rawInterval = palmasMeta.beats_per_compas / palmasMeta.bpm * 60;
     this.syncInterval = rawInterval / this.tempo;
 
-    // Decodificar voces y palmas base en paralelo
-    const [palmasBuffer, ...voiceBuffers] = await Promise.all([this._fetchAndDecode(palmasUrl), ...canteVoicesMeta.map(v => this._fetchAndDecode(v.audio_url))]);
-    this.palmasBuffer = palmasBuffer;
-    canteVoicesMeta.forEach((v, i) => {
-      this.canteBuffers.set(v.id, voiceBuffers[i]);
-    });
-
-    // Agrupar voces que tienen traste nativo grabado
+    // Agrupar voces por traste/tempo (solo metadatos, sin buffers aun)
     this.traste_groups = new Map();
     this.has_recorded_tempos = false;
     canteVoicesMeta.forEach(v => {
@@ -1512,11 +1512,16 @@ class DualStreamEngine {
       if (v.recorded_tempo != null) this.has_recorded_tempos = true;
     });
 
-    // Intentar cargar sampler si se proporcionaron samples
+    // ── Fase critica ──────────────────────────────────────────────────────────
     if (samplesMeta && samplesMeta.fuerte1) {
       try {
         const entries = Object.entries(samplesMeta).filter(([, v]) => v);
         const decoded = await Promise.all(entries.map(([, url]) => this._fetchAndDecode(url)));
+        if (gen !== this._loadGen) return {
+          palmasOk: false,
+          voicesCount: 0,
+          usingSampler: false
+        };
         const sampleBuffers = {};
         entries.forEach(([hitType], i) => {
           sampleBuffers[hitType] = decoded[i];
@@ -1532,14 +1537,43 @@ class DualStreamEngine {
         this.useSampler = false;
       }
     }
-
-    // Crear cola barajada de voces
+    if (!this.useSampler) {
+      this.palmasBuffer = await this._fetchAndDecode(palmasUrl);
+      if (gen !== this._loadGen) return {
+        palmasOk: false,
+        voicesCount: 0,
+        usingSampler: false
+      };
+    }
     this._reshuffleQueue();
+
+    // ── Fase fondo ────────────────────────────────────────────────────────────
+    this._loadInBackground(this.useSampler ? null : palmasUrl, canteVoicesMeta, gen);
     return {
-      palmasOk: !!palmasBuffer,
-      voicesCount: canteVoicesMeta.length,
+      palmasOk: true,
+      voicesCount: 0,
       usingSampler: this.useSampler
     };
+  }
+  async _loadInBackground(palmasUrl, canteVoicesMeta, gen) {
+    for (let i = 0; i < canteVoicesMeta.length; i++) {
+      if (gen !== this._loadGen) return;
+      const v = canteVoicesMeta[i];
+      try {
+        const buf = await this._fetchAndDecode(v.audio_url);
+        if (gen !== this._loadGen) return;
+        this.canteBuffers.set(v.id, buf);
+        this.loadedVoicesCount++;
+        if (this._onVoiceLoadedCb) {
+          this._onVoiceLoadedCb(this.loadedVoicesCount, canteVoicesMeta.length);
+        }
+      } catch (e) {
+        console.warn(`Voz ${v.id} no pudo cargarse:`, e);
+      }
+    }
+  }
+  onVoiceLoadProgress(cb) {
+    this._onVoiceLoadedCb = cb;
   }
   async _fetchAndDecode(url) {
     const res = await fetch(url);
@@ -1600,7 +1634,7 @@ class DualStreamEngine {
 
   async play() {
     if (this.isPlaying) return;
-    if (!this.palmasBuffer) throw new Error('Carga el audio antes de reproducir.');
+    if (!this.useSampler && !this.palmasBuffer) throw new Error('Carga el audio antes de reproducir.');
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
@@ -11972,9 +12006,59 @@ const ensayoAPI = {
   }
 };
 
+// Suggestions board API
+const suggestionsAPI = {
+  async getSuggestions(orderBy = 'votes') {
+    const column = orderBy === 'votes' ? 'vote_count' : 'created_at';
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').select('*').order(column, {
+      ascending: false
+    });
+    if (error) throw error;
+    return data || [];
+  },
+  async createSuggestion(title, description, user) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').insert([{
+      title,
+      description,
+      user_id: user.id,
+      user_email: user.email
+    }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async getUserVotes(userId) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestion_votes').select('suggestion_id').eq('user_id', userId);
+    if (error) throw error;
+    return new Set((data || []).map(v => v.suggestion_id));
+  },
+  async vote(suggestionId, userId) {
+    const {
+      error
+    } = await supabase.from('suggestion_votes').insert([{
+      suggestion_id: suggestionId,
+      user_id: userId
+    }]);
+    if (error) throw error;
+  },
+  async unvote(suggestionId, userId) {
+    const {
+      error
+    } = await supabase.from('suggestion_votes').delete().eq('suggestion_id', suggestionId).eq('user_id', userId);
+    if (error) throw error;
+  }
+};
+
 /**
- * ensayo.js - Controlador de la pagina del Modo Ensayo
- * Conecta la UI con DualStreamEngine y EnsayoMode
+ * ensayo.js - Controlador principal de cantaor.app
  */
 
 class EnsayoApp {
@@ -11984,8 +12068,6 @@ class EnsayoApp {
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
-
-    // UI refs
     this.selectWrapper = document.getElementById('ensayoSelectWrapper');
     this.selectDisplay = document.getElementById('ensayoSelectDisplay');
     this.selectText = document.getElementById('ensayoSelectText');
@@ -12012,8 +12094,10 @@ class EnsayoApp {
     this.userBar = document.getElementById('userBar');
     this.userBarEmail = document.getElementById('userBarEmail');
     this.userBarLogout = document.getElementById('userBarLogout');
+    this.userBarLogin = document.getElementById('userBarLogin');
     this.trackSelector = document.getElementById('trackSelector');
     this.trackSelList = document.getElementById('trackSelectorList');
+    this.voiceLoadProg = document.getElementById('voiceLoadProgress');
     this.init();
   }
   async init() {
@@ -12024,6 +12108,7 @@ class EnsayoApp {
     this._setupTrackSelector();
     this._setupAdminSecretAccess();
     this._setupDebugPanel();
+    this._setupSuggestionsBoard();
     await this._loadPalos();
   }
 
@@ -12041,13 +12126,290 @@ class EnsayoApp {
       this._updateUserBar();
     });
     this.userBarLogout.addEventListener('click', () => authAPI.signOut().catch(() => {}));
+    this.userBarLogin.addEventListener('click', () => this._openAuthModal());
   }
   _updateUserBar() {
     if (this.currentUser) {
-      this.userBar.style.display = 'flex';
       this.userBarEmail.textContent = this.currentUser.email;
+      this.userBarLogout.style.display = '';
+      this.userBarLogin.style.display = 'none';
     } else {
-      this.userBar.style.display = 'none';
+      this.userBarEmail.textContent = '';
+      this.userBarLogout.style.display = 'none';
+      this.userBarLogin.style.display = '';
+    }
+    this.userBar.style.display = 'flex';
+  }
+
+  // ─── Auth modal ────────────────────────────────────────────────────────────
+
+  _setupAuthModal() {
+    this._authOverlay = document.getElementById('authModalOverlay');
+    this._authClose = document.getElementById('authModalClose');
+    this._authFormLogin = document.getElementById('authFormLogin');
+    this._authFormReg = document.getElementById('authFormRegister');
+    this._loginEmail = document.getElementById('loginEmail');
+    this._loginPass = document.getElementById('loginPassword');
+    this._loginBtn = document.getElementById('loginSubmitBtn');
+    this._regEmail = document.getElementById('registerEmail');
+    this._regPass = document.getElementById('registerPassword');
+    this._regBtn = document.getElementById('registerSubmitBtn');
+    this._authErr = document.getElementById('authError');
+    this._authErrReg = document.getElementById('authErrorRegister');
+    this._authClose.addEventListener('click', () => this._closeAuthModal());
+    this._authOverlay.addEventListener('click', e => {
+      if (e.target === this._authOverlay) this._closeAuthModal();
+    });
+    document.getElementById('switchToRegister').addEventListener('click', () => {
+      this._authFormLogin.style.display = 'none';
+      this._authFormReg.style.display = 'flex';
+      this._authErr.textContent = '';
+    });
+    document.getElementById('switchToLogin').addEventListener('click', () => {
+      this._authFormReg.style.display = 'none';
+      this._authFormLogin.style.display = 'flex';
+      this._authErrReg.textContent = '';
+    });
+    this._loginBtn.addEventListener('click', () => this._handleLogin());
+    this._regBtn.addEventListener('click', () => this._handleRegister());
+    [this._loginEmail, this._loginPass].forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') this._handleLogin();
+      });
+    });
+    [this._regEmail, this._regPass].forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') this._handleRegister();
+      });
+    });
+  }
+  _openAuthModal() {
+    if (!this._authOverlay) this._setupAuthModal();
+    this._authFormLogin.style.display = 'flex';
+    this._authFormReg.style.display = 'none';
+    this._authErr.textContent = '';
+    this._authErrReg.textContent = '';
+    this._authOverlay.classList.add('open');
+    setTimeout(() => this._loginEmail.focus(), 100);
+  }
+  _closeAuthModal() {
+    this._authOverlay.classList.remove('open');
+  }
+  async _handleLogin() {
+    const email = this._loginEmail.value.trim();
+    const pass = this._loginPass.value;
+    if (!email || !pass) {
+      this._authErr.textContent = 'Por favor completa todos los campos.';
+      return;
+    }
+    this._loginBtn.disabled = true;
+    this._authErr.textContent = '';
+    try {
+      await authAPI.signIn(email, pass);
+      this._closeAuthModal();
+    } catch (err) {
+      this._authErr.textContent = 'Email o contrasena incorrectos.';
+    } finally {
+      this._loginBtn.disabled = false;
+    }
+  }
+  async _handleRegister() {
+    const email = this._regEmail.value.trim();
+    const pass = this._regPass.value;
+    if (!email || !pass) {
+      this._authErrReg.textContent = 'Por favor completa todos los campos.';
+      return;
+    }
+    if (pass.length < 6) {
+      this._authErrReg.textContent = 'La contrasena debe tener al menos 6 caracteres.';
+      return;
+    }
+    this._regBtn.disabled = true;
+    this._authErrReg.textContent = '';
+    try {
+      const data = await authAPI.signUp(email, pass);
+      if (!data.session) {
+        document.getElementById('authModal').innerHTML = `
+          <div class="auth-confirm-pending">
+            <div class="auth-confirm-icon">&#9993;</div>
+            <h2 class="auth-modal-title">Revisa tu correo</h2>
+            <p class="auth-confirm-text">Hemos enviado un enlace de confirmacion a<br><strong>${email}</strong></p>
+            <button class="auth-submit-btn" id="confirmPendingClose">Entendido</button>
+          </div>`;
+        document.getElementById('confirmPendingClose').addEventListener('click', () => this._closeAuthModal());
+      }
+    } catch (err) {
+      this._authErrReg.textContent = err.message || 'Error al crear la cuenta.';
+    } finally {
+      this._regBtn.disabled = false;
+    }
+  }
+
+  // ─── Suggestions board ─────────────────────────────────────────────────────
+
+  _setupSuggestionsBoard() {
+    this._sugOverlay = document.getElementById('suggestionsOverlay');
+    this._sugFab = document.getElementById('suggestionsFab');
+    this._sugClose = document.getElementById('suggestionsModalClose');
+    this._sugList = document.getElementById('suggestionsList');
+    this._newSugBtn = document.getElementById('newSuggestionBtn');
+    this._newSugForm = document.getElementById('newSuggestionForm');
+    this._cancelSugBtn = document.getElementById('cancelSuggestionBtn');
+    this._submitSugBtn = document.getElementById('submitSuggestionBtn');
+    this._sugTitle = document.getElementById('suggestionTitle');
+    this._sugDesc = document.getElementById('suggestionDescription');
+    this._sugFormErr = document.getElementById('suggestionFormError');
+    this._sortVotesBtn = document.getElementById('sortByVotes');
+    this._sortDateBtn = document.getElementById('sortByDate');
+    this._sugSortOrder = 'votes';
+    this._userVotes = new Set();
+    this._sugFab.addEventListener('click', () => this._openSuggestions());
+    this._sugClose.addEventListener('click', () => this._closeSuggestions());
+    this._sugOverlay.addEventListener('click', e => {
+      if (e.target === this._sugOverlay) this._closeSuggestions();
+    });
+    this._newSugBtn.addEventListener('click', () => {
+      if (!this.currentUser) {
+        this._closeSuggestions();
+        this._openAuthModal();
+        return;
+      }
+      this._newSugForm.style.display = 'block';
+      this._newSugBtn.style.display = 'none';
+      setTimeout(() => this._sugTitle.focus(), 50);
+    });
+    this._cancelSugBtn.addEventListener('click', () => this._hideSugForm());
+    this._submitSugBtn.addEventListener('click', () => this._submitSuggestion());
+    this._sugTitle.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._submitSuggestion();
+    });
+    this._sortVotesBtn.addEventListener('click', () => {
+      this._sugSortOrder = 'votes';
+      this._sortVotesBtn.classList.add('active');
+      this._sortDateBtn.classList.remove('active');
+      this._renderSuggestions();
+    });
+    this._sortDateBtn.addEventListener('click', () => {
+      this._sugSortOrder = 'date';
+      this._sortDateBtn.classList.add('active');
+      this._sortVotesBtn.classList.remove('active');
+      this._renderSuggestions();
+    });
+  }
+  _openSuggestions() {
+    this._sugOverlay.classList.add('open');
+    this._loadSuggestions();
+  }
+  _closeSuggestions() {
+    this._sugOverlay.classList.remove('open');
+    this._hideSugForm();
+  }
+  _hideSugForm() {
+    this._newSugForm.style.display = 'none';
+    this._newSugBtn.style.display = '';
+    this._sugTitle.value = '';
+    this._sugDesc.value = '';
+    this._sugFormErr.textContent = '';
+  }
+  async _loadSuggestions() {
+    this._sugList.innerHTML = '<div class="suggestions-loading">Cargando sugerencias...</div>';
+    try {
+      this._cachedSuggestions = await suggestionsAPI.getSuggestions('votes');
+      this._userVotes = this.currentUser ? await suggestionsAPI.getUserVotes(this.currentUser.id) : new Set();
+      this._renderSuggestions();
+    } catch (err) {
+      this._sugList.innerHTML = '<div class="suggestions-empty">Error cargando sugerencias.</div>';
+    }
+  }
+  _renderSuggestions() {
+    const suggestions = [...(this._cachedSuggestions || [])];
+    if (this._sugSortOrder === 'date') {
+      suggestions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else {
+      suggestions.sort((a, b) => b.vote_count - a.vote_count);
+    }
+    if (suggestions.length === 0) {
+      this._sugList.innerHTML = '<div class="suggestions-empty">No hay sugerencias aun. Se el primero en proponer algo!</div>';
+      return;
+    }
+    this._sugList.innerHTML = '';
+    suggestions.forEach(s => {
+      const hasVoted = this._userVotes.has(s.id);
+      const card = document.createElement('div');
+      card.className = 'suggestion-card';
+      const date = new Date(s.created_at).toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      const email = s.user_email ? s.user_email.split('@')[0] : 'anonimo';
+      card.innerHTML = `
+        <button class="suggestion-vote-btn${hasVoted ? ' voted' : ''}" aria-label="Votar">
+          <svg class="vote-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+          <span class="vote-count">${s.vote_count}</span>
+        </button>
+        <div class="suggestion-body">
+          <div class="suggestion-title">${this._esc(s.title)}</div>
+          ${s.description ? `<div class="suggestion-description">${this._esc(s.description)}</div>` : ''}
+          <div class="suggestion-meta">${email} &middot; ${date}</div>
+        </div>`;
+      card.querySelector('.suggestion-vote-btn').addEventListener('click', () => this._handleVote(s.id, card.querySelector('.suggestion-vote-btn')));
+      this._sugList.appendChild(card);
+    });
+  }
+  async _handleVote(suggestionId, voteBtn) {
+    if (!this.currentUser) {
+      this._closeSuggestions();
+      this._openAuthModal();
+      return;
+    }
+    if (voteBtn.disabled) return;
+    voteBtn.disabled = true;
+    const hasVoted = this._userVotes.has(suggestionId);
+    const countEl = voteBtn.querySelector('.vote-count');
+    const current = parseInt(countEl.textContent, 10);
+    const s = (this._cachedSuggestions || []).find(x => x.id === suggestionId);
+    if (hasVoted) {
+      voteBtn.classList.remove('voted');
+      countEl.textContent = current - 1;
+      this._userVotes.delete(suggestionId);
+      if (s) s.vote_count = Math.max(0, s.vote_count - 1);
+      await suggestionsAPI.unvote(suggestionId, this.currentUser.id).catch(() => {
+        voteBtn.classList.add('voted');
+        countEl.textContent = current;
+        this._userVotes.add(suggestionId);
+      });
+    } else {
+      voteBtn.classList.add('voted');
+      countEl.textContent = current + 1;
+      this._userVotes.add(suggestionId);
+      if (s) s.vote_count = s.vote_count + 1;
+      await suggestionsAPI.vote(suggestionId, this.currentUser.id).catch(() => {
+        voteBtn.classList.remove('voted');
+        countEl.textContent = current;
+        this._userVotes.delete(suggestionId);
+      });
+    }
+    voteBtn.disabled = false;
+  }
+  async _submitSuggestion() {
+    const title = this._sugTitle.value.trim();
+    const desc = this._sugDesc.value.trim();
+    if (!title || title.length < 5) {
+      this._sugFormErr.textContent = 'El titulo debe tener al menos 5 caracteres.';
+      return;
+    }
+    this._submitSugBtn.disabled = true;
+    this._sugFormErr.textContent = '';
+    try {
+      const newSug = await suggestionsAPI.createSuggestion(title, desc, this.currentUser);
+      this._cachedSuggestions = [newSug, ...(this._cachedSuggestions || [])];
+      this._hideSugForm();
+      this._renderSuggestions();
+    } catch (err) {
+      this._sugFormErr.textContent = 'Error al enviar la sugerencia. Intentalo de nuevo.';
+    } finally {
+      this._submitSugBtn.disabled = false;
     }
   }
 
@@ -12068,21 +12430,13 @@ class EnsayoApp {
     });
   }
 
-  // ─── EnsayoMode (voz) listeners ───────────────────────────────────────────
+  // ─── EnsayoMode listeners ─────────────────────────────────────────────────
 
   _setupEnsayoListeners() {
     this.ensayo.onCommand(cmd => {
-      if (cmd === 'falseta') {
-        this._showCommandFlash('Falseta');
-      } else if (cmd === 'vamos_alla') {
-        this._showCommandFlash('Vamos alla');
-      }
+      if (cmd === 'falseta') this._showCommandFlash('Falseta');else if (cmd === 'vamos_alla') this._showCommandFlash('Vamos alla');
     });
-    this.ensayo.onVoiceStatus(status => {
-      this._updateVoiceIndicator(status);
-    });
-
-    // Si el navegador no soporta voz, deshabilitar toggle permanentemente
+    this.ensayo.onVoiceStatus(status => this._updateVoiceIndicator(status));
     if (!this.ensayo.supported) {
       this.voiceToggle.disabled = true;
       document.getElementById('voiceSublabel').innerHTML = '<span class="voice-unsupported">No disponible en este navegador (usa Chrome)</span>';
@@ -12094,46 +12448,31 @@ class EnsayoApp {
   // ─── Controles ─────────────────────────────────────────────────────────────
 
   _setupControls() {
-    // Play/Stop
     this.playBtn.addEventListener('click', () => this._handlePlayClick());
     document.addEventListener('keydown', e => {
-      if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+      if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
         e.preventDefault();
         if (!this.playBtn.disabled) this._handlePlayClick();
       }
     });
-
-    // Tempo
     this.tempoSlider.addEventListener('input', e => {
       const v = parseFloat(e.target.value);
       this.engine.setTempo(v);
       this.tempoValue.textContent = `${v.toFixed(2)}x`;
     });
-
-    // Pitch
     this.pitchSlider.addEventListener('input', e => {
       const s = parseInt(e.target.value, 10);
       this.engine.setPitchSemitones(s);
       this.pitchValue.textContent = `Traste ${s + 5}`;
     });
-
-    // Botones manuales falseta/vamos
     this.btnFalseta.addEventListener('click', () => this.ensayo.manualFalseta());
     this.btnVamos.addEventListener('click', () => this.ensayo.manualVamosAlla());
-
-    // Toggle de voz
     this.voiceToggle.addEventListener('change', e => {
-      if (e.target.checked) {
-        this.ensayo.startVoice();
-      } else {
-        this.ensayo.stopVoice();
-      }
+      if (e.target.checked) this.ensayo.startVoice();else this.ensayo.stopVoice();
     });
   }
 
-  // ─── Playback ──────────────────────────────────────────────────────────────
-
-  // ─── Selector de pistas ────────────────────────────────────────────────────
+  // ─── Track selector ────────────────────────────────────────────────────────
 
   _setupTrackSelector() {
     document.getElementById('trackSelAll').addEventListener('click', () => {
@@ -12144,9 +12483,7 @@ class EnsayoApp {
       this._applyTrackSelection();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
-      const checkboxes = [...this.trackSelList.querySelectorAll('input[type="checkbox"]')];
-      checkboxes.forEach((cb, i) => {
-        // Keep at least the first one checked
+      [...this.trackSelList.querySelectorAll('input[type="checkbox"]')].forEach((cb, i) => {
         cb.checked = i === 0;
         cb.closest('.track-check-item').classList.toggle('checked', i === 0);
       });
@@ -12160,8 +12497,6 @@ class EnsayoApp {
       return;
     }
     this.trackSelector.style.display = '';
-
-    // Group by canonical_title (falling back to title for ungrouped voices)
     const groups = new Map();
     voices.forEach(voice => {
       const key = voice.canonical_title || voice.title;
@@ -12182,9 +12517,7 @@ class EnsayoApp {
       item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
-        // Ensure at least one stays checked
-        const checked = [...this.trackSelList.querySelectorAll('input:checked')];
-        if (checked.length === 0) {
+        if ([...this.trackSelList.querySelectorAll('input:checked')].length === 0) {
           cb.checked = true;
           item.classList.add('checked');
         }
@@ -12199,8 +12532,7 @@ class EnsayoApp {
     if (checkedCbs.length === allCbs.length) {
       this.engine.setSelectedVoices(null);
     } else {
-      const ids = checkedCbs.flatMap(cb => JSON.parse(cb.dataset.ids));
-      this.engine.setSelectedVoices(ids);
+      this.engine.setSelectedVoices(checkedCbs.flatMap(cb => JSON.parse(cb.dataset.ids)));
     }
   }
   async _handlePlayClick() {
@@ -12213,9 +12545,7 @@ class EnsayoApp {
       if (!this.isLoaded) return;
       try {
         await this.engine.play();
-        if (this.voiceToggle.checked) {
-          this.ensayo.startVoice();
-        }
+        if (this.voiceToggle.checked) this.ensayo.startVoice();
       } catch (err) {
         this._showError('Error al iniciar: ' + err.message);
       }
@@ -12237,19 +12567,13 @@ class EnsayoApp {
         opt.textContent = nombre;
         opt.addEventListener('click', () => this._selectPalo(nombre, opt));
         this.selectOptions.appendChild(opt);
-
-        // Populamos datalists del admin
-        ['ensayoPaloSuggestions'].forEach(id => {
-          const dl = document.getElementById(id);
-          if (dl) {
-            const o = document.createElement('option');
-            o.value = nombre;
-            dl.appendChild(o);
-          }
-        });
+        const dl = document.getElementById('ensayoPaloSuggestions');
+        if (dl) {
+          const o = document.createElement('option');
+          o.value = nombre;
+          dl.appendChild(o);
+        }
       });
-
-      // Click en el display abre/cierra
       this.selectDisplay.addEventListener('click', e => {
         e.stopPropagation();
         this.selectOptions.classList.toggle('open');
@@ -12260,11 +12584,8 @@ class EnsayoApp {
         this.selectDisplay.classList.remove('active');
       });
       this.selectOptions.addEventListener('click', e => e.stopPropagation());
-
-      // Autoseleccionar el primero
       if (palos.length > 0) {
-        const firstOpt = this.selectOptions.querySelector('.custom-select-option');
-        await this._selectPalo(palos[0].nombre, firstOpt);
+        await this._selectPalo(palos[0].nombre, this.selectOptions.querySelector('.custom-select-option'));
       }
     } catch (err) {
       this._showError('Error cargando palos: ' + err.message);
@@ -12272,8 +12593,6 @@ class EnsayoApp {
   }
   async _selectPalo(palo, optEl) {
     if (this.engine.isPlaying) return;
-
-    // Marcar seleccionado visualmente
     this.selectOptions.querySelectorAll('.custom-select-option').forEach(o => o.classList.toggle('selected', o === optEl));
     this.selectText.textContent = palo;
     this.selectOptions.classList.remove('open');
@@ -12285,6 +12604,7 @@ class EnsayoApp {
     this._resetCanteInfo();
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
+    if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
     await this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
@@ -12301,12 +12621,8 @@ class EnsayoApp {
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         return;
       }
-
-      // Configurar tempo/pitch actuales antes de cargar
       this.engine.setTempo(parseFloat(this.tempoSlider.value));
       this.engine.setPitchSemitones(parseInt(this.pitchSlider.value, 10));
-
-      // Construir mapa de samples por hit_type si estan disponibles
       let samplesMeta = null;
       if (samplesRows.length > 0) {
         samplesMeta = {};
@@ -12314,8 +12630,7 @@ class EnsayoApp {
           samplesMeta[s.hit_type] = s.audio_url;
         });
       }
-      const loadingMsg = samplesMeta ? `Cargando ${canteVoices.length} letras + palmas + samples...` : `Cargando ${canteVoices.length} letras + palmas...`;
-      this._showLoading(loadingMsg);
+      this._showLoading('Cargando palmas...');
       const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
       this.isLoaded = true;
       this._hideLoading();
@@ -12324,9 +12639,19 @@ class EnsayoApp {
       this._buildDebugBeatGrid();
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
-      if (result.usingSampler) {
-        this._showCommandFlash('Sampler activo');
+
+      // Background voice load progress indicator
+      const total = canteVoices.length;
+      if ((this.engine.loadedVoicesCount || 0) < total && this.voiceLoadProg) {
+        this.voiceLoadProg.textContent = `Letras cargando: 0/${total}`;
+        this.engine.onVoiceLoadProgress((n, t) => {
+          if (this.currentPalo !== palo) return;
+          if (this.voiceLoadProg) {
+            this.voiceLoadProg.textContent = n >= t ? '' : `Letras cargando: ${n}/${t}`;
+          }
+        });
       }
+      if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
       this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
@@ -12378,20 +12703,18 @@ class EnsayoApp {
     }
   }
   _updateVoiceIndicator(status) {
-    const dot = this.voiceDot;
-    const txt = this.voiceStatusTxt;
-    dot.className = 'voice-dot';
+    this.voiceDot.className = 'voice-dot';
     if (status === 'listening') {
-      dot.classList.add('on');
-      txt.textContent = 'Escuchando...';
+      this.voiceDot.classList.add('on');
+      this.voiceStatusTxt.textContent = 'Escuchando...';
     } else if (status === 'falseta') {
-      dot.classList.add('falseta');
-      txt.textContent = 'Falseta detectada';
+      this.voiceDot.classList.add('falseta');
+      this.voiceStatusTxt.textContent = 'Falseta detectada';
     } else if (status === 'error') {
-      dot.classList.add('error');
-      txt.textContent = 'Error de microfono';
+      this.voiceDot.classList.add('error');
+      this.voiceStatusTxt.textContent = 'Error de microfono';
     } else {
-      txt.textContent = 'Voz desactivada';
+      this.voiceStatusTxt.textContent = 'Voz desactivada';
     }
   }
   _resetCanteInfo() {
@@ -12416,17 +12739,7 @@ class EnsayoApp {
     this.commandFlash.textContent = text;
     this.commandFlash.classList.add('show');
     clearTimeout(this._flashTimer);
-    this._flashTimer = setTimeout(() => {
-      this.commandFlash.classList.remove('show');
-    }, 2500);
-  }
-  _showCommandFlash(text) {
-    this.commandFlash.textContent = text;
-    this.commandFlash.classList.add('show');
-    clearTimeout(this._flashTimer);
-    this._flashTimer = setTimeout(() => {
-      this.commandFlash.classList.remove('show');
-    }, 2500);
+    this._flashTimer = setTimeout(() => this.commandFlash.classList.remove('show'), 2500);
   }
 
   // ─── Debug panel ──────────────────────────────────────────────────────────
@@ -12434,9 +12747,8 @@ class EnsayoApp {
   _setupDebugPanel() {
     this._debugVisible = false;
     this._debugRaf = null;
-    this._fuerte1Timestamps = []; // performance.now() of last fuerte1 hits
-    this._canteLog = []; // { title, actualTime, devMs }
-
+    this._fuerte1Timestamps = [];
+    this._canteLog = [];
     let typed = '';
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -12460,9 +12772,7 @@ class EnsayoApp {
       this._updateDebugStatic();
       this._renderCanteLog();
       if (this.engine.isPlaying) this._startDebugRaf();
-    } else {
-      this._stopDebugRaf();
-    }
+    } else this._stopDebugRaf();
   }
   _updateDebugStatic() {
     if (!this._debugVisible) return;
@@ -12485,7 +12795,7 @@ class EnsayoApp {
       const cell = document.createElement('div');
       cell.className = 'debug-beat-cell' + (hitType.startsWith('fuerte') ? ' strong' : '');
       cell.id = `dbgBeat${i}`;
-      const beat = offset % 1 === 0 ? `T${offset + 1}` : `T${Math.floor(offset) + 1}½`;
+      const beat = offset % 1 === 0 ? `T${offset + 1}` : `T${Math.floor(offset) + 1}\u00bd`;
       cell.innerHTML = `<div class="dbc-label">${beat}</div><div class="dbc-type">${hitType}</div>`;
       grid.appendChild(cell);
     });
@@ -12521,8 +12831,7 @@ class EnsayoApp {
     const avgIntervalMs = (ts[ts.length - 1] - ts[0]) / (ts.length - 1);
     const compassBeats = this.engine.palmasSampler ? this.engine.palmasSampler.compassBeats : 4;
     const measured = (60000 * compassBeats / avgIntervalMs).toFixed(1);
-    const configured = this.engine.getDebugInfo().bpm;
-    const diff = Math.abs(parseFloat(measured) - configured);
+    const diff = Math.abs(parseFloat(measured) - this.engine.getDebugInfo().bpm);
     el.textContent = measured;
     el.className = 'debug-val ' + (diff < 1 ? 'ok' : diff < 3 ? 'warn' : 'bad');
   }
@@ -12531,10 +12840,8 @@ class EnsayoApp {
     const actual = info.currentTime;
     let devMs = null;
     if (info.palmasStartTime && info.syncInterval) {
-      const elapsed = actual - info.palmasStartTime;
-      const n = Math.round(elapsed / info.syncInterval);
-      const expected = info.palmasStartTime + n * info.syncInterval;
-      devMs = Math.round((actual - expected) * 1000);
+      const n = Math.round((actual - info.palmasStartTime) / info.syncInterval);
+      devMs = Math.round((actual - (info.palmasStartTime + n * info.syncInterval)) * 1000);
     }
     const now = new Date();
     const ts = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
@@ -12560,7 +12867,7 @@ class EnsayoApp {
         const sign = entry.devMs >= 0 ? '+' : '';
         devHtml = ` <span class="${cls}">${sign}${entry.devMs}ms</span>`;
       }
-      return `<div class="debug-log-entry">${entry.ts} [t=${entry.actualTime}s]${devHtml} — ${entry.title}</div>`;
+      return `<div class="debug-log-entry">${entry.ts} [t=${entry.actualTime}s]${devHtml} &mdash; ${entry.title}</div>`;
     }).join('');
   }
   _startDebugRaf() {
@@ -12604,7 +12911,6 @@ class EnsayoApp {
     });
   }
   _setupAdminPanel() {
-    // Tabs
     document.querySelectorAll('.admin-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
@@ -12613,63 +12919,40 @@ class EnsayoApp {
         document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).classList.add('active');
       });
     });
-
-    // Palmas upload
-    const palmasFileBtn = document.getElementById('palmasFileBtn');
     const palmasAudioInput = document.getElementById('palmasAudioInput');
-    const palmasFileName = document.getElementById('palmasFileName');
-    const palmasUploadBtn = document.getElementById('palmasUploadBtn');
-    palmasFileBtn.addEventListener('click', () => palmasAudioInput.click());
+    document.getElementById('palmasFileBtn').addEventListener('click', () => palmasAudioInput.click());
     palmasAudioInput.addEventListener('change', () => {
-      const f = palmasAudioInput.files[0];
-      palmasFileName.textContent = f ? f.name : 'Ningun archivo';
+      document.getElementById('palmasFileName').textContent = palmasAudioInput.files[0]?.name || 'Ningun archivo';
       this._validatePalmasForm();
     });
-    ['palmasPalo', 'palmasTitle', 'palmasBpm', 'palmasBeats'].forEach(id => {
-      document.getElementById(id).addEventListener('input', () => this._validatePalmasForm());
-    });
-    palmasUploadBtn.addEventListener('click', () => this._handlePalmasUpload());
-
-    // Voces upload
-    const vocesFileBtn = document.getElementById('vocesFileBtn');
+    ['palmasPalo', 'palmasTitle', 'palmasBpm', 'palmasBeats'].forEach(id => document.getElementById(id).addEventListener('input', () => this._validatePalmasForm()));
+    document.getElementById('palmasUploadBtn').addEventListener('click', () => this._handlePalmasUpload());
     const vocesAudioInput = document.getElementById('vocesAudioInput');
-    const vocesFileName = document.getElementById('vocesFileName');
-    const vocesUploadBtn = document.getElementById('vocesUploadBtn');
-    vocesFileBtn.addEventListener('click', () => vocesAudioInput.click());
+    document.getElementById('vocesFileBtn').addEventListener('click', () => vocesAudioInput.click());
     vocesAudioInput.addEventListener('change', () => {
-      const f = vocesAudioInput.files[0];
-      vocesFileName.textContent = f ? f.name : 'Ningun archivo';
+      document.getElementById('vocesFileName').textContent = vocesAudioInput.files[0]?.name || 'Ningun archivo';
       this._validateVocesForm();
     });
-    ['vocesPalo', 'vocesTitle'].forEach(id => {
-      document.getElementById(id).addEventListener('input', () => this._validateVocesForm());
-    });
-    vocesUploadBtn.addEventListener('click', () => this._handleVocesUpload());
-
-    // Samples upload
-    const samplesFileBtn = document.getElementById('samplesFileBtn');
+    ['vocesPalo', 'vocesTitle'].forEach(id => document.getElementById(id).addEventListener('input', () => this._validateVocesForm()));
+    document.getElementById('vocesUploadBtn').addEventListener('click', () => this._handleVocesUpload());
     const samplesAudioInput = document.getElementById('samplesAudioInput');
-    const samplesFileName = document.getElementById('samplesFileName');
-    const samplesUploadBtn = document.getElementById('samplesUploadBtn');
-    samplesFileBtn.addEventListener('click', () => samplesAudioInput.click());
+    document.getElementById('samplesFileBtn').addEventListener('click', () => samplesAudioInput.click());
     samplesAudioInput.addEventListener('change', () => {
-      const f = samplesAudioInput.files[0];
-      samplesFileName.textContent = f ? f.name : 'Ningun archivo';
+      document.getElementById('samplesFileName').textContent = samplesAudioInput.files[0]?.name || 'Ningun archivo';
       this._validateSamplesForm();
     });
     document.getElementById('samplesPalo').addEventListener('input', () => this._validateSamplesForm());
-    samplesUploadBtn.addEventListener('click', () => this._handleSamplesUpload());
-
-    // Cargar listas
+    document.getElementById('samplesUploadBtn').addEventListener('click', () => this._handleSamplesUpload());
     this._loadAdminLists();
   }
   _validatePalmasForm() {
-    const ok = document.getElementById('palmasPalo').value.trim() && document.getElementById('palmasTitle').value.trim() && document.getElementById('palmasBpm').value && document.getElementById('palmasBeats').value && document.getElementById('palmasAudioInput').files.length > 0;
-    document.getElementById('palmasUploadBtn').disabled = !ok;
+    document.getElementById('palmasUploadBtn').disabled = !(document.getElementById('palmasPalo').value.trim() && document.getElementById('palmasTitle').value.trim() && document.getElementById('palmasBpm').value && document.getElementById('palmasBeats').value && document.getElementById('palmasAudioInput').files.length > 0);
   }
   _validateVocesForm() {
-    const ok = document.getElementById('vocesPalo').value.trim() && document.getElementById('vocesTitle').value.trim() && document.getElementById('vocesAudioInput').files.length > 0;
-    document.getElementById('vocesUploadBtn').disabled = !ok;
+    document.getElementById('vocesUploadBtn').disabled = !(document.getElementById('vocesPalo').value.trim() && document.getElementById('vocesTitle').value.trim() && document.getElementById('vocesAudioInput').files.length > 0);
+  }
+  _validateSamplesForm() {
+    document.getElementById('samplesUploadBtn').disabled = !(document.getElementById('samplesPalo').value.trim() && document.getElementById('samplesAudioInput').files.length > 0);
   }
   async _handlePalmasUpload() {
     const palo = document.getElementById('palmasPalo').value.trim();
@@ -12677,26 +12960,25 @@ class EnsayoApp {
     const bpm = document.getElementById('palmasBpm').value;
     const beats = document.getElementById('palmasBeats').value;
     const file = document.getElementById('palmasAudioInput').files[0];
-    const statusEl = document.getElementById('palmasUploadStatus');
+    const status = document.getElementById('palmasUploadStatus');
     document.getElementById('palmasUploadBtn').disabled = true;
-    statusEl.textContent = 'Subiendo...';
-    statusEl.className = 'upload-status uploading';
+    status.textContent = 'Subiendo...';
+    status.className = 'upload-status uploading';
     try {
       await ensayoAPI.uploadAndCreatePalmasBase(file, palo, title, bpm, beats);
-      statusEl.textContent = 'Base de palmas subida correctamente';
-      statusEl.className = 'upload-status success';
-      document.getElementById('palmasPalo').value = '';
-      document.getElementById('palmasTitle').value = '';
+      status.textContent = 'Base de palmas subida correctamente';
+      status.className = 'upload-status success';
+      ['palmasPalo', 'palmasTitle'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('palmasAudioInput').value = '';
       document.getElementById('palmasFileName').textContent = 'Ningun archivo';
       this._loadAdminLists();
       setTimeout(() => {
-        statusEl.textContent = '';
-        statusEl.className = 'upload-status';
+        status.textContent = '';
+        status.className = 'upload-status';
       }, 3000);
     } catch (err) {
-      statusEl.textContent = 'Error: ' + err.message;
-      statusEl.className = 'upload-status error';
+      status.textContent = 'Error: ' + err.message;
+      status.className = 'upload-status error';
       document.getElementById('palmasUploadBtn').disabled = false;
     }
   }
@@ -12704,149 +12986,128 @@ class EnsayoApp {
     const palo = document.getElementById('vocesPalo').value.trim();
     const title = document.getElementById('vocesTitle').value.trim();
     const file = document.getElementById('vocesAudioInput').files[0];
-    const statusEl = document.getElementById('vocesUploadStatus');
+    const status = document.getElementById('vocesUploadStatus');
     document.getElementById('vocesUploadBtn').disabled = true;
-    statusEl.textContent = 'Subiendo...';
-    statusEl.className = 'upload-status uploading';
+    status.textContent = 'Subiendo...';
+    status.className = 'upload-status uploading';
     try {
       await ensayoAPI.uploadAndCreateCanteVoice(file, palo, title);
-      statusEl.textContent = 'Voz de cante subida correctamente';
-      statusEl.className = 'upload-status success';
-      document.getElementById('vocesPalo').value = '';
-      document.getElementById('vocesTitle').value = '';
+      status.textContent = 'Voz de cante subida correctamente';
+      status.className = 'upload-status success';
+      ['vocesPalo', 'vocesTitle'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('vocesAudioInput').value = '';
       document.getElementById('vocesFileName').textContent = 'Ningun archivo';
       this._loadAdminLists();
       setTimeout(() => {
-        statusEl.textContent = '';
-        statusEl.className = 'upload-status';
+        status.textContent = '';
+        status.className = 'upload-status';
       }, 3000);
     } catch (err) {
-      statusEl.textContent = 'Error: ' + err.message;
-      statusEl.className = 'upload-status error';
+      status.textContent = 'Error: ' + err.message;
+      status.className = 'upload-status error';
       document.getElementById('vocesUploadBtn').disabled = false;
+    }
+  }
+  async _handleSamplesUpload() {
+    const palo = document.getElementById('samplesPalo').value.trim();
+    const hitType = document.getElementById('samplesHitType').value;
+    const file = document.getElementById('samplesAudioInput').files[0];
+    const status = document.getElementById('samplesUploadStatus');
+    document.getElementById('samplesUploadBtn').disabled = true;
+    status.textContent = 'Subiendo...';
+    status.className = 'upload-status uploading';
+    try {
+      await ensayoAPI.uploadAndCreatePalmaSample(file, palo, hitType);
+      status.textContent = `Sample "${hitType}" para ${palo} subido`;
+      status.className = 'upload-status success';
+      document.getElementById('samplesPalo').value = '';
+      document.getElementById('samplesAudioInput').value = '';
+      document.getElementById('samplesFileName').textContent = 'Ningun archivo';
+      this._renderSamplesList();
+      setTimeout(() => {
+        status.textContent = '';
+        status.className = 'upload-status';
+      }, 3000);
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+      status.className = 'upload-status error';
+      document.getElementById('samplesUploadBtn').disabled = false;
     }
   }
   async _loadAdminLists() {
     await Promise.all([this._renderPalmasList(), this._renderVocesList(), this._renderSamplesList()]);
   }
   async _renderPalmasList() {
-    const container = document.getElementById('palmasList');
+    const c = document.getElementById('palmasList');
     try {
       const items = await ensayoAPI.getAllPalmasBases();
       if (items.length === 0) {
-        container.innerHTML = '<div class="no-data-msg">No hay bases de palmas subidas aun</div>';
+        c.innerHTML = '<div class="no-data-msg">No hay bases de palmas subidas aun</div>';
         return;
       }
-      container.innerHTML = '';
+      c.innerHTML = '';
       items.forEach(item => {
         const el = document.createElement('div');
         el.className = 'ensayo-track-item';
-        el.innerHTML = `
-          <div>
-            <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.title)}</div>
-            <div class="ensayo-track-meta">${item.bpm} BPM · ${item.beats_per_compas} tiempos/compas</div>
-          </div>
-          <button class="ensayo-track-delete" title="Eliminar">&times;</button>
-        `;
+        el.innerHTML = `<div><div><strong>${this._esc(item.palo)}</strong> &mdash; ${this._esc(item.title)}</div><div class="ensayo-track-meta">${item.bpm} BPM &middot; ${item.beats_per_compas} tiempos/compas</div></div><button class="ensayo-track-delete" title="Eliminar">&times;</button>`;
         el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
           if (!confirm('Eliminar esta base de palmas?')) return;
           await ensayoAPI.deletePalmasBase(item.id, item.audio_url).catch(() => {});
           this._renderPalmasList();
         });
-        container.appendChild(el);
+        c.appendChild(el);
       });
     } catch (e) {
-      container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
+      c.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
     }
   }
   async _renderVocesList() {
-    const container = document.getElementById('vocesList');
+    const c = document.getElementById('vocesList');
     try {
       const items = await ensayoAPI.getAllCanteVoices();
       if (items.length === 0) {
-        container.innerHTML = '<div class="no-data-msg">No hay voces de cante subidas aun</div>';
+        c.innerHTML = '<div class="no-data-msg">No hay voces de cante subidas aun</div>';
         return;
       }
-      container.innerHTML = '';
+      c.innerHTML = '';
       items.forEach(item => {
         const el = document.createElement('div');
         el.className = 'ensayo-track-item';
-        el.innerHTML = `
-          <div>
-            <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.title)}</div>
-          </div>
-          <button class="ensayo-track-delete" title="Eliminar">&times;</button>
-        `;
+        el.innerHTML = `<div><div><strong>${this._esc(item.palo)}</strong> &mdash; ${this._esc(item.title)}</div></div><button class="ensayo-track-delete" title="Eliminar">&times;</button>`;
         el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
           if (!confirm('Eliminar esta voz de cante?')) return;
           await ensayoAPI.deleteCanteVoice(item.id, item.audio_url).catch(() => {});
           this._renderVocesList();
         });
-        container.appendChild(el);
+        c.appendChild(el);
       });
     } catch (e) {
-      container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
-    }
-  }
-  _validateSamplesForm() {
-    const ok = document.getElementById('samplesPalo').value.trim() && document.getElementById('samplesAudioInput').files.length > 0;
-    document.getElementById('samplesUploadBtn').disabled = !ok;
-  }
-  async _handleSamplesUpload() {
-    const palo = document.getElementById('samplesPalo').value.trim();
-    const hitType = document.getElementById('samplesHitType').value;
-    const file = document.getElementById('samplesAudioInput').files[0];
-    const statusEl = document.getElementById('samplesUploadStatus');
-    document.getElementById('samplesUploadBtn').disabled = true;
-    statusEl.textContent = 'Subiendo...';
-    statusEl.className = 'upload-status uploading';
-    try {
-      await ensayoAPI.uploadAndCreatePalmaSample(file, palo, hitType);
-      statusEl.textContent = `Sample "${hitType}" para ${palo} subido correctamente`;
-      statusEl.className = 'upload-status success';
-      document.getElementById('samplesPalo').value = '';
-      document.getElementById('samplesAudioInput').value = '';
-      document.getElementById('samplesFileName').textContent = 'Ningun archivo';
-      this._renderSamplesList();
-      setTimeout(() => {
-        statusEl.textContent = '';
-        statusEl.className = 'upload-status';
-      }, 3000);
-    } catch (err) {
-      statusEl.textContent = 'Error: ' + err.message;
-      statusEl.className = 'upload-status error';
-      document.getElementById('samplesUploadBtn').disabled = false;
+      c.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
     }
   }
   async _renderSamplesList() {
-    const container = document.getElementById('samplesList');
-    if (!container) return;
+    const c = document.getElementById('samplesList');
+    if (!c) return;
     try {
       const items = await ensayoAPI.getAllPalmasSamples();
       if (items.length === 0) {
-        container.innerHTML = '<div class="no-data-msg">No hay samples subidos aun</div>';
+        c.innerHTML = '<div class="no-data-msg">No hay samples subidos aun</div>';
         return;
       }
-      container.innerHTML = '';
+      c.innerHTML = '';
       items.forEach(item => {
         const el = document.createElement('div');
         el.className = 'ensayo-track-item';
-        el.innerHTML = `
-          <div>
-            <div><strong>${this._esc(item.palo)}</strong> — ${this._esc(item.hit_type)}</div>
-          </div>
-          <button class="ensayo-track-delete" title="Eliminar">&times;</button>
-        `;
+        el.innerHTML = `<div><div><strong>${this._esc(item.palo)}</strong> &mdash; ${this._esc(item.hit_type)}</div></div><button class="ensayo-track-delete" title="Eliminar">&times;</button>`;
         el.querySelector('.ensayo-track-delete').addEventListener('click', async () => {
           if (!confirm('Eliminar este sample?')) return;
           await ensayoAPI.deletePalmaSample(item.id, item.audio_url).catch(() => {});
           this._renderSamplesList();
         });
-        container.appendChild(el);
+        c.appendChild(el);
       });
     } catch (e) {
-      container.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
+      c.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
     }
   }
   _esc(str) {
