@@ -12062,7 +12062,7 @@ class EnsayoApp {
       this._updateFalsetaUI(falseta);
     });
     this.engine.onCanteEnter(voice => {
-      this.canteTitle.textContent = voice.title;
+      this.canteTitle.textContent = voice.canonical_title || voice.title;
       this.canteTitle.classList.remove('empty');
       this._recordCanteEntry(voice);
     });
@@ -12160,18 +12160,26 @@ class EnsayoApp {
       return;
     }
     this.trackSelector.style.display = '';
+
+    // Group by canonical_title (falling back to title for ungrouped voices)
+    const groups = new Map();
     voices.forEach(voice => {
+      const key = voice.canonical_title || voice.title;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(voice.id);
+    });
+    groups.forEach((ids, label) => {
       const item = document.createElement('label');
       item.className = 'track-check-item checked';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = true;
-      cb.dataset.id = voice.id;
-      const title = document.createElement('span');
-      title.className = 'track-check-title';
-      title.textContent = voice.title;
+      cb.dataset.ids = JSON.stringify(ids);
+      const titleEl = document.createElement('span');
+      titleEl.className = 'track-check-title';
+      titleEl.textContent = label;
       item.appendChild(cb);
-      item.appendChild(title);
+      item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
         // Ensure at least one stays checked
@@ -12186,12 +12194,13 @@ class EnsayoApp {
     });
   }
   _applyTrackSelection() {
-    const checked = [...this.trackSelList.querySelectorAll('input:checked')];
-    const allCount = this.trackSelList.querySelectorAll('input').length;
-    if (checked.length === allCount) {
+    const allCbs = [...this.trackSelList.querySelectorAll('input')];
+    const checkedCbs = allCbs.filter(cb => cb.checked);
+    if (checkedCbs.length === allCbs.length) {
       this.engine.setSelectedVoices(null);
     } else {
-      this.engine.setSelectedVoices(checked.map(cb => cb.dataset.id));
+      const ids = checkedCbs.flatMap(cb => JSON.parse(cb.dataset.ids));
+      this.engine.setSelectedVoices(ids);
     }
   }
   async _handlePlayClick() {
@@ -12530,7 +12539,7 @@ class EnsayoApp {
     const now = new Date();
     const ts = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
     this._canteLog.push({
-      title: voice.title,
+      title: voice.canonical_title || voice.title,
       actualTime: actual.toFixed(3),
       devMs,
       ts
