@@ -436,15 +436,51 @@ export const ensayoAPI = {
 
 // Suggestions board API
 export const suggestionsAPI = {
-  async getSuggestions(orderBy = 'votes') {
+  async getSuggestions(orderBy = 'votes', statusFilter = null) {
     const column = orderBy === 'votes' ? 'vote_count' : 'created_at';
-    const { data, error } = await supabase
+    let query = supabase
       .from('suggestions')
       .select('*')
       .order(column, { ascending: false });
 
+    if (statusFilter) query = query.eq('status', statusFilter);
+
+    const { data, error } = await query;
     if (error) throw error;
     return data || [];
+  },
+
+  async getTopSuggestions(limit = 3) {
+    const { data, error } = await supabase
+      .from('suggestions')
+      .select('id, title, vote_count, status')
+      .in('status', ['open', 'in_progress'])
+      .order('vote_count', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getRecentlyDone(limit = 1) {
+    const { data, error } = await supabase
+      .from('suggestions')
+      .select('id, title, updated_at')
+      .eq('status', 'done')
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async updateSuggestionStatus(id, status) {
+    const { error } = await supabase
+      .from('suggestions')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) throw error;
   },
 
   async createSuggestion(title, description, user) {

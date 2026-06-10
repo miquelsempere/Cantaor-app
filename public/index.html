@@ -346,6 +346,22 @@
             </div>
         </div>
 
+        <!-- Community strip — always visible, loaded on init -->
+        <div id="communityStrip" class="community-strip" style="display:none">
+            <div class="community-strip-header">
+                <div>
+                    <div class="community-strip-title">Construyendo juntos</div>
+                    <div class="community-strip-subtitle">Las propuestas mas votadas de la comunidad</div>
+                </div>
+                <button class="community-see-all-btn" id="communityOpenModal">Ver todas y proponer &rarr;</button>
+            </div>
+            <div class="recently-done-ticker" id="recentlyDoneTicker" style="display:none">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Recien implementado: </span><strong id="recentlyDoneTitle"></strong>
+            </div>
+            <div class="community-mini-cards" id="communityMiniCards"></div>
+        </div>
+
         <div id="ensayoAdminSection" style="display:none">
             <div class="ensayo-admin-section">
                 <div class="ensayo-admin-title">Gestion de contenido</div>
@@ -353,6 +369,7 @@
                     <button class="admin-tab-btn active" data-tab="palmas">Bases de palmas</button>
                     <button class="admin-tab-btn" data-tab="voces">Voces de cante</button>
                     <button class="admin-tab-btn" data-tab="samples">Samples</button>
+                    <button class="admin-tab-btn" data-tab="sugerencias">Sugerencias</button>
                 </div>
                 <div class="admin-tab-panel active" id="tabPalmas">
                     <div class="admin-form" style="margin-bottom:1rem">
@@ -386,6 +403,9 @@
                         <div id="samplesUploadStatus" class="upload-status"></div>
                     </div>
                     <div id="samplesList"></div>
+                </div>
+                <div class="admin-tab-panel" id="tabSugerencias">
+                    <div id="adminSuggestionsList"></div>
                 </div>
             </div>
         </div>
@@ -445,6 +465,7 @@
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>Sugerencias</span>
+        <span class="fab-badge" id="fabBadge" style="display:none"></span>
     </button>
 
     <!-- Suggestions Modal -->
@@ -463,6 +484,11 @@
                     <button class="sort-btn" id="sortByDate">Mas recientes</button>
                 </div>
                 <button class="new-suggestion-btn" id="newSuggestionBtn">+ Nueva sugerencia</button>
+            </div>
+            <div class="suggestions-status-filter">
+                <button class="status-filter-btn active" data-status="all" id="sfAll">Todas</button>
+                <button class="status-filter-btn" data-status="in_progress" id="sfInProgress">En curso</button>
+                <button class="status-filter-btn" data-status="done" id="sfDone">Completadas</button>
             </div>
             <div class="new-suggestion-form" id="newSuggestionForm" style="display:none">
                 <div class="form-group"><label for="suggestionTitle">Titulo *</label><input type="text" id="suggestionTitle" class="form-input" placeholder="Ej: Anadir palo de Soleares" maxlength="120"></div>

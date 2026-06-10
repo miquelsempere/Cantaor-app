@@ -12008,16 +12008,46 @@ const ensayoAPI = {
 
 // Suggestions board API
 const suggestionsAPI = {
-  async getSuggestions(orderBy = 'votes') {
+  async getSuggestions(orderBy = 'votes', statusFilter = null) {
     const column = orderBy === 'votes' ? 'vote_count' : 'created_at';
+    let query = supabase.from('suggestions').select('*').order(column, {
+      ascending: false
+    });
+    if (statusFilter) query = query.eq('status', statusFilter);
     const {
       data,
       error
-    } = await supabase.from('suggestions').select('*').order(column, {
-      ascending: false
-    });
+    } = await query;
     if (error) throw error;
     return data || [];
+  },
+  async getTopSuggestions(limit = 3) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').select('id, title, vote_count, status').in('status', ['open', 'in_progress']).order('vote_count', {
+      ascending: false
+    }).limit(limit);
+    if (error) throw error;
+    return data || [];
+  },
+  async getRecentlyDone(limit = 1) {
+    const {
+      data,
+      error
+    } = await supabase.from('suggestions').select('id, title, updated_at').eq('status', 'done').order('updated_at', {
+      ascending: false
+    }).limit(limit);
+    if (error) throw error;
+    return data || [];
+  },
+  async updateSuggestionStatus(id, status) {
+    const {
+      error
+    } = await supabase.from('suggestions').update({
+      status
+    }).eq('id', id);
+    if (error) throw error;
   },
   async createSuggestion(title, description, user) {
     const {
@@ -12098,6 +12128,7 @@ class EnsayoApp {
     this.trackSelector = document.getElementById('trackSelector');
     this.trackSelList = document.getElementById('trackSelectorList');
     this.voiceLoadProg = document.getElementById('voiceLoadProgress');
+    this._fabBadge = document.getElementById('fabBadge');
     this.init();
   }
   async init() {
@@ -12109,6 +12140,7 @@ class EnsayoApp {
     this._setupAdminSecretAccess();
     this._setupDebugPanel();
     this._setupSuggestionsBoard();
+    this._loadCommunityStrip();
     await this._loadPalos();
   }
 
@@ -12262,8 +12294,10 @@ class EnsayoApp {
     this._sortVotesBtn = document.getElementById('sortByVotes');
     this._sortDateBtn = document.getElementById('sortByDate');
     this._sugSortOrder = 'votes';
+    this._sugStatusFilter = 'all';
     this._userVotes = new Set();
     this._sugFab.addEventListener('click', () => this._openSuggestions());
+    document.getElementById('communityOpenModal')?.addEventListener('click', () => this._openSuggestions());
     this._sugClose.addEventListener('click', () => this._closeSuggestions());
     this._sugOverlay.addEventListener('click', e => {
       if (e.target === this._sugOverlay) this._closeSuggestions();
@@ -12295,10 +12329,24 @@ class EnsayoApp {
       this._sortVotesBtn.classList.remove('active');
       this._renderSuggestions();
     });
+
+    // Status filter tabs
+    ['sfAll', 'sfInProgress', 'sfDone'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        this._sugStatusFilter = btn.dataset.status;
+        document.querySelectorAll('.status-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this._loadSuggestions();
+      });
+    });
   }
   _openSuggestions() {
     this._sugOverlay.classList.add('open');
     this._loadSuggestions();
+    sessionStorage.setItem('sug_seen', '1');
+    this._sugFab.classList.remove('has-unread');
   }
   _closeSuggestions() {
     this._sugOverlay.classList.remove('open');
@@ -12314,7 +12362,8 @@ class EnsayoApp {
   async _loadSuggestions() {
     this._sugList.innerHTML = '<div class="suggestions-loading">Cargando sugerencias...</div>';
     try {
-      this._cachedSuggestions = await suggestionsAPI.getSuggestions('votes');
+      const statusFilter = this._sugStatusFilter === 'all' ? null : this._sugStatusFilter;
+      this._cachedSuggestions = await suggestionsAPI.getSuggestions('votes', statusFilter);
       this._userVotes = this.currentUser ? await suggestionsAPI.getUserVotes(this.currentUser.id) : new Set();
       this._renderSuggestions();
     } catch (err) {
@@ -12343,13 +12392,18 @@ class EnsayoApp {
         year: 'numeric'
       });
       const email = s.user_email ? s.user_email.split('@')[0] : 'anonimo';
+      const statusMap = {
+        in_progress: ['En curso', 'status-badge--progress'],
+        done: ['Completada', 'status-badge--done']
+      };
+      const statusBadge = s.status && statusMap[s.status] ? `<span class="status-badge ${statusMap[s.status][1]}">${statusMap[s.status][0]}</span>` : '';
       card.innerHTML = `
         <button class="suggestion-vote-btn${hasVoted ? ' voted' : ''}" aria-label="Votar">
           <svg class="vote-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
           <span class="vote-count">${s.vote_count}</span>
         </button>
         <div class="suggestion-body">
-          <div class="suggestion-title">${this._esc(s.title)}</div>
+          <div class="suggestion-title-row">${statusBadge}<span class="suggestion-title">${this._esc(s.title)}</span></div>
           ${s.description ? `<div class="suggestion-description">${this._esc(s.description)}</div>` : ''}
           <div class="suggestion-meta">${email} &middot; ${date}</div>
         </div>`;
@@ -12391,6 +12445,7 @@ class EnsayoApp {
       });
     }
     voteBtn.disabled = false;
+    this._loadCommunityStrip();
   }
   async _submitSuggestion() {
     const title = this._sugTitle.value.trim();
@@ -12406,11 +12461,73 @@ class EnsayoApp {
       this._cachedSuggestions = [newSug, ...(this._cachedSuggestions || [])];
       this._hideSugForm();
       this._renderSuggestions();
+      this._loadCommunityStrip();
     } catch (err) {
       this._sugFormErr.textContent = 'Error al enviar la sugerencia. Intentalo de nuevo.';
     } finally {
       this._submitSugBtn.disabled = false;
     }
+  }
+
+  // ─── Community strip ───────────────────────────────────────────────────────
+
+  async _loadCommunityStrip() {
+    try {
+      const [topSugs, recentDone] = await Promise.all([suggestionsAPI.getTopSuggestions(3), suggestionsAPI.getRecentlyDone(1)]);
+      this._renderCommunityStrip(topSugs);
+      if (recentDone.length > 0) this._renderRecentlyDoneTicker(recentDone[0]);
+
+      // Update FAB badge with total active suggestions count
+      const totalActive = topSugs.length;
+      if (this._fabBadge) {
+        const allSugs = await suggestionsAPI.getSuggestions('votes');
+        const total = allSugs.length;
+        if (total > 0) {
+          this._fabBadge.textContent = total;
+          this._fabBadge.style.display = '';
+          if (!sessionStorage.getItem('sug_seen')) {
+            this._sugFab.classList.add('has-unread');
+          }
+        }
+      }
+    } catch (e) {
+      // Non-critical; community strip stays hidden on error
+    }
+  }
+  _renderCommunityStrip(topSugs) {
+    const strip = document.getElementById('communityStrip');
+    const cardsEl = document.getElementById('communityMiniCards');
+    if (!strip || !cardsEl) return;
+    if (topSugs.length === 0) {
+      cardsEl.innerHTML = '<div class="community-empty">Se el primero en proponer algo. Tu voz construye esta app.</div>';
+    } else {
+      cardsEl.innerHTML = '';
+      const statusMap = {
+        in_progress: ['En curso', 'status-badge--progress']
+      };
+      topSugs.forEach(s => {
+        const badge = statusMap[s.status] ? `<span class="status-badge ${statusMap[s.status][1]}">${statusMap[s.status][0]}</span>` : '';
+        const card = document.createElement('div');
+        card.className = 'community-mini-card';
+        card.innerHTML = `
+          <div class="community-mini-votes">
+            <span class="community-mini-vote-count">${s.vote_count}</span>
+            <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+          </div>
+          <div class="community-mini-body">
+            <span class="community-mini-title">${this._esc(s.title)}</span>${badge}
+          </div>`;
+        cardsEl.appendChild(card);
+      });
+    }
+    strip.style.display = '';
+  }
+  _renderRecentlyDoneTicker(item) {
+    const ticker = document.getElementById('recentlyDoneTicker');
+    const titleEl = document.getElementById('recentlyDoneTitle');
+    if (!ticker || !titleEl) return;
+    titleEl.textContent = item.title;
+    ticker.style.display = 'flex';
   }
 
   // ─── Engine listeners ──────────────────────────────────────────────────────
@@ -13035,7 +13152,7 @@ class EnsayoApp {
     }
   }
   async _loadAdminLists() {
-    await Promise.all([this._renderPalmasList(), this._renderVocesList(), this._renderSamplesList()]);
+    await Promise.all([this._renderPalmasList(), this._renderVocesList(), this._renderSamplesList(), this._renderAdminSuggestions()]);
   }
   async _renderPalmasList() {
     const c = document.getElementById('palmasList');
@@ -13108,6 +13225,54 @@ class EnsayoApp {
       });
     } catch (e) {
       c.innerHTML = '<div class="no-data-msg">Error cargando lista</div>';
+    }
+  }
+  async _renderAdminSuggestions() {
+    const c = document.getElementById('adminSuggestionsList');
+    if (!c) return;
+    c.innerHTML = '<div class="no-data-msg">Cargando...</div>';
+    try {
+      const items = await suggestionsAPI.getSuggestions('date');
+      if (items.length === 0) {
+        c.innerHTML = '<div class="no-data-msg">No hay sugerencias aun</div>';
+        return;
+      }
+      c.innerHTML = '';
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'admin-suggestion-item';
+        const email = item.user_email ? item.user_email.split('@')[0] : 'anonimo';
+        const date = new Date(item.created_at).toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'short'
+        });
+        el.innerHTML = `
+          <div class="admin-sug-body">
+            <div class="admin-sug-title">${this._esc(item.title)}</div>
+            <div class="admin-sug-meta">${email} &middot; ${date} &middot; ${item.vote_count} votos</div>
+          </div>
+          <select class="admin-sug-status-select" data-id="${item.id}">
+            <option value="open"${item.status === 'open' ? ' selected' : ''}>Abierta</option>
+            <option value="in_progress"${item.status === 'in_progress' ? ' selected' : ''}>En curso</option>
+            <option value="done"${item.status === 'done' ? ' selected' : ''}>Completada</option>
+          </select>`;
+        el.querySelector('.admin-sug-status-select').addEventListener('change', async e => {
+          const sel = e.target;
+          const prev = item.status;
+          try {
+            await suggestionsAPI.updateSuggestionStatus(item.id, sel.value);
+            item.status = sel.value;
+            sel.classList.add('saved');
+            setTimeout(() => sel.classList.remove('saved'), 1500);
+            this._loadCommunityStrip();
+          } catch (err) {
+            sel.value = prev;
+          }
+        });
+        c.appendChild(el);
+      });
+    } catch (e) {
+      c.innerHTML = '<div class="no-data-msg">Error cargando sugerencias</div>';
     }
   }
   _esc(str) {
