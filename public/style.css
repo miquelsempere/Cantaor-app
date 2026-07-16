@@ -1071,39 +1071,6 @@ body {
     line-height: 1.6;
 }
 
-/* Suggestions FAB button */
-.suggestions-fab {
-    position: fixed;
-    bottom: 1.25rem;
-    left: 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(20, 8, 8, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 220, 200, 0.15);
-    border-radius: 20px;
-    padding: 0.4rem 0.85rem 0.4rem 0.65rem;
-    color: #F5EDE0;
-    font-size: 0.78rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    z-index: 1000;
-    transition: all 0.25s ease;
-}
-
-.suggestions-fab svg {
-    color: #FFB89A;
-}
-
-.suggestions-fab:hover {
-    border-color: rgba(255, 220, 200, 0.3);
-    background: rgba(20, 8, 8, 0.85);
-    transform: translateY(-1px);
-}
-
 /* Suggestions Modal Overlay */
 .suggestions-overlay {
     position: fixed;
@@ -1593,37 +1560,6 @@ body {
 }
 .user-bar-login:hover {
     background: rgba(255, 255, 255, 0.2);
-}
-
-/* ── FAB badge ── */
-.suggestions-fab {
-    position: relative;
-}
-.fab-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #C0392B;
-    color: white;
-    font-size: 0.62rem;
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-    border: 2px solid rgba(20, 8, 8, 0.75);
-    line-height: 1;
-    pointer-events: none;
-}
-.suggestions-fab.has-unread {
-    animation: fab-pulse 2s ease-in-out infinite;
-}
-@keyframes fab-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4); }
-    50%       { box-shadow: 0 0 0 8px rgba(192, 57, 43, 0); }
 }
 
 /* ── Status filter tabs in modal ── */

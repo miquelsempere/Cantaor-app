@@ -12128,7 +12128,6 @@ class EnsayoApp {
     this.trackSelector = document.getElementById('trackSelector');
     this.trackSelList = document.getElementById('trackSelectorList');
     this.voiceLoadProg = document.getElementById('voiceLoadProgress');
-    this._fabBadge = document.getElementById('fabBadge');
     this.init();
   }
   async init() {
@@ -12281,7 +12280,6 @@ class EnsayoApp {
 
   _setupSuggestionsBoard() {
     this._sugOverlay = document.getElementById('suggestionsOverlay');
-    this._sugFab = document.getElementById('suggestionsFab');
     this._sugClose = document.getElementById('suggestionsModalClose');
     this._sugList = document.getElementById('suggestionsList');
     this._newSugBtn = document.getElementById('newSuggestionBtn');
@@ -12296,7 +12294,6 @@ class EnsayoApp {
     this._sugSortOrder = 'votes';
     this._sugStatusFilter = 'all';
     this._userVotes = new Set();
-    this._sugFab.addEventListener('click', () => this._openSuggestions());
     document.getElementById('communityOpenModal')?.addEventListener('click', () => this._openSuggestions());
     this._sugClose.addEventListener('click', () => this._closeSuggestions());
     this._sugOverlay.addEventListener('click', e => {
@@ -12346,7 +12343,6 @@ class EnsayoApp {
     this._sugOverlay.classList.add('open');
     this._loadSuggestions();
     sessionStorage.setItem('sug_seen', '1');
-    this._sugFab.classList.remove('has-unread');
   }
   _closeSuggestions() {
     this._sugOverlay.classList.remove('open');
@@ -12476,20 +12472,6 @@ class EnsayoApp {
       const [topSugs, recentDone] = await Promise.all([suggestionsAPI.getTopSuggestions(3), suggestionsAPI.getRecentlyDone(1)]);
       this._renderCommunityStrip(topSugs);
       if (recentDone.length > 0) this._renderRecentlyDoneTicker(recentDone[0]);
-
-      // Update FAB badge with total active suggestions count
-      const totalActive = topSugs.length;
-      if (this._fabBadge) {
-        const allSugs = await suggestionsAPI.getSuggestions('votes');
-        const total = allSugs.length;
-        if (total > 0) {
-          this._fabBadge.textContent = total;
-          this._fabBadge.style.display = '';
-          if (!sessionStorage.getItem('sug_seen')) {
-            this._sugFab.classList.add('has-unread');
-          }
-        }
-      }
     } catch (e) {
       // Non-critical; community strip stays hidden on error
     }
