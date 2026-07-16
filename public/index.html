@@ -31,14 +31,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #FFF8F0;
-            border: 1px solid #E8D5B7;
+            background: rgba(30, 15, 15, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 220, 200, 0.15);
             border-radius: 12px;
             padding: 0.75rem 1rem;
             min-height: 52px;
         }
         .status-mode {
-            font-size: 0.9rem; font-weight: 600; color: #4A2C2C;
+            font-size: 0.9rem; font-weight: 600; color: #F5EDE0;
             display: flex; align-items: center; gap: 0.5rem;
         }
         .status-dot {
@@ -51,7 +52,7 @@
         @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
         .status-voice {
-            font-size: 0.75rem; color: #8B7355;
+            font-size: 0.75rem; color: rgba(245, 237, 224, 0.6);
             display: flex; align-items: center; gap: 0.35rem;
         }
         .voice-dot {
@@ -64,16 +65,16 @@
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
         .ensayo-cante-info {
-            background: #FFF8F0; border: 1px solid #E8D5B7; border-radius: 12px;
+            background: rgba(30, 15, 15, 0.4); backdrop-filter: blur(8px); border: 1px solid rgba(255, 220, 200, 0.15); border-radius: 12px;
             padding: 0.9rem 1rem; min-height: 60px;
             display: flex; flex-direction: column; justify-content: center;
         }
         .ensayo-cante-label {
             font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
-            letter-spacing: 0.06em; color: #8B7355; margin-bottom: 0.3rem;
+            letter-spacing: 0.06em; color: rgba(245, 237, 224, 0.55); margin-bottom: 0.3rem;
         }
-        .ensayo-cante-title { font-size: 1rem; font-weight: 600; color: #4A2C2C; }
-        .ensayo-cante-title.empty { color: #C4A882; font-weight: 400; font-style: italic; }
+        .ensayo-cante-title { font-size: 1rem; font-weight: 600; color: #F5EDE0; }
+        .ensayo-cante-title.empty { color: rgba(245, 237, 224, 0.35); font-weight: 400; font-style: italic; }
 
         .ensayo-actions { display: flex; gap: 0.75rem; width: 100%; }
         .action-btn {
@@ -82,31 +83,31 @@
             display: flex; align-items: center; justify-content: center; gap: 0.4rem;
         }
         .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-falseta { background:#FEF3E2; color:#E67E22; border:1.5px solid #E67E22; }
+        .btn-falseta { background:rgba(230, 126, 34, 0.15); color:#FFB89A; border:1.5px solid #E67E22; }
         .btn-falseta:hover:not(:disabled) { background:#E67E22; color:#fff; }
         .btn-falseta.active { background:#E67E22; color:#fff; }
-        .btn-vamos { background:#EAF7EE; color:#27AE60; border:1.5px solid #27AE60; }
+        .btn-vamos { background:rgba(39, 174, 96, 0.15); color:#6EE7A6; border:1.5px solid #27AE60; }
         .btn-vamos:hover:not(:disabled) { background:#27AE60; color:#fff; }
         .btn-vamos:disabled { opacity:0.3; }
 
-        .ensayo-preplay-label { font-size:0.75rem; color:#8B7355; margin-bottom:0.5rem; font-weight:500; }
+        .ensayo-preplay-label { font-size:0.75rem; color:rgba(245, 237, 224, 0.6); margin-bottom:0.5rem; font-weight:500; }
         .ensayo-preplay.locked .control-slider,
         .ensayo-preplay.locked .ensayo-preplay-label { opacity:0.5; pointer-events:none; }
-        .locked-note { display:none; font-size:0.68rem; color:#C0392B; margin-top:0.3rem; }
+        .locked-note { display:none; font-size:0.68rem; color:#FFB89A; margin-top:0.3rem; }
         .ensayo-preplay.locked .locked-note { display:block; }
 
         .ensayo-voice-section {
             display:flex; align-items:center; justify-content:space-between;
-            background:#FFF8F0; border:1px solid #E8D5B7; border-radius:12px; padding:0.75rem 1rem;
+            background:rgba(30, 15, 15, 0.4); backdrop-filter:blur(8px); border:1px solid rgba(255, 220, 200, 0.15); border-radius:12px; padding:0.75rem 1rem;
         }
-        .voice-label { font-size:0.85rem; color:#4A2C2C; font-weight:500; }
-        .voice-sublabel { font-size:0.72rem; color:#8B7355; margin-top:0.15rem; }
-        .voice-unsupported { font-size:0.72rem; color:#C0392B; }
+        .voice-label { font-size:0.85rem; color:#F5EDE0; font-weight:500; }
+        .voice-sublabel { font-size:0.72rem; color:rgba(245, 237, 224, 0.55); margin-top:0.15rem; }
+        .voice-unsupported { font-size:0.72rem; color:#FF8A8A; }
 
         .toggle-switch { position:relative; width:44px; height:24px; flex-shrink:0; }
         .toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
         .toggle-track {
-            position:absolute; inset:0; background:#D1D5DB; border-radius:24px;
+            position:absolute; inset:0; background:rgba(255, 220, 200, 0.2); border-radius:24px;
             cursor:pointer; transition:background 0.25s;
         }
         .toggle-track::after {
@@ -114,7 +115,7 @@
             left:3px; top:3px; background:white; border-radius:50%;
             transition:transform 0.25s; box-shadow:0 1px 3px rgba(0,0,0,0.2);
         }
-        .toggle-switch input:checked + .toggle-track { background:#C0392B; }
+        .toggle-switch input:checked + .toggle-track { background:#FFB89A; }
         .toggle-switch input:checked + .toggle-track::after { transform:translateX(20px); }
         .toggle-switch input:disabled + .toggle-track { opacity:0.4; cursor:not-allowed; }
 
@@ -128,52 +129,52 @@
         .command-flash.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
         .track-selector-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; }
-        .track-selector-label { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#8B7355; }
+        .track-selector-label { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:rgba(245, 237, 224, 0.55); }
         .track-selector-actions { display:flex; gap:0.4rem; }
         .track-sel-btn {
             font-size:0.68rem; font-weight:600; padding:0.2rem 0.55rem;
-            border-radius:6px; border:1px solid #E8D5B7; background:transparent;
-            color:#8B7355; cursor:pointer; transition:all 0.15s;
+            border-radius:6px; border:1px solid rgba(255, 220, 200, 0.2); background:transparent;
+            color:rgba(245, 237, 224, 0.6); cursor:pointer; transition:all 0.15s;
         }
-        .track-sel-btn:hover { background:#F5EDE0; color:#4A2C2C; }
+        .track-sel-btn:hover { background:rgba(255, 220, 200, 0.1); color:#F5EDE0; }
         .track-selector-list { display:flex; flex-direction:column; gap:0.35rem; max-height:260px; overflow-y:auto; }
         .track-check-item {
             display:flex; align-items:center; gap:0.55rem; padding:0.45rem 0.65rem;
-            border-radius:8px; background:#FFF8F0; border:1px solid #E8D5B7;
+            border-radius:8px; background:rgba(30, 15, 15, 0.35); border:1px solid rgba(255, 220, 200, 0.12);
             cursor:pointer; transition:background 0.15s,border-color 0.15s; user-select:none;
         }
-        .track-check-item:hover { background:#F5EDE0; }
-        .track-check-item.checked { border-color:#C0392B; background:#FEF2F0; }
-        .track-check-item input[type="checkbox"] { accent-color:#C0392B; width:14px; height:14px; flex-shrink:0; cursor:pointer; }
-        .track-check-title { font-size:0.82rem; color:#4A2C2C; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .track-check-item:hover { background:rgba(255, 220, 200, 0.08); }
+        .track-check-item.checked { border-color:#FFB89A; background:rgba(255, 184, 154, 0.12); }
+        .track-check-item input[type="checkbox"] { accent-color:#FFB89A; width:14px; height:14px; flex-shrink:0; cursor:pointer; }
+        .track-check-title { font-size:0.82rem; color:#F5EDE0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .track-selector.locked { opacity:0.5; pointer-events:none; }
-        .voice-load-progress { font-size:0.7rem; color:#C4A882; font-style:italic; margin-top:0.35rem; min-height:1em; }
+        .voice-load-progress { font-size:0.7rem; color:rgba(245, 237, 224, 0.4); font-style:italic; margin-top:0.35rem; min-height:1em; }
 
-        .ensayo-admin-section { border-top:1px solid #E8D5B7; margin-top:1.5rem; padding-top:1.2rem; }
-        .ensayo-admin-title { font-size:0.85rem; font-weight:700; color:#4A2C2C; margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em; }
+        .ensayo-admin-section { border-top:1px solid rgba(255, 220, 200, 0.15); margin-top:1.5rem; padding-top:1.2rem; }
+        .ensayo-admin-title { font-size:0.85rem; font-weight:700; color:#F5EDE0; margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em; }
         .ensayo-admin-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
         .admin-tab-btn {
-            flex:1; padding:0.45rem; border:1.5px solid #E8D5B7; border-radius:8px;
-            background:transparent; color:#8B7355; font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.2s;
+            flex:1; padding:0.45rem; border:1.5px solid rgba(255, 220, 200, 0.2); border-radius:8px;
+            background:transparent; color:rgba(245, 237, 224, 0.6); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.2s;
         }
-        .admin-tab-btn.active { background:#C0392B; color:#fff; border-color:#C0392B; }
+        .admin-tab-btn.active { background:#FFB89A; color:#2a1010; border-color:#FFB89A; }
         .admin-tab-panel { display:none; }
         .admin-tab-panel.active { display:block; }
-        .no-data-msg { text-align:center; color:#C4A882; font-size:0.8rem; padding:1rem 0; font-style:italic; }
+        .no-data-msg { text-align:center; color:rgba(245, 237, 224, 0.4); font-size:0.8rem; padding:1rem 0; font-style:italic; }
         .ensayo-track-item {
             display:flex; align-items:center; justify-content:space-between;
-            padding:0.6rem 0.75rem; border-radius:8px; background:#FFF8F0;
-            border:1px solid #E8D5B7; margin-bottom:0.5rem; font-size:0.82rem;
+            padding:0.6rem 0.75rem; border-radius:8px; background:rgba(30, 15, 15, 0.4);
+            border:1px solid rgba(255, 220, 200, 0.15); margin-bottom:0.5rem; font-size:0.82rem;
         }
-        .ensayo-track-meta { color:#8B7355; font-size:0.72rem; margin-top:0.15rem; }
-        .ensayo-track-delete { background:none; border:none; color:#C0392B; font-size:1.1rem; cursor:pointer; padding:0 0.25rem; line-height:1; opacity:0.6; transition:opacity 0.2s; }
+        .ensayo-track-meta { color:rgba(245, 237, 224, 0.5); font-size:0.72rem; margin-top:0.15rem; }
+        .ensayo-track-delete { background:none; border:none; color:#FF8A8A; font-size:1.1rem; cursor:pointer; padding:0 0.25rem; line-height:1; opacity:0.6; transition:opacity 0.2s; }
         .ensayo-track-delete:hover { opacity:1; }
 
         .ensayo-loading { display:flex; flex-direction:column; align-items:center; gap:0.75rem; padding:1rem 0; }
-        .ensayo-loading-text { color:#8B7355; font-size:0.85rem; }
-        .loading-spinner-small { width:28px; height:28px; border:3px solid #E8D5B7; border-top-color:#C0392B; border-radius:50%; animation:spin 0.8s linear infinite; }
+        .ensayo-loading-text { color:rgba(245, 237, 224, 0.6); font-size:0.85rem; }
+        .loading-spinner-small { width:28px; height:28px; border:3px solid rgba(255, 220, 200, 0.15); border-top-color:#FFB89A; border-radius:50%; animation:spin 0.8s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
-        .ensayo-error-msg { background:#FEF2F2; border:1px solid #FECACA; color:#C0392B; border-radius:10px; padding:0.75rem 1rem; font-size:0.85rem; }
+        .ensayo-error-msg { background:rgba(192, 57, 43, 0.2); border:1px solid rgba(192, 57, 43, 0.5); color:#FF8A8A; border-radius:10px; padding:0.75rem 1rem; font-size:0.85rem; }
 
         #debugPanel { margin-top:1.5rem; }
         .debug-panel { background:#1a1a1a; color:#e0e0e0; border-radius:12px; padding:1rem; font-family:monospace; font-size:0.8rem; }
@@ -200,10 +201,10 @@
         .debug-log-entry { font-size:0.72rem; color:#ccc; padding:0.15rem 0; border-bottom:1px solid #222; }
         .debug-hint { font-size:0.62rem; color:#555; margin-top:0.5rem; }
 
-        .ensayo-card { background:#FFF8F0; border:1px solid #E8D5B7; border-radius:12px; padding:1rem; }
-        .ensayo-card-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#8B7355; margin-bottom:0.75rem; }
+        .ensayo-card { background:rgba(30, 15, 15, 0.4); backdrop-filter:blur(8px); border:1px solid rgba(255, 220, 200, 0.15); border-radius:12px; padding:1rem; }
+        .ensayo-card-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:rgba(245, 237, 224, 0.55); margin-bottom:0.75rem; }
         .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.75rem; }
-        .ensayo-falseta-card .ensayo-status-bar { background:#F5EDE0; border:1px solid #E0CDB3; margin:0; }
+        .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; }
         .ensayo-falseta-card .ensayo-actions { margin:0; }
         .ensayo-falseta-card .ensayo-voice-section { margin:0; }
         .player-section { display:flex; flex-direction:column; align-items:center; margin-bottom:0; }
@@ -394,7 +395,7 @@
                     <div id="vocesList"></div>
                 </div>
                 <div class="admin-tab-panel" id="tabSamples">
-                    <p style="font-size:0.78rem;color:#8B7355;margin-bottom:0.8rem">Sube un sample de golpe individual por tipo.</p>
+                    <p style="font-size:0.78rem;color:rgba(245, 237, 224, 0.6);margin-bottom:0.8rem">Sube un sample de golpe individual por tipo.</p>
                     <div class="admin-form" style="margin-bottom:1rem">
                         <div class="form-group"><label>Palo</label><input type="text" id="samplesPalo" class="form-input" placeholder="Ej: Tangos" list="ensayoPaloSuggestions"></div>
                         <div class="form-group"><label>Tipo de golpe</label><select id="samplesHitType" class="form-input"><option value="fuerte1">Palma fuerte 1</option><option value="fuerte2">Palma fuerte 2</option><option value="floja1">Palma floja 1</option><option value="floja2">Palma floja 2</option></select></div>
