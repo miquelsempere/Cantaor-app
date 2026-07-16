@@ -10,33 +10,65 @@ dotenv.config();
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
-export default {
-  input: path.join(__dirname, '../public/ensayo.js'),
-  output: {
-    file: path.join(__dirname, '../public/ensayo-bundle.js'),
-    format: 'es',
-    sourcemap: true,
+export default [
+  {
+    input: path.join(__dirname, '../public/ensayo.js'),
+    output: {
+      file: path.join(__dirname, '../public/ensayo-bundle.js'),
+      format: 'es',
+      sourcemap: true,
+    },
+    onwarn(warning, warn) {
+      if (warning.code === 'SOURCEMAP_ERROR' && warning.loc && warning.loc.file.includes('node_modules')) {
+        return;
+      }
+      warn(warning);
+    },
+    plugins: [
+      replace({
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
+        preventAssignment: true,
+      }),
+      resolve({
+        browser: true,
+        preferBuiltins: false,
+      }),
+      commonjs(),
+      babel({
+        babelHelpers: 'bundled',
+        exclude: ['/node_modules/**'],
+      }),
+    ],
   },
-  onwarn(warning, warn) {
-    if (warning.code === 'SOURCEMAP_ERROR' && warning.loc && warning.loc.file.includes('node_modules')) {
-      return;
-    }
-    warn(warning);
+  {
+    input: path.join(__dirname, '../public/sugerencias.js'),
+    output: {
+      file: path.join(__dirname, '../public/sugerencias-bundle.js'),
+      format: 'es',
+      sourcemap: true,
+    },
+    onwarn(warning, warn) {
+      if (warning.code === 'SOURCEMAP_ERROR' && warning.loc && warning.loc.file.includes('node_modules')) {
+        return;
+      }
+      warn(warning);
+    },
+    plugins: [
+      replace({
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
+        preventAssignment: true,
+      }),
+      resolve({
+        browser: true,
+        preferBuiltins: false,
+      }),
+      commonjs(),
+      babel({
+        babelHelpers: 'bundled',
+        exclude: ['/node_modules/**'],
+      }),
+    ],
   },
-  plugins: [
-    replace({
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
-      preventAssignment: true,
-    }),
-    resolve({
-      browser: true,
-      preferBuiltins: false,
-    }),
-    commonjs(),
-    babel({
-      babelHelpers: 'bundled',
-      exclude: ['/node_modules/**'],
-    }),
-  ],
-};
+];

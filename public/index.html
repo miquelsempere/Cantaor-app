@@ -244,6 +244,7 @@
                 <span class="nav-brand-name">cantaor.app</span>
             </div>
             <div class="nav-actions" id="userBar">
+                <a href="sugerencias.html" class="nav-suggestions-link">Sugerencias</a>
                 <span class="user-bar-email" id="userBarEmail"></span>
                 <button class="user-bar-logout" id="userBarLogout" style="display:none">Salir</button>
                 <button class="user-bar-login" id="userBarLogin">Iniciar sesion</button>
@@ -382,26 +383,6 @@
             </div>
         </div>
 
-        <!-- Community strip — always visible, loaded on init -->
-        <div id="communityStrip" class="community-strip" style="display:none">
-            <div class="section-divider"></div>
-            <div class="section-header">
-                <span class="section-header-label">Comunidad</span>
-            </div>
-            <div class="community-strip-header">
-                <div>
-                    <div class="community-strip-title">Construyendo juntos</div>
-                    <div class="community-strip-subtitle">Las propuestas mas votadas de la comunidad</div>
-                </div>
-                <button class="community-see-all-btn" id="communityOpenModal">Ver todas y proponer &rarr;</button>
-            </div>
-            <div class="recently-done-ticker" id="recentlyDoneTicker" style="display:none">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                <span>Recien implementado: </span><strong id="recentlyDoneTitle"></strong>
-            </div>
-            <div class="community-mini-cards" id="communityMiniCards"></div>
-        </div>
-
         <div id="ensayoAdminSection" style="display:none">
             <div class="ensayo-admin-section">
             <div class="section-divider"></div>
@@ -498,43 +479,6 @@
                 <div id="authErrorRegister" class="auth-error"></div>
                 <button id="registerSubmitBtn" class="auth-submit-btn">Crear cuenta gratis</button>
                 <p class="auth-switch">Ya tienes cuenta? <button class="auth-switch-btn" id="switchToLogin">Inicia sesion</button></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Suggestions Modal -->
-    <div class="suggestions-overlay" id="suggestionsOverlay">
-        <div class="suggestions-modal" id="suggestionsModal">
-            <div class="suggestions-modal-header">
-                <div>
-                    <h2 class="suggestions-modal-title">Tablero de sugerencias</h2>
-                    <p class="suggestions-modal-subtitle">Propone y vota las mejoras que quieres ver</p>
-                </div>
-                <button class="suggestions-modal-close" id="suggestionsModalClose" aria-label="Cerrar">&times;</button>
-            </div>
-            <div class="suggestions-toolbar">
-                <div class="suggestions-sort">
-                    <button class="sort-btn active" id="sortByVotes">Mas votadas</button>
-                    <button class="sort-btn" id="sortByDate">Mas recientes</button>
-                </div>
-                <button class="new-suggestion-btn" id="newSuggestionBtn">+ Nueva sugerencia</button>
-            </div>
-            <div class="suggestions-status-filter">
-                <button class="status-filter-btn active" data-status="all" id="sfAll">Todas</button>
-                <button class="status-filter-btn" data-status="in_progress" id="sfInProgress">En curso</button>
-                <button class="status-filter-btn" data-status="done" id="sfDone">Completadas</button>
-            </div>
-            <div class="new-suggestion-form" id="newSuggestionForm" style="display:none">
-                <div class="form-group"><label for="suggestionTitle">Titulo *</label><input type="text" id="suggestionTitle" class="form-input" placeholder="Ej: Anadir palo de Soleares" maxlength="120"></div>
-                <div class="form-group"><label for="suggestionDescription">Descripcion (opcional)</label><textarea id="suggestionDescription" class="form-input suggestion-textarea" placeholder="Explica tu idea..." maxlength="500" rows="3"></textarea></div>
-                <div id="suggestionFormError" class="auth-error"></div>
-                <div class="new-suggestion-form-actions">
-                    <button class="suggestion-cancel-btn" id="cancelSuggestionBtn">Cancelar</button>
-                    <button class="auth-submit-btn suggestion-submit-btn" id="submitSuggestionBtn">Enviar sugerencia</button>
-                </div>
-            </div>
-            <div class="suggestions-list" id="suggestionsList">
-                <div class="suggestions-loading" id="suggestionsLoading">Cargando sugerencias...</div>
             </div>
         </div>
     </div>
