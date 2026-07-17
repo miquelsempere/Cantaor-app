@@ -210,11 +210,19 @@
         .ensayo-card { background:rgba(20, 10, 10, 0.35); backdrop-filter:blur(12px); border:1px solid rgba(255, 220, 200, 0.12); border-radius:14px; padding:1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.12); transition: border-color 0.2s ease; }
         .ensayo-card:hover { border-color: rgba(255, 220, 200, 0.2); }
         .ensayo-card-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); margin-bottom:0.75rem; }
-        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.5rem; padding:0.75rem; }
+        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.6rem; padding:0.9rem; }
         .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; min-height:auto; padding:0.5rem 0.75rem; }
         .ensayo-falseta-card .ensayo-actions { margin:0; }
         .ensayo-falseta-card .action-btn { padding:0.5rem 0.75rem; font-size:0.82rem; }
         .falseta-voice-toggle { display:flex; align-items:center; gap:0.4rem; }
+        .falseta-section-title { display:flex; align-items:center; gap:0.45rem; font-size:0.9rem; font-weight:700; color:#F5EDE0; }
+        .falseta-section-title .title-dot { width:8px; height:8px; border-radius:50%; background:#E67E22; flex-shrink:0; }
+        .falseta-section-explain { font-size:0.74rem; line-height:1.4; color:rgba(245, 237, 224, 0.6); margin-top:-0.1rem; }
+        .falseta-voice-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; background:rgba(30, 15, 15, 0.25); border:1px solid rgba(255, 220, 200, 0.08); border-radius:10px; padding:0.5rem 0.75rem; }
+        .falseta-voice-label { display:flex; flex-direction:column; gap:0.1rem; }
+        .falseta-voice-name { font-size:0.78rem; font-weight:600; color:#F5EDE0; display:flex; align-items:center; gap:0.4rem; }
+        .falseta-voice-hint { font-size:0.66rem; color:rgba(245, 237, 224, 0.5); }
+        .falseta-actions-help { font-size:0.68rem; color:rgba(245, 237, 224, 0.5); margin-top:0.1rem; }
         .player-section { display:flex; flex-direction:column; align-items:center; margin-bottom:0; }
 
         @media (max-width:680px) {
@@ -336,18 +344,28 @@
                 </div>
 
                 <div class="ensayo-card ensayo-falseta-card">
+                    <div class="falseta-section-header">
+                        <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
+                        <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas.</div>
+                    </div>
                     <div class="ensayo-status-bar ensayo-falseta-status">
                         <div class="status-mode">
                             <span class="status-dot stopped" id="statusDot"></span>
                             <span id="statusText">Listo para empezar</span>
                         </div>
-                        <div class="falseta-voice-toggle">
-                            <span class="voice-dot" id="voiceDot"></span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="voiceToggle" disabled>
-                                <span class="toggle-track"></span>
-                            </label>
+                    </div>
+                    <div class="falseta-voice-row">
+                        <div class="falseta-voice-label">
+                            <div class="falseta-voice-name">
+                                <span class="voice-dot" id="voiceDot"></span>
+                                Control por voz
+                            </div>
+                            <div class="falseta-voice-hint">Di &laquo;falseta&raquo; o &laquo;vamos alla&raquo;</div>
                         </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="voiceToggle" disabled>
+                            <span class="toggle-track"></span>
+                        </label>
                     </div>
                     <div class="ensayo-actions">
                         <button class="action-btn btn-falseta" id="btnFalseta" disabled>
@@ -363,6 +381,7 @@
                             Vamos alla
                         </button>
                     </div>
+                    <div class="falseta-actions-help">Falseta: solo palmas &middot; Vamos alla: vuelve el cante</div>
                 </div>
 
             </div>
