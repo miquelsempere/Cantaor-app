@@ -195,33 +195,55 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.4rem;
-    margin: 0 auto 2rem;
-    padding: 1rem 1.5rem;
+    gap: 0.75rem;
+    margin: 0 auto 1.5rem;
+    padding: 1.25rem 1.5rem;
     max-width: 560px;
-    background: rgba(255, 184, 154, 0.06);
-    border: 1px solid rgba(255, 184, 154, 0.18);
+    background: rgba(20, 10, 10, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 220, 200, 0.12);
     border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
     text-align: center;
-    transition: border-color 0.3s ease, background 0.3s ease;
+    animation: scene-rise 0.5s ease both;
 }
 .step-prompt.step-prompt-changed {
     animation: step-prompt-pop 0.45s ease;
 }
 @keyframes step-prompt-pop {
     0%   { transform: scale(1); }
-    35%  { transform: scale(1.04); border-color: rgba(255, 184, 154, 0.45); }
+    35%  { transform: scale(1.03); border-color: rgba(255, 184, 154, 0.45); box-shadow: 0 4px 18px rgba(255, 184, 154, 0.15); }
     100% { transform: scale(1); }
 }
+@keyframes scene-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
 .step-prompt-num {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     color: #FFB89A;
+    background: rgba(255, 184, 154, 0.1);
+    border: 1px solid rgba(255, 184, 154, 0.25);
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+}
+.step-prompt-num::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #FFB89A;
+    animation: pulse-dot 1.5s ease-in-out infinite;
 }
 .step-prompt-text {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #F5EDE0;
     line-height: 1.4;
@@ -229,6 +251,19 @@ body {
 
 .step-hidden {
     display: none !important;
+}
+
+.ensayo-layout.step-single {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+    margin: 0 auto;
+}
+.ensayo-card.scene-enter {
+    animation: scene-rise 0.5s ease both;
+}
+.ensayo-card.is-selected {
+    border-color: rgba(255, 184, 154, 0.4);
+    box-shadow: 0 2px 16px rgba(255, 184, 154, 0.1);
 }
 
 .palo-selector {

@@ -12128,6 +12128,8 @@ class EnsayoApp {
     this.stepPromptText = document.getElementById('stepPromptText');
     this.colRight = document.getElementById('ensayoColRight');
     this.falsetaCard = document.getElementById('ensayoFalsetaCard');
+    this.paloCard = document.getElementById('ensayoPaloCard');
+    this.ensayoLayout = document.getElementById('ensayoLayout');
     this.init();
   }
   async init() {
@@ -12470,6 +12472,7 @@ class EnsayoApp {
         prompt.classList.add('step-prompt-changed');
       }
     }
+    if (this.paloCard) this.paloCard.classList.add('is-selected');
     await this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
