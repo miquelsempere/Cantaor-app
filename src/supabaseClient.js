@@ -434,6 +434,32 @@ export const ensayoAPI = {
   },
 };
 
+// Ensayo preferences API (per-user, per-palo practice settings)
+export const ensayoPreferencesAPI = {
+  async getPreferences(palo) {
+    const { data, error } = await supabase
+      .from('ensayo_preferences')
+      .select('mode, selected_titles')
+      .eq('palo', palo)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async savePreferences(palo, mode, selectedTitles) {
+    const { data, error } = await supabase
+      .from('ensayo_preferences')
+      .upsert(
+        { palo, mode, selected_titles: selectedTitles },
+        { onConflict: 'user_id,palo' }
+      )
+      .select('mode, selected_titles')
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+};
+
 // Suggestions board API
 export const suggestionsAPI = {
   async getSuggestions(orderBy = 'votes', statusFilter = null) {

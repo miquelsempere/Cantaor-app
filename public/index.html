@@ -149,6 +149,41 @@
             opacity: 0.55;
             flex-shrink: 0;
         }
+        /* ── Paso 2: interruptor de modo (aleatorio / selección) ── */
+        .mode-switch {
+            display: inline-flex;
+            gap: 0;
+            background: rgba(255, 220, 200, 0.06);
+            border: 1px solid rgba(255, 220, 200, 0.14);
+            border-radius: 999px;
+            padding: 0.25rem;
+            margin: 0 auto 1.5rem;
+            transition: opacity 0.25s ease;
+        }
+        .mode-switch.locked, .mode-switch-wrap.locked .mode-switch { opacity: 0.45; pointer-events: none; }
+        .mode-switch-btn {
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: rgba(245, 237, 224, 0.7);
+            background: transparent;
+            border: none;
+            border-radius: 999px;
+            padding: 0.5rem 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+        .mode-switch-btn:hover:not(.active) {
+            color: #F5EDE0;
+            background: rgba(255, 220, 200, 0.06);
+        }
+        .mode-switch-btn.active {
+            background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(192, 57, 43, 0.3);
+        }
+        .mode-switch-wrap { text-align: center; }
+
         .status-mode {
             font-size: 0.9rem; font-weight: 600; color: #F5EDE0;
             display: flex; align-items: center; gap: 0.5rem;
@@ -352,6 +387,18 @@
             <p class="step-sub">Elige un palo para empezar a practicar.</p>
         </div>
         <div class="palo-grid" id="ensayoPaloGrid"></div>
+
+        <div class="step-intro step-hidden" id="step2Intro">
+            <div class="step-eyebrow">Paso 2</div>
+            <h2 class="step-question">¿Cómo quieres ensayar por <span class="step-question-palo" id="step2Palo">…</span>?</h2>
+            <p class="step-sub">Elige reproducción aleatoria o selecciona las letras que quieres trabajar.</p>
+        </div>
+        <div class="mode-switch-wrap step-hidden" id="modeSwitch">
+            <div class="mode-switch">
+                <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
+                <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
+            </div>
+        </div>
 
         <div class="ensayo-layout step-single" id="ensayoLayout">
             <div class="ensayo-col-left">

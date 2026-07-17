@@ -12006,6 +12006,32 @@ const ensayoAPI = {
   }
 };
 
+// Ensayo preferences API (per-user, per-palo practice settings)
+const ensayoPreferencesAPI = {
+  async getPreferences(palo) {
+    const {
+      data,
+      error
+    } = await supabase.from('ensayo_preferences').select('mode, selected_titles').eq('palo', palo).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+  async savePreferences(palo, mode, selectedTitles) {
+    const {
+      data,
+      error
+    } = await supabase.from('ensayo_preferences').upsert({
+      palo,
+      mode,
+      selected_titles: selectedTitles
+    }, {
+      onConflict: 'user_id,palo'
+    }).select('mode, selected_titles').maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+};
+
 // Suggestions board API
 const suggestionsAPI = {
   async getSuggestions(orderBy = 'votes', statusFilter = null) {
@@ -12098,6 +12124,7 @@ class EnsayoApp {
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
+    this.currentMode = 'random';
     this.paloGrid = document.getElementById('ensayoPaloGrid');
     this.playBtn = document.getElementById('ensayoPlayBtn');
     this.voiceToggle = document.getElementById('voiceToggle');
@@ -12126,6 +12153,9 @@ class EnsayoApp {
     this.colRight = document.getElementById('ensayoColRight');
     this.falsetaCard = document.getElementById('ensayoFalsetaCard');
     this.ensayoLayout = document.getElementById('ensayoLayout');
+    this.step2Intro = document.getElementById('step2Intro');
+    this.step2Palo = document.getElementById('step2Palo');
+    this.modeSwitch = document.getElementById('modeSwitch');
     this.init();
   }
   async init() {
@@ -12134,6 +12164,7 @@ class EnsayoApp {
     this._setupEnsayoListeners();
     this._setupControls();
     this._setupTrackSelector();
+    this._setupModeSwitch();
     this._setupAdminSecretAccess();
     this._setupDebugPanel();
     await this._loadPalos();
@@ -12331,6 +12362,76 @@ class EnsayoApp {
 
   // ─── Track selector ────────────────────────────────────────────────────────
 
+  _setupModeSwitch() {
+    if (!this.modeSwitch) return;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (mode === this.currentMode) return;
+        this._setMode(mode, true);
+      });
+    });
+  }
+  _setMode(mode, persist) {
+    this.currentMode = mode;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    if (mode === 'random') {
+      this.trackSelector.style.display = 'none';
+      this.engine.setSelectedVoices(null);
+    } else {
+      this.trackSelector.style.display = '';
+      this._applyTrackSelection();
+    }
+    if (persist) this._savePreferences();
+  }
+  async _loadPreferences(palo) {
+    if (!this.currentUser) {
+      this._setMode('random', false);
+      return;
+    }
+    try {
+      const prefs = await ensayoPreferencesAPI.getPreferences(palo);
+      const mode = prefs && prefs.mode || 'random';
+      const savedTitles = prefs && prefs.selected_titles || [];
+      this.currentMode = mode;
+      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      if (mode === 'selection' && savedTitles.length > 0) {
+        this.trackSelector.style.display = '';
+        this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          const ids = JSON.parse(cb.dataset.ids);
+          const label = cb.parentElement.querySelector('.track-check-title');
+          const titleText = label ? label.textContent : null;
+          const wasChecked = savedTitles.includes(titleText);
+          cb.checked = wasChecked;
+          cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
+        });
+        this._applyTrackSelection();
+      } else if (mode === 'random') {
+        this.trackSelector.style.display = 'none';
+        this.engine.setSelectedVoices(null);
+      }
+    } catch (err) {
+      this._setMode('random', false);
+    }
+  }
+  _getSelectedTitles() {
+    const allCbs = [...this.trackSelList.querySelectorAll('input[type="checkbox"]')];
+    const checkedCbs = allCbs.filter(cb => cb.checked);
+    if (checkedCbs.length === allCbs.length) return [];
+    return checkedCbs.map(cb => {
+      const label = cb.parentElement.querySelector('.track-check-title');
+      return label ? label.textContent : null;
+    }).filter(Boolean);
+  }
+  _savePreferences() {
+    if (!this.currentUser || !this.currentPalo) return;
+    const titles = this.currentMode === 'selection' ? this._getSelectedTitles() : [];
+    ensayoPreferencesAPI.savePreferences(this.currentPalo, this.currentMode, titles).catch(() => {});
+  }
   _setupTrackSelector() {
     document.getElementById('trackSelAll').addEventListener('click', () => {
       this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -12338,6 +12439,7 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.add('checked');
       });
       this._applyTrackSelection();
+      if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
       [...this.trackSelList.querySelectorAll('input[type="checkbox"]')].forEach((cb, i) => {
@@ -12345,6 +12447,7 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.toggle('checked', i === 0);
       });
       this._applyTrackSelection();
+      if (this.currentMode === 'selection') this._savePreferences();
     });
   }
   _renderTrackSelector(voices) {
@@ -12379,6 +12482,7 @@ class EnsayoApp {
           item.classList.add('checked');
         }
         this._applyTrackSelection();
+        if (this.currentMode === 'selection') this._savePreferences();
       });
       this.trackSelList.appendChild(item);
     });
@@ -12466,6 +12570,12 @@ class EnsayoApp {
       const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
       if (paloSpan) paloSpan.textContent = palo;
     }
+    this.step2Intro.classList.add('step-hidden');
+    this.modeSwitch.classList.add('step-hidden');
+    this.preplay.classList.add('step-hidden');
+    this.colRight.classList.add('step-hidden');
+    this.falsetaCard.classList.add('step-hidden');
+    if (this.step2Palo) this.step2Palo.textContent = palo;
     await this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
@@ -12500,6 +12610,13 @@ class EnsayoApp {
       this._buildDebugBeatGrid();
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
+      this.step2Intro.classList.remove('step-hidden');
+      this.modeSwitch.classList.remove('step-hidden');
+      this.preplay.classList.remove('step-hidden');
+      this.colRight.classList.remove('step-hidden');
+      this.falsetaCard.classList.remove('step-hidden');
+      this.step2Intro.classList.add('scene-enter');
+      await this._loadPreferences(palo);
 
       // Background voice load progress indicator
       const total = canteVoices.length;
@@ -12529,6 +12646,7 @@ class EnsayoApp {
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.add('locked');
       this.trackSelector.classList.add('locked');
+      this.modeSwitch.classList.add('locked');
       this.statusDot.className = 'status-dot cante';
       this.statusText.textContent = 'Reproduciendo cante';
       if (this._debugVisible) this._startDebugRaf();
@@ -12539,6 +12657,7 @@ class EnsayoApp {
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.remove('locked');
       this.trackSelector.classList.remove('locked');
+      this.modeSwitch.classList.remove('locked');
       this.statusDot.className = 'status-dot stopped';
       this.statusText.textContent = 'Listo para empezar';
       this._stopDebugRaf();
