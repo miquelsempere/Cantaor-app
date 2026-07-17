@@ -109,14 +109,6 @@
         .locked-note { display:none; font-size:0.68rem; color:#FFB89A; margin-top:0.3rem; }
         .ensayo-preplay.locked .locked-note { display:block; }
 
-        .ensayo-voice-section {
-            display:flex; align-items:center; justify-content:space-between;
-            background:rgba(20, 10, 10, 0.35); backdrop-filter:blur(8px); border:1px solid rgba(255, 220, 200, 0.1); border-radius:10px; padding:0.75rem 1rem;
-        }
-        .voice-label { font-size:0.85rem; color:#F5EDE0; font-weight:500; }
-        .voice-sublabel { font-size:0.72rem; color:rgba(245, 237, 224, 0.55); margin-top:0.15rem; }
-        .voice-unsupported { font-size:0.72rem; color:#FF8A8A; }
-
         .toggle-switch { position:relative; width:44px; height:24px; flex-shrink:0; }
         .toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
         .toggle-track {
@@ -218,10 +210,11 @@
         .ensayo-card { background:rgba(20, 10, 10, 0.35); backdrop-filter:blur(12px); border:1px solid rgba(255, 220, 200, 0.12); border-radius:14px; padding:1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.12); transition: border-color 0.2s ease; }
         .ensayo-card:hover { border-color: rgba(255, 220, 200, 0.2); }
         .ensayo-card-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); margin-bottom:0.75rem; }
-        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.75rem; }
-        .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; }
+        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.5rem; padding:0.75rem; }
+        .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; min-height:auto; padding:0.5rem 0.75rem; }
         .ensayo-falseta-card .ensayo-actions { margin:0; }
-        .ensayo-falseta-card .ensayo-voice-section { margin:0; }
+        .ensayo-falseta-card .action-btn { padding:0.5rem 0.75rem; font-size:0.82rem; }
+        .falseta-voice-toggle { display:flex; align-items:center; gap:0.4rem; }
         .player-section { display:flex; flex-direction:column; align-items:center; margin-bottom:0; }
 
         @media (max-width:680px) {
@@ -343,15 +336,17 @@
                 </div>
 
                 <div class="ensayo-card ensayo-falseta-card">
-                    <div class="ensayo-card-label">Modo falseta</div>
-                    <div class="ensayo-status-bar">
+                    <div class="ensayo-status-bar ensayo-falseta-status">
                         <div class="status-mode">
                             <span class="status-dot stopped" id="statusDot"></span>
                             <span id="statusText">Listo para empezar</span>
                         </div>
-                        <div class="status-voice">
+                        <div class="falseta-voice-toggle">
                             <span class="voice-dot" id="voiceDot"></span>
-                            <span id="voiceStatusText">Voz desactivada</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="voiceToggle" disabled>
+                                <span class="toggle-track"></span>
+                            </label>
                         </div>
                     </div>
                     <div class="ensayo-actions">
@@ -367,16 +362,6 @@
                             </svg>
                             Vamos alla
                         </button>
-                    </div>
-                    <div class="ensayo-voice-section" id="ensayoVoiceSection" style="margin:0;border-radius:8px">
-                        <div>
-                            <div class="voice-label">Control por voz</div>
-                            <div class="voice-sublabel" id="voiceSublabel">Di "falseta" o "vamos alla" mientras tocas</div>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="voiceToggle" disabled>
-                            <span class="toggle-track"></span>
-                        </label>
                     </div>
                 </div>
 

@@ -12110,7 +12110,6 @@ class EnsayoApp {
     this.statusDot = document.getElementById('statusDot');
     this.statusText = document.getElementById('statusText');
     this.voiceDot = document.getElementById('voiceDot');
-    this.voiceStatusTxt = document.getElementById('voiceStatusText');
     this.canteTitle = document.getElementById('canteTitle');
     this.ensayoError = document.getElementById('ensayoError');
     this.ensayoLoading = document.getElementById('ensayoLoading');
@@ -12300,7 +12299,7 @@ class EnsayoApp {
     this.ensayo.onVoiceStatus(status => this._updateVoiceIndicator(status));
     if (!this.ensayo.supported) {
       this.voiceToggle.disabled = true;
-      document.getElementById('voiceSublabel').innerHTML = '<span class="voice-unsupported">No disponible en este navegador (usa Chrome)</span>';
+      this.voiceToggle.title = 'No disponible en este navegador (usa Chrome)';
     } else {
       this.voiceToggle.disabled = false;
     }
@@ -12567,15 +12566,12 @@ class EnsayoApp {
     this.voiceDot.className = 'voice-dot';
     if (status === 'listening') {
       this.voiceDot.classList.add('on');
-      this.voiceStatusTxt.textContent = 'Escuchando...';
     } else if (status === 'falseta') {
       this.voiceDot.classList.add('falseta');
-      this.voiceStatusTxt.textContent = 'Falseta detectada';
     } else if (status === 'error') {
       this.voiceDot.classList.add('error');
-      this.voiceStatusTxt.textContent = 'Error de microfono';
     } else {
-      this.voiceStatusTxt.textContent = 'Voz desactivada';
+      this.voiceDot.className = 'voice-dot';
     }
   }
   _resetCanteInfo() {
