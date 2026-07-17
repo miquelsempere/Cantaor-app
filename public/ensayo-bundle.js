@@ -12103,8 +12103,6 @@ class EnsayoApp {
     this.selectText = document.getElementById('ensayoSelectText');
     this.selectOptions = document.getElementById('ensayoSelectOptions');
     this.playBtn = document.getElementById('ensayoPlayBtn');
-    this.btnFalseta = document.getElementById('btnFalseta');
-    this.btnVamos = document.getElementById('btnVamos');
     this.voiceToggle = document.getElementById('voiceToggle');
     this.visualizer = document.getElementById('ensayoVisualizer');
     this.statusDot = document.getElementById('statusDot');
@@ -12325,8 +12323,6 @@ class EnsayoApp {
       this.engine.setPitchSemitones(s);
       this.pitchValue.textContent = `Traste ${s + 5}`;
     });
-    this.btnFalseta.addEventListener('click', () => this.ensayo.manualFalseta());
-    this.btnVamos.addEventListener('click', () => this.ensayo.manualVamosAlla());
     this.voiceToggle.addEventListener('change', e => {
       if (e.target.checked) this.ensayo.startVoice();else this.ensayo.stopVoice();
     });
@@ -12525,8 +12521,6 @@ class EnsayoApp {
       this.playBtn.classList.add('is-playing');
       this.visualizer.classList.add('playing');
       this.selectWrapper.classList.add('disabled');
-      this.btnFalseta.disabled = false;
-      this.btnVamos.disabled = false;
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.add('locked');
       this.trackSelector.classList.add('locked');
@@ -12537,8 +12531,6 @@ class EnsayoApp {
       this.playBtn.classList.remove('is-playing');
       this.visualizer.classList.remove('playing');
       this.selectWrapper.classList.remove('disabled');
-      this.btnFalseta.disabled = true;
-      this.btnVamos.disabled = true;
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.remove('locked');
       this.trackSelector.classList.remove('locked');
@@ -12549,13 +12541,11 @@ class EnsayoApp {
   }
   _updateFalsetaUI(falseta) {
     if (falseta) {
-      this.btnFalseta.classList.add('active');
       this.statusDot.className = 'status-dot falseta';
       this.statusText.textContent = 'Modo falseta - solo palmas';
       this.canteTitle.textContent = 'Solo palmas';
       this.canteTitle.classList.add('empty');
     } else {
-      this.btnFalseta.classList.remove('active');
       if (this.engine.isPlaying) {
         this.statusDot.className = 'status-dot cante';
         this.statusText.textContent = 'Reproduciendo cante';
