@@ -15,10 +15,7 @@ class EnsayoApp {
     this.isLoaded = false;
     this.currentUser = null;
 
-    this.selectWrapper  = document.getElementById('ensayoSelectWrapper');
-    this.selectDisplay  = document.getElementById('ensayoSelectDisplay');
-    this.selectText     = document.getElementById('ensayoSelectText');
-    this.selectOptions  = document.getElementById('ensayoSelectOptions');
+    this.paloGrid       = document.getElementById('ensayoPaloGrid');
     this.playBtn        = document.getElementById('ensayoPlayBtn');
     this.voiceToggle    = document.getElementById('voiceToggle');
     this.visualizer     = document.getElementById('ensayoVisualizer');
@@ -46,7 +43,6 @@ class EnsayoApp {
     this.stepPromptText = document.getElementById('stepPromptText');
     this.colRight       = document.getElementById('ensayoColRight');
     this.falsetaCard    = document.getElementById('ensayoFalsetaCard');
-    this.paloCard       = document.getElementById('ensayoPaloCard');
     this.ensayoLayout   = document.getElementById('ensayoLayout');
 
     this.init();
@@ -325,38 +321,42 @@ class EnsayoApp {
   async _loadPalos() {
     try {
       const palos = await canteTracksAPI.getAvailablePalos();
-      this.selectOptions.innerHTML = '';
-      palos.forEach(({ nombre }) => {
-        const opt = document.createElement('div');
-        opt.className = 'custom-select-option'; opt.dataset.value = nombre; opt.textContent = nombre;
-        opt.addEventListener('click', () => this._selectPalo(nombre, opt));
-        this.selectOptions.appendChild(opt);
+      this.paloGrid.innerHTML = '';
+      palos.forEach(({ nombre, free }) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'palo-chip';
+        chip.dataset.value = nombre;
+        const label = document.createElement('span');
+        label.textContent = nombre;
+        chip.appendChild(label);
+        if (free) {
+          const tag = document.createElement('span');
+          tag.className = 'palo-chip-free';
+          tag.textContent = 'Free';
+          chip.appendChild(tag);
+        } else {
+          const lock = document.createElement('img');
+          lock.className = 'palo-chip-lock';
+          lock.src = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'currentColor\' d=\'M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-8 0V6a2 2 0 0 1 4 0v2z\'/></svg>');
+          lock.alt = '';
+          chip.appendChild(lock);
+        }
+        chip.addEventListener('click', () => this._selectPalo(nombre, chip));
+        this.paloGrid.appendChild(chip);
         const dl = document.getElementById('ensayoPaloSuggestions');
         if (dl) { const o = document.createElement('option'); o.value = nombre; dl.appendChild(o); }
       });
-      this.selectDisplay.addEventListener('click', e => {
-        e.stopPropagation();
-        this.selectOptions.classList.toggle('open');
-        this.selectDisplay.classList.toggle('active');
-      });
-      document.addEventListener('click', () => {
-        this.selectOptions.classList.remove('open');
-        this.selectDisplay.classList.remove('active');
-      });
-      this.selectOptions.addEventListener('click', e => e.stopPropagation());
     } catch (err) {
       this._showError('Error cargando palos: ' + err.message);
     }
   }
 
-  async _selectPalo(palo, optEl) {
+  async _selectPalo(palo, chipEl) {
     if (this.engine.isPlaying) return;
-    this.selectOptions.querySelectorAll('.custom-select-option').forEach(o =>
-      o.classList.toggle('selected', o === optEl)
+    this.paloGrid.querySelectorAll('.palo-chip').forEach(c =>
+      c.classList.toggle('selected', c === chipEl)
     );
-    this.selectText.textContent = palo;
-    this.selectOptions.classList.remove('open');
-    this.selectDisplay.classList.remove('active');
     this.currentPalo = palo;
     this.isLoaded = false;
     this.playBtn.disabled = true;
@@ -366,11 +366,9 @@ class EnsayoApp {
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
     if (this.stepPromptText) {
-      this.stepPromptText.textContent = `Vamos a tocar un poquito por: ${palo}`;
-      const prompt = this.stepPromptText.closest('.step-prompt');
-      if (prompt) { prompt.classList.remove('step-prompt-changed'); void prompt.offsetWidth; prompt.classList.add('step-prompt-changed'); }
+      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
+      if (paloSpan) paloSpan.textContent = palo;
     }
-    if (this.paloCard) this.paloCard.classList.add('is-selected');
     await this._loadPaloContent(palo);
   }
 
@@ -437,7 +435,7 @@ class EnsayoApp {
     if (isPlaying) {
       this.playBtn.classList.add('is-playing');
       this.visualizer.classList.add('playing');
-      this.selectWrapper.classList.add('disabled');
+      this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.add('locked'));
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.add('locked');
       this.trackSelector.classList.add('locked');
@@ -447,7 +445,7 @@ class EnsayoApp {
     } else {
       this.playBtn.classList.remove('is-playing');
       this.visualizer.classList.remove('playing');
-      this.selectWrapper.classList.remove('disabled');
+      this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.remove('locked'));
       this.voiceToggle.disabled = !this.ensayo.supported;
       this.preplay.classList.remove('locked');
       this.trackSelector.classList.remove('locked');
