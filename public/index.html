@@ -254,6 +254,11 @@
             <p class="app-subtitle">Practica cante flamenco con base de palmas, ajusta compas y cejilla, y acompana tu voz en tiempo real</p>
         </div>
 
+        <div class="step-prompt" id="stepPrompt">
+            <span class="step-prompt-num">Paso 1</span>
+            <span class="step-prompt-text" id="stepPromptText">Vamos a tocar un poquito por:</span>
+        </div>
+
         <div class="ensayo-layout">
             <div class="ensayo-col-left">
 
@@ -290,7 +295,7 @@
                     <div class="voice-load-progress" id="voiceLoadProgress"></div>
                 </div>
 
-                <div class="ensayo-card ensayo-preplay" id="ensayoPreplay">
+                <div class="ensayo-card ensayo-preplay step-hidden" id="ensayoPreplay">
                     <div class="ensayo-card-label">Ajustes</div>
                     <div class="ensayo-preplay-label">Configura antes de iniciar</div>
                     <div class="controls-section" style="margin-bottom:0.5rem">
@@ -310,7 +315,7 @@
 
             </div>
 
-            <div class="ensayo-col-right">
+            <div class="ensayo-col-right step-hidden" id="ensayoColRight">
 
                 <div class="player-section" style="margin-bottom:0">
                     <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
@@ -336,7 +341,7 @@
                     </div>
                 </div>
 
-                <div class="ensayo-card ensayo-falseta-card">
+                <div class="ensayo-card ensayo-falseta-card step-hidden" id="ensayoFalsetaCard">
                     <div class="falseta-section-header">
                         <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
                         <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Act&iacute;valo con tu voz.</div>

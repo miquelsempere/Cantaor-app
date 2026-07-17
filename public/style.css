@@ -190,6 +190,47 @@ body {
     line-height: 1.5;
 }
 
+/* ── Step prompt (gamification) ── */
+.step-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 auto 2rem;
+    padding: 1rem 1.5rem;
+    max-width: 560px;
+    background: rgba(255, 184, 154, 0.06);
+    border: 1px solid rgba(255, 184, 154, 0.18);
+    border-radius: 14px;
+    text-align: center;
+    transition: border-color 0.3s ease, background 0.3s ease;
+}
+.step-prompt.step-prompt-changed {
+    animation: step-prompt-pop 0.45s ease;
+}
+@keyframes step-prompt-pop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.04); border-color: rgba(255, 184, 154, 0.45); }
+    100% { transform: scale(1); }
+}
+.step-prompt-num {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #FFB89A;
+}
+.step-prompt-text {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #F5EDE0;
+    line-height: 1.4;
+}
+
+.step-hidden {
+    display: none !important;
+}
+
 .palo-selector {
     margin-bottom: 2rem;
 }

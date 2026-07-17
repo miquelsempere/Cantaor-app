@@ -12125,6 +12125,9 @@ class EnsayoApp {
     this.trackSelector = document.getElementById('trackSelector');
     this.trackSelList = document.getElementById('trackSelectorList');
     this.voiceLoadProg = document.getElementById('voiceLoadProgress');
+    this.stepPromptText = document.getElementById('stepPromptText');
+    this.colRight = document.getElementById('ensayoColRight');
+    this.falsetaCard = document.getElementById('ensayoFalsetaCard');
     this.init();
   }
   async init() {
@@ -12440,9 +12443,6 @@ class EnsayoApp {
         this.selectDisplay.classList.remove('active');
       });
       this.selectOptions.addEventListener('click', e => e.stopPropagation());
-      if (palos.length > 0) {
-        await this._selectPalo(palos[0].nombre, this.selectOptions.querySelector('.custom-select-option'));
-      }
     } catch (err) {
       this._showError('Error cargando palos: ' + err.message);
     }
@@ -12461,6 +12461,15 @@ class EnsayoApp {
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
+    if (this.stepPromptText) {
+      this.stepPromptText.textContent = `Vamos a tocar un poquito por: ${palo}`;
+      const prompt = this.stepPromptText.closest('.step-prompt');
+      if (prompt) {
+        prompt.classList.remove('step-prompt-changed');
+        void prompt.offsetWidth;
+        prompt.classList.add('step-prompt-changed');
+      }
+    }
     await this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
