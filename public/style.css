@@ -253,6 +253,11 @@ body {
     display: none !important;
 }
 
+.step-continue-hidden {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
 .ensayo-layout.step-single {
     grid-template-columns: 1fr;
     max-width: 560px;

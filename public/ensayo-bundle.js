@@ -12486,7 +12486,7 @@ class EnsayoApp {
   _updateContinueButton() {
     if (!this.step2Continue) return;
     const anyChecked = this.trackSelList.querySelector('input[type="checkbox"]:checked');
-    this.step2Continue.classList.toggle('step-hidden', !anyChecked);
+    this.step2Continue.classList.toggle('step-continue-hidden', !anyChecked);
   }
   _renderTrackSelector(voices) {
     this.trackSelList.innerHTML = '';
