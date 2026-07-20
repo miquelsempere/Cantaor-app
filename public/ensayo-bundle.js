@@ -12124,7 +12124,7 @@ class EnsayoApp {
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
-    this.currentMode = 'random';
+    this.currentMode = null;
     this.paloGrid = document.getElementById('ensayoPaloGrid');
     this.playBtn = document.getElementById('ensayoPlayBtn');
     this.voiceToggle = document.getElementById('voiceToggle');
@@ -12400,6 +12400,7 @@ class EnsayoApp {
         this._setMode(mode, true);
       });
     });
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
   }
   _setMode(mode, persist) {
     this.currentMode = mode;
@@ -12419,14 +12420,12 @@ class EnsayoApp {
     if (persist && this.currentStep === 2 && this.isLoaded) this._goToStep(3);
   }
   async _loadPreferences(palo) {
-    if (!this.currentUser) {
-      this._setMode('random', false);
-      return;
-    }
+    if (!this.currentUser) return;
     try {
       const prefs = await ensayoPreferencesAPI.getPreferences(palo);
-      const mode = prefs && prefs.mode || 'random';
+      const mode = prefs && prefs.mode || null;
       const savedTitles = prefs && prefs.selected_titles || [];
+      if (!mode) return;
       this.currentMode = mode;
       this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -12449,7 +12448,7 @@ class EnsayoApp {
         this.engine.setSelectedVoices(null);
       }
     } catch (err) {
-      this._setMode('random', false);
+      /* sin preferencias: ningún modo preseleccionado */
     }
   }
   _getSelectedTitles() {
