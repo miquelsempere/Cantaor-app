@@ -487,11 +487,11 @@ class EnsayoApp {
     }
     if (this.step2Palo) this.step2Palo.textContent = palo;
     this.step2Substep.classList.add('step-hidden');
+    this._goToStep(2);
     await this._loadPaloContent(palo);
   }
 
   async _loadPaloContent(palo) {
-    this._showLoading('Buscando contenido para ' + palo + '...');
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([
         ensayoAPI.getPalmasBaseByPalo(palo),
@@ -499,12 +499,12 @@ class EnsayoApp {
         ensayoAPI.getSamplesByPalo(palo).catch(() => []),
       ]);
       if (!palmasBase) {
-        this._hideLoading();
+        this._goToStep(1);
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
         return;
       }
       if (canteVoices.length === 0) {
-        this._hideLoading();
+        this._goToStep(1);
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         return;
       }
@@ -517,11 +517,9 @@ class EnsayoApp {
         samplesRows.forEach(s => { samplesMeta[s.hit_type] = s.audio_url; });
       }
 
-      this._showLoading('Cargando palmas...');
       const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
 
       this.isLoaded = true;
-      this._hideLoading();
       this.playBtn.disabled = false;
       this._renderTrackSelector(canteVoices);
       this._buildDebugBeatGrid();
@@ -529,7 +527,6 @@ class EnsayoApp {
       this._updateDebugStatic();
 
       await this._loadPreferences(palo);
-      this._goToStep(2);
 
       // Background voice load progress indicator
       const total = canteVoices.length;
@@ -545,7 +542,7 @@ class EnsayoApp {
 
       if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
-      this._hideLoading();
+      this._goToStep(1);
       this._showError('Error cargando audio: ' + err.message);
     }
   }
