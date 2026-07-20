@@ -304,6 +304,7 @@ class EnsayoApp {
       this.step2Substep.classList.remove('step-hidden');
       this.trackSelector.style.display = '';
       this._applyTrackSelection();
+      this._updateContinueButton();
     }
     if (persist) this._savePreferences();
     if (persist && mode === 'random' && this.currentStep === 2 && this.isLoaded) this._goToStep(3);
@@ -323,6 +324,7 @@ class EnsayoApp {
           cb.checked = wasChecked;
           cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
         });
+        this._updateContinueButton();
       }
     } catch (err) {
       /* sin preferencias: ningún modo preseleccionado */
@@ -352,6 +354,7 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.add('checked');
       });
       this._applyTrackSelection();
+      this._updateContinueButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
@@ -360,8 +363,15 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.remove('checked');
       });
       this._applyTrackSelection();
+      this._updateContinueButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
+  }
+
+  _updateContinueButton() {
+    if (!this.step2Continue) return;
+    const anyChecked = this.trackSelList.querySelector('input[type="checkbox"]:checked');
+    this.step2Continue.classList.toggle('step-hidden', !anyChecked);
   }
 
   _renderTrackSelector(voices) {
@@ -389,6 +399,7 @@ class EnsayoApp {
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
         this._applyTrackSelection();
+        this._updateContinueButton();
         if (this.currentMode === 'selection') this._savePreferences();
       });
       this.trackSelList.appendChild(item);
