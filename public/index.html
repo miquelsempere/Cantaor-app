@@ -260,7 +260,7 @@
         }
         .command-flash.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-        .track-selector-header { display:flex; align-items:center; justify-content:flex-end; margin-bottom:0.75rem; }
+        .track-selector-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
         .track-selector-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); }
         .track-selector-actions { display:flex; gap:0.4rem; }
         .track-sel-btn {
@@ -416,7 +416,7 @@
         .step-2-substep.step-hidden { display:none !important; }
 
         .step-continue-btn {
-            padding:0.6rem 1.75rem; border:none; border-radius:12px; margin-top:1.25rem;
+            padding:0.6rem 1.75rem; border:none; border-radius:12px;
             background:linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
             color:white; font-size:0.9rem; font-weight:600; cursor:pointer;
             font-family:inherit; transition:all 0.2s ease;
@@ -477,13 +477,14 @@
             </div>
             <div class="mode-switch-wrap" id="modeSwitch">
                 <div class="mode-switch">
-                    <button class="mode-switch-btn" data-mode="random" type="button">Aleatorio</button>
+                    <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
                     <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
                 </div>
             </div>
             <div class="step-2-substep step-hidden" id="step2Substep">
                 <div class="track-selector ensayo-card" id="trackSelector">
                     <div class="track-selector-header">
+                        <span class="track-selector-label">Pistas de cante</span>
                         <div class="track-selector-actions">
                             <button class="track-sel-btn" id="trackSelAll">Todas</button>
                             <button class="track-sel-btn" id="trackSelNone">Ninguna</button>
@@ -493,7 +494,7 @@
                     <div class="voice-load-progress" id="voiceLoadProgress"></div>
                 </div>
             </div>
-            <button class="step-continue-btn" id="step2Continue" type="button" style="display:none">Continuar</button>
+            <button class="step-continue-btn" id="step2Continue" type="button">Continuar</button>
         </section>
 
         <section class="step step-3 step-hidden" id="step3">

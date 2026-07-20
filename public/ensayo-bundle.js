@@ -12124,7 +12124,7 @@ class EnsayoApp {
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
-    this.currentMode = null;
+    this.currentMode = 'random';
     this.paloGrid = document.getElementById('ensayoPaloGrid');
     this.playBtn = document.getElementById('ensayoPlayBtn');
     this.voiceToggle = document.getElementById('voiceToggle');
@@ -12412,51 +12412,31 @@ class EnsayoApp {
       this.step2Substep.classList.add('step-hidden');
       this.trackSelector.style.display = 'none';
       this.engine.setSelectedVoices(null);
-      this._updateContinueVisibility();
-      this._goToStep(3);
     } else {
       this.step2Substep.classList.remove('step-hidden');
       this.trackSelector.style.display = '';
       this._applyTrackSelection();
-      this._updateContinueVisibility();
     }
     if (persist) this._savePreferences();
   }
-  _resetModeSwitch() {
-    this.currentMode = null;
-    if (this.modeSwitch) {
-      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
-    }
-    this.step2Substep.classList.add('step-hidden');
-    this.trackSelector.style.display = 'none';
-    this._updateContinueVisibility();
-  }
-  _updateContinueVisibility() {
-    if (!this.step2Continue) return;
-    if (this.currentMode === 'selection') {
-      const checked = [...this.trackSelList.querySelectorAll('input:checked')];
-      this.step2Continue.style.display = checked.length > 0 ? '' : 'none';
-    } else {
-      this.step2Continue.style.display = 'none';
-    }
-  }
   async _loadPreferences(palo) {
     if (!this.currentUser) {
-      this._resetModeSwitch();
+      this._setMode('random', false);
       return;
     }
     try {
       const prefs = await ensayoPreferencesAPI.getPreferences(palo);
-      const mode = prefs && prefs.mode || null;
+      const mode = prefs && prefs.mode || 'random';
       const savedTitles = prefs && prefs.selected_titles || [];
+      this.currentMode = mode;
+      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
       if (mode === 'selection' && savedTitles.length > 0) {
-        this.currentMode = 'selection';
-        this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
-          btn.classList.toggle('active', btn.dataset.mode === 'selection');
-        });
         this.trackSelector.style.display = '';
         this.step2Substep.classList.remove('step-hidden');
         this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          const ids = JSON.parse(cb.dataset.ids);
           const label = cb.parentElement.querySelector('.track-check-title');
           const titleText = label ? label.textContent : null;
           const wasChecked = savedTitles.includes(titleText);
@@ -12464,22 +12444,13 @@ class EnsayoApp {
           cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
         });
         this._applyTrackSelection();
-        this._updateContinueVisibility();
       } else if (mode === 'random') {
-        this.currentMode = 'random';
-        this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
-          btn.classList.toggle('active', btn.dataset.mode === 'random');
-        });
         this.trackSelector.style.display = 'none';
         this.step2Substep.classList.add('step-hidden');
         this.engine.setSelectedVoices(null);
-        this._updateContinueVisibility();
-        this._goToStep(3);
-      } else {
-        this._resetModeSwitch();
       }
     } catch (err) {
-      this._resetModeSwitch();
+      this._setMode('random', false);
     }
   }
   _getSelectedTitles() {
@@ -12503,7 +12474,6 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.add('checked');
       });
       this._applyTrackSelection();
-      this._updateContinueVisibility();
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
@@ -12512,17 +12482,12 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.toggle('checked', i === 0);
       });
       this._applyTrackSelection();
-      this._updateContinueVisibility();
       if (this.currentMode === 'selection') this._savePreferences();
     });
   }
   _renderTrackSelector(voices) {
     this.trackSelList.innerHTML = '';
     if (!voices || voices.length === 0) {
-      this.trackSelector.style.display = 'none';
-      return;
-    }
-    if (this.currentMode !== 'selection') {
       this.trackSelector.style.display = 'none';
       return;
     }
@@ -12556,7 +12521,6 @@ class EnsayoApp {
           item.classList.add('checked');
         }
         this._applyTrackSelection();
-        this._updateContinueVisibility();
         if (this.currentMode === 'selection') this._savePreferences();
       });
       this.trackSelList.appendChild(item);
@@ -12570,7 +12534,6 @@ class EnsayoApp {
     } else {
       this.engine.setSelectedVoices(checkedCbs.flatMap(cb => JSON.parse(cb.dataset.ids)));
     }
-    this._updateContinueVisibility();
   }
   async _handlePlayClick() {
     if (this.engine.isPlaying) {
@@ -12643,7 +12606,7 @@ class EnsayoApp {
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
     if (this.step2Palo) this.step2Palo.textContent = palo;
-    this._resetModeSwitch();
+    this.step2Substep.classList.add('step-hidden');
     this._goToStep(2);
     await this._loadPaloContent(palo);
   }
