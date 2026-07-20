@@ -12161,6 +12161,7 @@ class EnsayoApp {
     this.step3El = document.getElementById('step3');
     this.step2Substep = document.getElementById('step2Substep');
     this.step2Back = document.getElementById('step2Back');
+    this.step2Continue = document.getElementById('step2Continue');
     this.step3Back = document.getElementById('step3Back');
     this.currentStep = 1;
     this.init();
@@ -12179,6 +12180,7 @@ class EnsayoApp {
   }
   _setupStepFlow() {
     if (this.step2Back) this.step2Back.addEventListener('click', () => this._goToStep(1));
+    if (this.step2Continue) this.step2Continue.addEventListener('click', () => this._goToStep(3));
     if (this.step3Back) this.step3Back.addEventListener('click', () => this._goToStep(2));
   }
   _goToStep(n) {
@@ -12417,7 +12419,7 @@ class EnsayoApp {
       this._applyTrackSelection();
     }
     if (persist) this._savePreferences();
-    if (persist && this.currentStep === 2 && this.isLoaded) this._goToStep(3);
+    if (persist && mode === 'random' && this.currentStep === 2 && this.isLoaded) this._goToStep(3);
   }
   async _loadPreferences(palo) {
     if (!this.currentUser) return;
