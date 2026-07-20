@@ -481,10 +481,6 @@ class EnsayoApp {
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
-    if (this.stepPromptText) {
-      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
-      if (paloSpan) paloSpan.textContent = palo;
-    }
     if (this.step2Palo) this.step2Palo.textContent = palo;
     this.step2Substep.classList.add('step-hidden');
     this._goToStep(2);
