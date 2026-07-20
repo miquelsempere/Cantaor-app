@@ -12403,7 +12403,7 @@ class EnsayoApp {
       });
     });
   }
-  _setMode(mode, persist, advance = true) {
+  _setMode(mode, persist) {
     this.currentMode = mode;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -12411,7 +12411,6 @@ class EnsayoApp {
     if (mode === 'random') {
       this.step2Substep.classList.add('step-hidden');
       this.engine.setSelectedVoices(null);
-      if (advance) this._goToStep(3);
     } else {
       this.step2Substep.classList.remove('step-hidden');
       this._applyTrackSelection();
@@ -12420,8 +12419,8 @@ class EnsayoApp {
   }
   async _loadPreferences(palo) {
     if (!this.currentUser) {
-      this._setMode('random', false, false);
-      return 'random';
+      this._setMode('random', false);
+      return;
     }
     try {
       const prefs = await ensayoPreferencesAPI.getPreferences(palo);
@@ -12448,10 +12447,8 @@ class EnsayoApp {
         this.step2Substep.classList.add('step-hidden');
         this.engine.setSelectedVoices(null);
       }
-      return mode;
     } catch (err) {
-      this._setMode('random', false, false);
-      return 'random';
+      this._setMode('random', false);
     }
   }
   _getSelectedTitles() {
@@ -12642,8 +12639,8 @@ class EnsayoApp {
       this._buildDebugBeatGrid();
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
-      const restoredMode = await this._loadPreferences(palo);
-      this._goToStep(restoredMode === 'random' ? 3 : 2);
+      await this._loadPreferences(palo);
+      this._goToStep(2);
 
       // Background voice load progress indicator
       const total = canteVoices.length;
