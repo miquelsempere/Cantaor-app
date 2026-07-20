@@ -295,9 +295,11 @@ class EnsayoApp {
     });
     if (mode === 'random') {
       this.step2Substep.classList.add('step-hidden');
+      this.trackSelector.style.display = 'none';
       this.engine.setSelectedVoices(null);
     } else {
       this.step2Substep.classList.remove('step-hidden');
+      this.trackSelector.style.display = '';
       this._applyTrackSelection();
     }
     if (persist) this._savePreferences();
