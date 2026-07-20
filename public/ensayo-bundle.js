@@ -12505,10 +12505,14 @@ class EnsayoApp {
       cb.type = 'checkbox';
       cb.checked = true;
       cb.dataset.ids = JSON.stringify(ids);
+      const mark = document.createElement('span');
+      mark.className = 'track-check-mark';
+      mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#C0392B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       const titleEl = document.createElement('span');
       titleEl.className = 'track-check-title';
       titleEl.textContent = label;
       item.appendChild(cb);
+      item.appendChild(mark);
       item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
