@@ -1727,6 +1727,12 @@ class DualStreamEngine {
     if (this.canteQueuePos >= this.canteQueue.length) {
       this._reshuffleQueue();
     }
+    if (this.canteQueue.length === 0) {
+      // Ninguna voz seleccionada: solo palmas, reprogramar siguiente entrada
+      const next = startContextTime + this.syncInterval;
+      this._scheduleNextCante(next);
+      return;
+    }
     const voiceIdx = this.canteQueue[this.canteQueuePos++];
     const voice = this.canteVoices[voiceIdx];
     const buffer = this.canteBuffers.get(voice.id);
@@ -1823,10 +1829,11 @@ class DualStreamEngine {
 
   /**
    * Restringe la rotacion de cante a los IDs indicados.
-   * Pasar null o un array vacio restaura "todas las pistas".
+   * Pasar null restaura "todas las pistas"; un array vacio significa
+   * ninguna voz (solo palmas).
    */
   setSelectedVoices(ids) {
-    if (!ids || ids.length === 0) {
+    if (ids === null) {
       this.selectedVoiceIds = null;
     } else {
       this.selectedVoiceIds = new Set(ids);
@@ -12464,9 +12471,9 @@ class EnsayoApp {
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
-      [...this.trackSelList.querySelectorAll('input[type="checkbox"]')].forEach((cb, i) => {
-        cb.checked = i === 0;
-        cb.closest('.track-check-item').classList.toggle('checked', i === 0);
+      this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.track-check-item').classList.remove('checked');
       });
       this._applyTrackSelection();
       if (this.currentMode === 'selection') this._savePreferences();
@@ -12488,10 +12495,10 @@ class EnsayoApp {
     });
     groups.forEach((ids, label) => {
       const item = document.createElement('label');
-      item.className = 'track-check-item checked';
+      item.className = 'track-check-item';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = true;
+      cb.checked = false;
       cb.dataset.ids = JSON.stringify(ids);
       const mark = document.createElement('span');
       mark.className = 'track-check-mark';
@@ -12504,10 +12511,6 @@ class EnsayoApp {
       item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
-        if ([...this.trackSelList.querySelectorAll('input:checked')].length === 0) {
-          cb.checked = true;
-          item.classList.add('checked');
-        }
         this._applyTrackSelection();
         if (this.currentMode === 'selection') this._savePreferences();
       });
