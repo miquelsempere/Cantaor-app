@@ -12661,38 +12661,30 @@ class EnsayoApp {
       const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
       if (paloSpan) paloSpan.textContent = palo;
     }
-    this.step2Intro.classList.add('step-hidden');
-    this.modeSwitch.classList.add('step-hidden');
+    if (this.step2Palo) this.step2Palo.textContent = palo;
+    // Show step 2 immediately — audio loads invisibly in the background
+    this.step2Intro.classList.remove('step-hidden');
+    this.modeSwitch.classList.remove('step-hidden');
+    this.step2Intro.classList.add('scene-enter');
+    this.currentMode = null;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
     this.preplay.classList.add('step-hidden');
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
     this.stepStartWrap.classList.add('step-hidden');
-    this.trackSelector.style.display = 'none';
-    this.currentMode = null;
-    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
-    if (this.step2Palo) this.step2Palo.textContent = palo;
-    await this._loadPaloContent(palo);
+    this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([ensayoAPI.getPalmasBaseByPalo(palo), ensayoAPI.getCanteVoicesByPalo(palo), ensayoAPI.getSamplesByPalo(palo).catch(() => [])]);
+      if (this.currentPalo !== palo) return;
       if (!palmasBase) {
-        if (this._loadingTimer) {
-          clearTimeout(this._loadingTimer);
-          this._loadingTimer = null;
-        }
-        this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
         this._restoreStep1();
         return;
       }
       if (canteVoices.length === 0) {
-        if (this._loadingTimer) {
-          clearTimeout(this._loadingTimer);
-          this._loadingTimer = null;
-        }
-        this._hideLoading();
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         this._restoreStep1();
         return;
@@ -12706,32 +12698,19 @@ class EnsayoApp {
           samplesMeta[s.hit_type] = s.audio_url;
         });
       }
-      const result = await new Promise((resolve, reject) => {
-        this._loadingTimer = setTimeout(() => {
-          this._loadingTimer = null;
-          this._showLoading('Cargando palmas...');
-          this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta).then(resolve, reject);
-        }, 250);
-      });
-      if (this._loadingTimer) {
-        clearTimeout(this._loadingTimer);
-        this._loadingTimer = null;
-      }
+      const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
+      if (this.currentPalo !== palo) return;
       this.isLoaded = true;
-      this._hideLoading();
       this.playBtn.disabled = false;
       this._renderTrackSelector(canteVoices);
       this._buildDebugBeatGrid();
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
-      this.step2Intro.classList.remove('step-hidden');
-      this.modeSwitch.classList.remove('step-hidden');
       this.currentMode = null;
       this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
       this.trackSelector.style.display = 'none';
       this.stepStartWrap.classList.add('step-hidden');
       this.ensayoLayout.classList.add('step-hidden');
-      this.step2Intro.classList.add('scene-enter');
       await this._loadPreferences(palo);
 
       // Background voice load progress indicator
@@ -12747,11 +12726,6 @@ class EnsayoApp {
       }
       if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
-      if (this._loadingTimer) {
-        clearTimeout(this._loadingTimer);
-        this._loadingTimer = null;
-      }
-      this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
       this._restoreStep1();
     }
