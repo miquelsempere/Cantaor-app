@@ -48,14 +48,6 @@ class EnsayoApp {
     this.step2Intro      = document.getElementById('step2Intro');
     this.step2Palo       = document.getElementById('step2Palo');
     this.modeSwitch      = document.getElementById('modeSwitch');
-    this.step1El        = document.getElementById('step1');
-    this.step2El        = document.getElementById('step2');
-    this.step3El        = document.getElementById('step3');
-    this.step2Substep   = document.getElementById('step2Substep');
-    this.step2Continue  = document.getElementById('step2Continue');
-    this.step2Back      = document.getElementById('step2Back');
-    this.step3Back      = document.getElementById('step3Back');
-    this.currentStep    = 1;
 
     this.init();
   }
@@ -67,30 +59,9 @@ class EnsayoApp {
     this._setupControls();
     this._setupTrackSelector();
     this._setupModeSwitch();
-    this._setupStepFlow();
     this._setupAdminSecretAccess();
     this._setupDebugPanel();
     await this._loadPalos();
-  }
-
-  _setupStepFlow() {
-    if (this.step2Back) this.step2Back.addEventListener('click', () => this._goToStep(1));
-    if (this.step3Back) this.step3Back.addEventListener('click', () => this._goToStep(2));
-    if (this.step2Continue) this.step2Continue.addEventListener('click', () => this._goToStep(3));
-  }
-
-  _goToStep(n) {
-    if (n === this.currentStep) return;
-    if (n < this.currentStep && this.engine.isPlaying) { this.engine.stop(); this.ensayo.stopVoice(); this._updatePlayUI(false); }
-    const fromEl = this.currentStep === 1 ? this.step1El : this.currentStep === 2 ? this.step2El : this.step3El;
-    const toEl   = n === 1 ? this.step1El : n === 2 ? this.step2El : this.step3El;
-    fromEl.classList.add('step-leaving');
-    setTimeout(() => {
-      fromEl.classList.remove('step-leaving');
-      fromEl.classList.add('step-hidden');
-      toEl.classList.remove('step-hidden');
-      this.currentStep = n;
-    }, 300);
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -294,10 +265,10 @@ class EnsayoApp {
       btn.classList.toggle('active', btn.dataset.mode === mode);
     });
     if (mode === 'random') {
-      this.step2Substep.classList.add('step-hidden');
+      this.trackSelector.style.display = 'none';
       this.engine.setSelectedVoices(null);
     } else {
-      this.step2Substep.classList.remove('step-hidden');
+      this.trackSelector.style.display = '';
       this._applyTrackSelection();
     }
     if (persist) this._savePreferences();
@@ -315,7 +286,6 @@ class EnsayoApp {
       });
       if (mode === 'selection' && savedTitles.length > 0) {
         this.trackSelector.style.display = '';
-        this.step2Substep.classList.remove('step-hidden');
         this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
           const ids = JSON.parse(cb.dataset.ids);
           const label = cb.parentElement.querySelector('.track-check-title');
@@ -327,7 +297,6 @@ class EnsayoApp {
         this._applyTrackSelection();
       } else if (mode === 'random') {
         this.trackSelector.style.display = 'none';
-        this.step2Substep.classList.add('step-hidden');
         this.engine.setSelectedVoices(null);
       }
     } catch (err) {
@@ -480,8 +449,12 @@ class EnsayoApp {
       const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
       if (paloSpan) paloSpan.textContent = palo;
     }
+    this.step2Intro.classList.add('step-hidden');
+    this.modeSwitch.classList.add('step-hidden');
+    this.preplay.classList.add('step-hidden');
+    this.colRight.classList.add('step-hidden');
+    this.falsetaCard.classList.add('step-hidden');
     if (this.step2Palo) this.step2Palo.textContent = palo;
-    this.step2Substep.classList.add('step-hidden');
     await this._loadPaloContent(palo);
   }
 
@@ -523,8 +496,13 @@ class EnsayoApp {
       this._attachSamplerCallbacks();
       this._updateDebugStatic();
 
+      this.step2Intro.classList.remove('step-hidden');
+      this.modeSwitch.classList.remove('step-hidden');
+      this.preplay.classList.remove('step-hidden');
+      this.colRight.classList.remove('step-hidden');
+      this.falsetaCard.classList.remove('step-hidden');
+      this.step2Intro.classList.add('scene-enter');
       await this._loadPreferences(palo);
-      this._goToStep(2);
 
       // Background voice load progress indicator
       const total = canteVoices.length;
