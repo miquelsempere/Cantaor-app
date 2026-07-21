@@ -509,13 +509,15 @@ body {
 .play-button {
     width: 96px;
     height: 96px;
-    border: none;
+    border: 1.5px solid rgba(255, 220, 200, 0.22);
     border-radius: 50%;
-    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-    color: white;
+    background: rgba(255, 220, 200, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #F5EDE0;
     cursor: pointer;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 20px rgba(192, 57, 43, 0.35), 0 0 0 0 rgba(192, 57, 43, 0.2);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, border-color 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 220, 200, 0.15);
     margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
@@ -524,17 +526,33 @@ body {
 
 .play-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(192, 57, 43, 0.45), 0 0 0 4px rgba(192, 57, 43, 0.1);
+    background: rgba(255, 220, 200, 0.18);
+    border-color: rgba(255, 220, 200, 0.35);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 220, 200, 0.2);
 }
 
 .play-button:active {
-    transform: translateY(0);
+    transform: scale(0.96);
+    background: rgba(255, 220, 200, 0.1);
 }
 
 .play-button:disabled {
-    opacity: 0.6;
+    opacity: 0.35;
     cursor: not-allowed;
     transform: none;
+}
+
+.play-button.is-playing {
+    background: rgba(255, 220, 200, 0.16);
+    border-color: rgba(230, 126, 34, 0.45);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 220, 200, 0.15), 0 0 0 0 rgba(230, 126, 34, 0.4);
+    animation: play-ring-pulse 2s ease-out infinite;
+}
+
+@keyframes play-ring-pulse {
+    0%   { box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,220,200,0.15), 0 0 0 0 rgba(230,126,34,0.35); }
+    60%  { box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,220,200,0.15), 0 0 0 12px rgba(230,126,34,0); }
+    100% { box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,220,200,0.15), 0 0 0 0 rgba(230,126,34,0); }
 }
 
 .play-icon,
@@ -716,10 +734,11 @@ body {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+    background: rgba(255, 220, 200, 0.3);
+    border: 1.5px solid rgba(255, 220, 200, 0.5);
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    margin-top: -4px;
 }
 
 /* Capo styling for pitch slider */
@@ -742,11 +761,11 @@ body {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+    background: rgba(255, 220, 200, 0.3);
+    border: 1.5px solid rgba(255, 220, 200, 0.5);
     cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 6px rgba(192, 57, 43, 0.3);
-  margin-top: -4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    margin-top: -4px;
 }
 
 #pitchSlider::-moz-range-thumb {
