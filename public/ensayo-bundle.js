@@ -12795,7 +12795,7 @@ class EnsayoApp {
     }
   }
   _resetCanteInfo() {
-    this.canteTitle.textContent = 'Esperando inicio...';
+    this.canteTitle.textContent = 'Esperando inicio…';
     this.canteTitle.classList.add('empty');
   }
   _showLoading(msg) {

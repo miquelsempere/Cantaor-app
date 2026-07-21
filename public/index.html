@@ -44,18 +44,6 @@
             gap: 1.25rem;
         }
 
-        .ensayo-status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(20, 10, 10, 0.35);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 220, 200, 0.1);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            min-height: 52px;
-        }
-
         /* ── Paso 1: prompt abierto + rejilla de palos (sin cajas) ── */
         .step-intro { text-align: center; margin-bottom: 2rem; }
         .step-eyebrow {
@@ -248,8 +236,7 @@
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
         .ensayo-cante-info {
-            background: rgba(20, 10, 10, 0.35); backdrop-filter: blur(8px); border: 1px solid rgba(255, 220, 200, 0.1); border-radius: 10px;
-            padding: 0.9rem 1rem; min-height: 60px;
+            padding: 0.25rem 0;
             display: flex; flex-direction: column; justify-content: center;
         }
         .ensayo-cante-label {
@@ -262,15 +249,15 @@
         .ensayo-actions { display: flex; gap: 0.75rem; width: 100%; }
         .action-btn {
             flex: 1; padding: 0.75rem 1rem; border: none; border-radius: 10px;
-            font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, color 0.25s ease;
             display: flex; align-items: center; justify-content: center; gap: 0.4rem;
         }
         .action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
         .ensayo-preplay-label { font-size:0.75rem; color:rgba(245, 237, 224, 0.6); margin-bottom:0.5rem; font-weight:500; }
         .ensayo-preplay.locked .control-slider,
-        .ensayo-preplay.locked .ensayo-preplay-label { opacity:0.5; pointer-events:none; }
-        .locked-note { display:none; font-size:0.68rem; color:#FFB89A; margin-top:0.3rem; }
+        .ensayo-preplay.locked .control-label { opacity:0.5; pointer-events:none; }
+        .locked-note { display:none; font-size:0.68rem; color:#FFB89A; margin-top:0.5rem; text-align:center; }
         .ensayo-preplay.locked .locked-note { display:block; }
 
         .toggle-switch { position:relative; width:44px; height:24px; flex-shrink:0; }
@@ -332,7 +319,7 @@
         .ensayo-admin-tabs { display:flex; gap:0.5rem; margin-bottom:1.25rem; }
         .admin-tab-btn {
             flex:1; padding:0.5rem 0.5rem; border:1.5px solid rgba(255, 220, 200, 0.15); border-radius:10px;
-            background:rgba(20, 10, 10, 0.3); color:rgba(245, 237, 224, 0.6); font-size:0.75rem; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit;
+            background:rgba(20, 10, 10, 0.3); color:rgba(245, 237, 224, 0.6); font-size:0.75rem; font-weight:600; cursor:pointer; transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease; font-family:inherit;
         }
         .admin-tab-btn:hover { border-color: rgba(255, 220, 200, 0.3); color: #F5EDE0; }
         .admin-tab-btn.active { background:rgba(255, 184, 154, 0.15); color:#FFB89A; border-color:#FFB89A; box-shadow: 0 0 12px rgba(255, 184, 154, 0.1); }
@@ -377,25 +364,39 @@
         .debug-log-entry { font-size:0.72rem; color:#ccc; padding:0.15rem 0; border-bottom:1px solid #222; }
         .debug-hint { font-size:0.62rem; color:#555; margin-top:0.5rem; }
 
-        .ensayo-card { background:rgba(20, 10, 10, 0.35); backdrop-filter:blur(12px); border:1px solid rgba(255, 220, 200, 0.12); border-radius:14px; padding:1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.12); transition: border-color 0.2s ease; }
-        .ensayo-card:hover { border-color: rgba(255, 220, 200, 0.2); }
-        .ensayo-card-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); margin-bottom:0.75rem; }
-        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.6rem; padding:0.9rem; }
-        .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; min-height:auto; padding:0.5rem 0.75rem; }
-        .ensayo-falseta-card .action-btn { padding:0.5rem 0.75rem; font-size:0.82rem; }
-        .ensayo-player-card { display:flex; flex-direction:column; align-items:center; padding:1.1rem; }
-        .ensayo-player-card .player-section { width:100%; }
-        .falseta-section-header { display:flex; flex-direction:column; gap:0.2rem; margin-bottom:0.1rem; }
-        .falseta-voice-toggle { display:flex; align-items:center; gap:0.4rem; }
-        .falseta-section-title { display:flex; align-items:center; gap:0.45rem; font-size:0.9rem; font-weight:700; color:#F5EDE0; }
-        .falseta-section-title .title-dot { width:8px; height:8px; border-radius:50%; background:#E67E22; flex-shrink:0; }
-        .falseta-section-explain { font-size:0.74rem; line-height:1.4; color:rgba(245, 237, 224, 0.6); margin-top:-0.1rem; }
-        .falseta-voice-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; background:rgba(30, 15, 15, 0.25); border:1px solid rgba(255, 220, 200, 0.08); border-radius:10px; padding:0.5rem 0.75rem; }
-        .falseta-voice-label { display:flex; flex-direction:column; gap:0.1rem; }
-        .falseta-voice-name { font-size:0.78rem; font-weight:600; color:#F5EDE0; display:flex; align-items:center; gap:0.4rem; }
-        .falseta-voice-hint { font-size:0.66rem; color:rgba(245, 237, 224, 0.5); }
+        .ensayo-console { background:rgba(20, 10, 10, 0.4); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255, 220, 200, 0.12); border-radius:18px; padding:1.75rem 1.5rem; box-shadow: 0 4px 24px rgba(0,0,0,0.15); display:flex; flex-direction:column; align-items:center; }
+        .console-divider { width:100%; height:1px; background:rgba(255, 220, 200, 0.08); margin:1.25rem 0; border:none; }
+        .ensayo-col-right { display:flex; flex-direction:column; align-items:center; gap:0.5rem; width:100%; }
+        .console-now-playing { width:100%; text-align:center; padding-top:0.25rem; }
+        .ensayo-preplay { width:100%; }
+        .console-controls { display:grid; grid-template-columns:1fr 1px 1fr; gap:1.25rem; align-items:center; }
+        .console-controls-sep { width:1px; height:48px; background:rgba(255, 220, 200, 0.08); align-self:center; }
+        .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.65rem; width:100%; }
+        .console-falseta-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+        .falseta-status-info { display:flex; align-items:center; gap:0.5rem; font-size:0.88rem; font-weight:600; color:#F5EDE0; }
+        .falseta-voice-control { display:flex; align-items:center; gap:0.6rem; }
+        .falseta-section-explain { font-size:0.74rem; line-height:1.4; color:rgba(245, 237, 224, 0.5); }
+        .ensayo-preplay .control-label { font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255, 184, 154, 0.7); }
+        .ensayo-preplay .control-value { font-size:0.82rem; }
+        .ensayo-preplay.locked .control-slider,
+        .ensayo-preplay.locked .control-label { opacity:0.5; pointer-events:none; }
+        .locked-note { display:none; font-size:0.68rem; color:#FFB89A; margin-top:0.5rem; text-align:center; }
+        .ensayo-preplay.locked .locked-note { display:block; }
+        .play-button:focus-visible { outline: 2px solid #FFB89A; outline-offset: 4px; }
+        .control-slider:focus-visible { outline: 2px solid #FFB89A; outline-offset: 4px; }
+        .step-back-link:focus-visible { outline: 2px solid #FFB89A; outline-offset: 4px; border-radius: 4px; }
+        .toggle-switch input:focus-visible + .toggle-track { outline: 2px solid #FFB89A; outline-offset: 4px; }
+        @media (prefers-reduced-motion: reduce) {
+            .ensayo-card.scene-enter, .step-intro.scene-enter, .ensayo-layout.scene-enter { animation: none !important; }
+            .visualizer.playing .visualizer-bar { animation: none !important; opacity: 0.5; }
+            .play-button, .step-start-btn, .palo-chip, .mode-switch-btn, .track-check-item, .track-sel-btn { transition: none !important; }
+        }
 
         .player-section { display:flex; flex-direction:column; align-items:center; margin-bottom:0; }
+        @media (max-width:680px) {
+            .console-controls { grid-template-columns:1fr; gap:0.75rem; }
+            .console-controls-sep { display:none; }
+        }
 
         @media (max-width:680px) {
             .ensayo-container { max-width:100%; padding: 0 1rem; }
@@ -488,83 +489,68 @@
         </div>
 
         <div class="ensayo-layout step-single step-hidden" id="ensayoLayout">
-            <div class="ensayo-col-left">
+            <div class="ensayo-console">
 
-                <div class="ensayo-card ensayo-preplay step-hidden" id="ensayoPreplay">
-                    <div class="ensayo-card-label">Ajustes</div>
-                    <div class="ensayo-preplay-label">Configura antes de iniciar</div>
-                    <div class="controls-section" style="margin-bottom:0.5rem">
+                <div class="ensayo-col-right step-hidden" id="ensayoColRight">
+                    <button id="ensayoPlayBtn" class="play-button" disabled aria-label="Reproducir">
+                        <div class="play-icon">
+                            <svg viewBox="0 0 24 24" width="28" height="28"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                        </div>
+                        <div class="pause-icon">
+                            <svg viewBox="0 0 24 24" width="28" height="28"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
+                        </div>
+                    </button>
+                    <div class="visualizer" id="ensayoVisualizer" aria-hidden="true">
+                        <div class="visualizer-bars">
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                        </div>
+                    </div>
+                    <div class="console-now-playing">
+                        <div class="ensayo-cante-label">Sonando ahora</div>
+                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio&hellip;</div>
+                    </div>
+                </div>
+
+                <div class="console-divider" aria-hidden="true"></div>
+
+                <div class="ensayo-preplay step-hidden" id="ensayoPreplay">
+                    <div class="console-controls">
                         <div class="control-group">
-                            <label class="control-label">Compas</label>
+                            <label class="control-label" for="ensayoTempoSlider">Comp&aacute;s</label>
                             <input type="range" id="ensayoTempoSlider" class="control-slider" min="0.5" max="1.5" step="0.05" value="1.0">
                             <div class="control-value" id="ensayoTempoValue">1.00x</div>
                         </div>
+                        <div class="console-controls-sep" aria-hidden="true"></div>
                         <div class="control-group">
-                            <label class="control-label">Cejilla</label>
+                            <label class="control-label" for="ensayoPitchSlider">Cejilla</label>
                             <input type="range" id="ensayoPitchSlider" class="control-slider" min="-5" max="5" step="1" value="0">
                             <div class="control-value" id="ensayoPitchValue">Traste 5</div>
                         </div>
                     </div>
-                    <div class="locked-note" id="ensayoLockedNote">Ajusta compas y cejilla antes de reproducir</div>
+                    <div class="locked-note" id="ensayoLockedNote">Ajusta comp&aacute;s y cejilla antes de reproducir</div>
                 </div>
 
-            </div>
+                <div class="console-divider" aria-hidden="true"></div>
 
-            <div class="ensayo-col-right step-hidden" id="ensayoColRight">
-
-                <div class="ensayo-card ensayo-player-card">
-                    <div class="ensayo-card-label">Reproducir</div>
-                    <div class="player-section" style="margin-bottom:0">
-                        <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
-                            <div class="play-icon">
-                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
-                            </div>
-                            <div class="pause-icon">
-                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
-                            </div>
-                        </button>
-                        <div class="visualizer" id="ensayoVisualizer" style="width:100%;margin:0 0 0.25rem">
-                            <div class="visualizer-bars">
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            </div>
-                        </div>
-                        <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
-                            <div class="ensayo-cante-label">Sonando ahora</div>
-                            <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ensayo-card ensayo-falseta-card step-hidden" id="ensayoFalsetaCard">
-                    <div class="ensayo-card-label">Falseta</div>
-                    <div class="falseta-section-header">
-                        <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
-                        <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Act&iacute;valo con tu voz.</div>
-                    </div>
-                    <div class="ensayo-status-bar ensayo-falseta-status">
-                        <div class="status-mode">
+                <div class="ensayo-falseta-card step-hidden" id="ensayoFalsetaCard">
+                    <div class="console-falseta-row">
+                        <div class="falseta-status-info">
                             <span class="status-dot stopped" id="statusDot"></span>
-                            <span id="statusText">Listo para empezar</span>
+                            <span id="statusText" aria-live="polite">Listo para empezar</span>
+                        </div>
+                        <div class="falseta-voice-control">
+                            <span class="voice-dot" id="voiceDot"></span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="voiceToggle" disabled>
+                                <span class="toggle-track"></span>
+                            </label>
                         </div>
                     </div>
-                    <div class="falseta-voice-row">
-                        <div class="falseta-voice-label">
-                            <div class="falseta-voice-name">
-                                <span class="voice-dot" id="voiceDot"></span>
-                                Control por voz
-                            </div>
-                            <div class="falseta-voice-hint">Di &laquo;falseta&raquo; o &laquo;vamos alla&raquo;</div>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="voiceToggle" disabled>
-                            <span class="toggle-track"></span>
-                        </label>
-                    </div>
-
+                    <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Di &laquo;falseta&raquo; o &laquo;vamos alla&raquo; para activarlo.</div>
                 </div>
 
             </div>
