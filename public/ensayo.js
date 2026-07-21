@@ -271,10 +271,6 @@ class EnsayoApp {
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
     this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.remove('selected'));
-    if (this.stepPromptText) {
-      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
-      if (paloSpan) paloSpan.textContent = '…';
-    }
     this.tempoSlider.value = 1.0;
     this.engine.setTempo(1.0);
     this.tempoValue.textContent = '1.00x';
@@ -536,10 +532,6 @@ class EnsayoApp {
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
-    if (this.stepPromptText) {
-      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
-      if (paloSpan) paloSpan.textContent = palo;
-    }
     this.step2Intro.classList.add('step-hidden');
     this.modeSwitch.classList.add('step-hidden');
     this.preplay.classList.add('step-hidden');
