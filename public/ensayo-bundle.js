@@ -12157,6 +12157,7 @@ class EnsayoApp {
     this.step2Intro = document.getElementById('step2Intro');
     this.step2Palo = document.getElementById('step2Palo');
     this.stepBackBtn = document.getElementById('stepBackBtn');
+    this.ensayoBackBtn = document.getElementById('ensayoBackBtn');
     this.modeSwitch = document.getElementById('modeSwitch');
     this.stepStartWrap = document.getElementById('stepStartWrap');
     this.stepStartBtn = document.getElementById('stepStartBtn');
@@ -12365,6 +12366,9 @@ class EnsayoApp {
     if (this.stepBackBtn) {
       this.stepBackBtn.addEventListener('click', () => this._resetToStep1());
     }
+    if (this.ensayoBackBtn) {
+      this.ensayoBackBtn.addEventListener('click', () => this._backToStep2());
+    }
     if (this.stepStartBtn) {
       this.stepStartBtn.addEventListener('click', () => this._advanceToStep3());
     }
@@ -12394,9 +12398,30 @@ class EnsayoApp {
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
   }
-
-  // ─── Track selector ────────────────────────────────────────────────────────
-
+  _backToStep2() {
+    if (this.engine.isPlaying) this.engine.stop();
+    this.ensayo.stopVoice();
+    this._updateVoiceIndicator('off');
+    this._resetCanteInfo();
+    this.isLoaded = false;
+    this.playBtn.disabled = true;
+    this._hideError();
+    this.trackSelector.style.display = 'none';
+    this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+      cb.closest('.track-check-item').classList.remove('checked');
+    });
+    this.preplay.classList.add('step-hidden');
+    this.colRight.classList.add('step-hidden');
+    this.falsetaCard.classList.add('step-hidden');
+    this.ensayoLayout.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('step-hidden');
+    this.currentMode = null;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
+    this.step2Intro.classList.remove('step-hidden');
+    this.modeSwitch.classList.remove('step-hidden');
+    this.step2Intro.classList.add('scene-enter');
+  }
   _setupModeSwitch() {
     if (!this.modeSwitch) return;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
