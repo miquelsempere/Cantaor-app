@@ -304,7 +304,6 @@ class EnsayoApp {
       this.step2Substep.classList.remove('step-hidden');
       this.trackSelector.style.display = '';
       this._applyTrackSelection();
-      this._updateContinueButton();
     }
     if (persist) this._savePreferences();
     if (persist && mode === 'random' && this.currentStep === 2 && this.isLoaded) this._goToStep(3);
@@ -324,7 +323,6 @@ class EnsayoApp {
           cb.checked = wasChecked;
           cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
         });
-        this._updateContinueButton();
       }
     } catch (err) {
       /* sin preferencias: ningún modo preseleccionado */
@@ -354,24 +352,16 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.add('checked');
       });
       this._applyTrackSelection();
-      this._updateContinueButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
-      this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-        cb.closest('.track-check-item').classList.remove('checked');
+      [...this.trackSelList.querySelectorAll('input[type="checkbox"]')].forEach((cb, i) => {
+        cb.checked = i === 0;
+        cb.closest('.track-check-item').classList.toggle('checked', i === 0);
       });
       this._applyTrackSelection();
-      this._updateContinueButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
-  }
-
-  _updateContinueButton() {
-    if (!this.step2Continue) return;
-    const anyChecked = this.trackSelList.querySelector('input[type="checkbox"]:checked');
-    this.step2Continue.classList.toggle('step-continue-hidden', !anyChecked);
   }
 
   _renderTrackSelector(voices) {
@@ -387,9 +377,9 @@ class EnsayoApp {
     });
     groups.forEach((ids, label) => {
       const item = document.createElement('label');
-      item.className = 'track-check-item';
+      item.className = 'track-check-item checked';
       const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.checked = false; cb.dataset.ids = JSON.stringify(ids);
+      cb.type = 'checkbox'; cb.checked = true; cb.dataset.ids = JSON.stringify(ids);
       const mark = document.createElement('span');
       mark.className = 'track-check-mark';
       mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#C0392B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -398,8 +388,10 @@ class EnsayoApp {
       item.appendChild(cb); item.appendChild(mark); item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
+        if ([...this.trackSelList.querySelectorAll('input:checked')].length === 0) {
+          cb.checked = true; item.classList.add('checked');
+        }
         this._applyTrackSelection();
-        this._updateContinueButton();
         if (this.currentMode === 'selection') this._savePreferences();
       });
       this.trackSelList.appendChild(item);
