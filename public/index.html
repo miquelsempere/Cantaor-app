@@ -260,7 +260,7 @@
         }
         .command-flash.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-        .track-selector-header { display:flex; align-items:center; justify-content:flex-end; margin-bottom:0.75rem; }
+        .track-selector-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
         .track-selector-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); }
         .track-selector-actions { display:flex; gap:0.4rem; }
         .track-sel-btn {
@@ -277,7 +277,7 @@
             border-color: rgba(255, 184, 154, 0.45);
             color:#F5EDE0; background:rgba(255, 184, 154, 0.1);
         }
-        .track-selector-list { display:flex; flex-direction:column; gap:0.5rem; max-height:264px; overflow-y:auto; padding-right:0.15rem; padding-top:0.25rem; }
+        .track-selector-list { display:flex; flex-direction:column; gap:0.5rem; max-height:260px; overflow-y:auto; padding-right:0.15rem; }
         .track-check-item {
             display:flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem;
             font-family:inherit; font-size:0.95rem; font-weight:600;
@@ -286,7 +286,8 @@
             border:1px solid rgba(255, 220, 200, 0.14);
             border-radius:999px; cursor:pointer; user-select:none;
             transition: transform 0.18s cubic-bezier(0.4,0,0.2,1),
-                        background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+                        background 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+                        box-shadow 0.2s ease;
         }
         .track-check-item:hover {
             transform: translateY(-2px);
@@ -418,11 +419,7 @@
             padding:0.6rem 1.75rem; border:none; border-radius:12px;
             background:linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
             color:white; font-size:0.9rem; font-weight:600; cursor:pointer;
-            font-family:inherit;
-            opacity:1; transform:translateY(0) scale(1);
-            transition:opacity 0.35s cubic-bezier(0.34, 1.2, 0.64, 1),
-                       transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1),
-                       box-shadow 0.2s ease;
+            font-family:inherit; transition:all 0.2s ease;
         }
         .step-continue-btn:hover { box-shadow:0 4px 14px rgba(192, 57, 43, 0.35); transform:translateY(-1px); }
 
@@ -480,13 +477,14 @@
             </div>
             <div class="mode-switch-wrap" id="modeSwitch">
                 <div class="mode-switch">
-                    <button class="mode-switch-btn" data-mode="random" type="button">Aleatorio</button>
+                    <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
                     <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
                 </div>
             </div>
             <div class="step-2-substep step-hidden" id="step2Substep">
                 <div class="track-selector ensayo-card" id="trackSelector">
                     <div class="track-selector-header">
+                        <span class="track-selector-label">Pistas de cante</span>
                         <div class="track-selector-actions">
                             <button class="track-sel-btn" id="trackSelAll">Todas</button>
                             <button class="track-sel-btn" id="trackSelNone">Ninguna</button>
@@ -495,8 +493,8 @@
                     <div class="track-selector-list" id="trackSelectorList"></div>
                     <div class="voice-load-progress" id="voiceLoadProgress"></div>
                 </div>
-                <button class="step-continue-btn step-continue-hidden" id="step2Continue" type="button">Continuar</button>
             </div>
+            <button class="step-continue-btn" id="step2Continue" type="button">Continuar</button>
         </section>
 
         <section class="step step-3 step-hidden" id="step3">
