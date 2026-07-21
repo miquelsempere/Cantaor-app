@@ -12157,6 +12157,8 @@ class EnsayoApp {
     this.voiceDot = document.getElementById('voiceDot');
     this.canteTitle = document.getElementById('canteTitle');
     this.ensayoError = document.getElementById('ensayoError');
+    this.ensayoLoading = document.getElementById('ensayoLoading');
+    this.loadingText = document.getElementById('ensayoLoadingText');
     this.preplay = document.getElementById('ensayoPreplay');
     this.tempoSlider = document.getElementById('ensayoTempoSlider');
     this.tempoValue = document.getElementById('ensayoTempoValue');
@@ -12403,6 +12405,7 @@ class EnsayoApp {
     this.currentPalo = null;
     this.playBtn.disabled = true;
     this._hideError();
+    this._hideLoading();
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
@@ -12419,27 +12422,15 @@ class EnsayoApp {
     this.pitchValue.textContent = 'Traste 5';
     this.voiceToggle.checked = false;
     this.engine.unload();
-    this.step2Intro.classList.add('step-exit');
-    this.modeSwitch.classList.add('step-exit');
-    setTimeout(() => {
-      this.step2Intro.classList.remove('step-exit');
-      this.modeSwitch.classList.remove('step-exit');
-      this.step2Intro.classList.add('step-hidden');
-      this.modeSwitch.classList.add('step-hidden');
-      this.preplay.classList.add('step-hidden');
-      this.colRight.classList.add('step-hidden');
-      this.falsetaCard.classList.add('step-hidden');
-      this.ensayoLayout.classList.add('step-hidden');
-      this.stepStartWrap.classList.add('step-hidden');
-      this.step1Intro.classList.remove('step-hidden');
-      this.paloGrid.classList.remove('step-hidden');
-      this.step1Intro.classList.add('step-enter');
-      this.paloGrid.classList.add('step-enter');
-      setTimeout(() => {
-        this.step1Intro.classList.remove('step-enter');
-        this.paloGrid.classList.remove('step-enter');
-      }, 400);
-    }, 250);
+    this.step1Intro.classList.remove('step-hidden');
+    this.paloGrid.classList.remove('step-hidden');
+    this.step2Intro.classList.add('step-hidden');
+    this.modeSwitch.classList.add('step-hidden');
+    this.preplay.classList.add('step-hidden');
+    this.colRight.classList.add('step-hidden');
+    this.falsetaCard.classList.add('step-hidden');
+    this.ensayoLayout.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('step-hidden');
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
   }
@@ -12656,14 +12647,8 @@ class EnsayoApp {
   async _selectPalo(palo, chipEl) {
     if (this.engine.isPlaying) return;
     this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.toggle('selected', c === chipEl));
-    this.step1Intro.classList.add('step-exit');
-    this.paloGrid.classList.add('step-exit');
-    setTimeout(() => {
-      this.step1Intro.classList.remove('step-exit');
-      this.paloGrid.classList.remove('step-exit');
-      this.step1Intro.classList.add('step-hidden');
-      this.paloGrid.classList.add('step-hidden');
-    }, 250);
+    this.step1Intro.classList.add('step-hidden');
+    this.paloGrid.classList.add('step-hidden');
     this.currentPalo = palo;
     this.isLoaded = false;
     this.playBtn.disabled = true;
@@ -12693,11 +12678,21 @@ class EnsayoApp {
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([ensayoAPI.getPalmasBaseByPalo(palo), ensayoAPI.getCanteVoicesByPalo(palo), ensayoAPI.getSamplesByPalo(palo).catch(() => [])]);
       if (!palmasBase) {
+        if (this._loadingTimer) {
+          clearTimeout(this._loadingTimer);
+          this._loadingTimer = null;
+        }
+        this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
         this._restoreStep1();
         return;
       }
       if (canteVoices.length === 0) {
+        if (this._loadingTimer) {
+          clearTimeout(this._loadingTimer);
+          this._loadingTimer = null;
+        }
+        this._hideLoading();
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         this._restoreStep1();
         return;
@@ -12711,8 +12706,19 @@ class EnsayoApp {
           samplesMeta[s.hit_type] = s.audio_url;
         });
       }
-      const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
+      const result = await new Promise((resolve, reject) => {
+        this._loadingTimer = setTimeout(() => {
+          this._loadingTimer = null;
+          this._showLoading('Cargando palmas...');
+          this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta).then(resolve, reject);
+        }, 250);
+      });
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
       this.isLoaded = true;
+      this._hideLoading();
       this.playBtn.disabled = false;
       this._renderTrackSelector(canteVoices);
       this._buildDebugBeatGrid();
@@ -12725,12 +12731,7 @@ class EnsayoApp {
       this.trackSelector.style.display = 'none';
       this.stepStartWrap.classList.add('step-hidden');
       this.ensayoLayout.classList.add('step-hidden');
-      this.step2Intro.classList.add('step-enter');
-      this.modeSwitch.classList.add('step-enter');
-      setTimeout(() => {
-        this.step2Intro.classList.remove('step-enter');
-        this.modeSwitch.classList.remove('step-enter');
-      }, 400);
+      this.step2Intro.classList.add('scene-enter');
       await this._loadPreferences(palo);
 
       // Background voice load progress indicator
@@ -12746,27 +12747,18 @@ class EnsayoApp {
       }
       if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
+      this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
       this._restoreStep1();
     }
   }
   _restoreStep1() {
-    this.step2Intro.classList.add('step-exit');
-    this.modeSwitch.classList.add('step-exit');
-    setTimeout(() => {
-      this.step2Intro.classList.remove('step-exit');
-      this.modeSwitch.classList.remove('step-exit');
-      this.step2Intro.classList.add('step-hidden');
-      this.modeSwitch.classList.add('step-hidden');
-      this.step1Intro.classList.remove('step-hidden');
-      this.paloGrid.classList.remove('step-hidden');
-      this.step1Intro.classList.add('step-enter');
-      this.paloGrid.classList.add('step-enter');
-      setTimeout(() => {
-        this.step1Intro.classList.remove('step-enter');
-        this.paloGrid.classList.remove('step-enter');
-      }, 400);
-    }, 250);
+    this.step1Intro.classList.remove('step-hidden');
+    this.paloGrid.classList.remove('step-hidden');
   }
 
   // ─── UI helpers ───────────────────────────────────────────────────────────
@@ -12824,6 +12816,13 @@ class EnsayoApp {
   _resetCanteInfo() {
     this.canteTitle.textContent = 'Esperando inicio...';
     this.canteTitle.classList.add('empty');
+  }
+  _showLoading(msg) {
+    this.loadingText.textContent = msg;
+    this.ensayoLoading.style.display = 'flex';
+  }
+  _hideLoading() {
+    this.ensayoLoading.style.display = 'none';
   }
   _showError(msg) {
     this.ensayoError.textContent = msg;
