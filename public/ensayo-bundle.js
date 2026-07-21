@@ -12678,12 +12678,20 @@ class EnsayoApp {
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([ensayoAPI.getPalmasBaseByPalo(palo), ensayoAPI.getCanteVoicesByPalo(palo), ensayoAPI.getSamplesByPalo(palo).catch(() => [])]);
       if (!palmasBase) {
+        if (this._loadingTimer) {
+          clearTimeout(this._loadingTimer);
+          this._loadingTimer = null;
+        }
         this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
         this._restoreStep1();
         return;
       }
       if (canteVoices.length === 0) {
+        if (this._loadingTimer) {
+          clearTimeout(this._loadingTimer);
+          this._loadingTimer = null;
+        }
         this._hideLoading();
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         this._restoreStep1();
@@ -12698,8 +12706,17 @@ class EnsayoApp {
           samplesMeta[s.hit_type] = s.audio_url;
         });
       }
-      this._showLoading('Cargando palmas...');
-      const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
+      const result = await new Promise((resolve, reject) => {
+        this._loadingTimer = setTimeout(() => {
+          this._loadingTimer = null;
+          this._showLoading('Cargando palmas...');
+          this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta).then(resolve, reject);
+        }, 250);
+      });
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
       this.isLoaded = true;
       this._hideLoading();
       this.playBtn.disabled = false;
@@ -12730,6 +12747,10 @@ class EnsayoApp {
       }
       if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
+      if (this._loadingTimer) {
+        clearTimeout(this._loadingTimer);
+        this._loadingTimer = null;
+      }
       this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
       this._restoreStep1();
