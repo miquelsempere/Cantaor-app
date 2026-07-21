@@ -12529,9 +12529,9 @@ class EnsayoApp {
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
-      [...this.trackSelList.querySelectorAll('input[type="checkbox"]')].forEach((cb, i) => {
-        cb.checked = i === 0;
-        cb.closest('.track-check-item').classList.toggle('checked', i === 0);
+      this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.track-check-item').classList.remove('checked');
       });
       this._applyTrackSelection();
       this._updateStartButton();
