@@ -297,27 +297,34 @@
         }
         .command-flash.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-        .track-selector-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; }
-        .track-selector-label { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:rgba(245, 237, 224, 0.55); }
+        .track-selector-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
+        .track-selector-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255, 184, 154, 0.7); }
         .track-selector-actions { display:flex; gap:0.4rem; }
         .track-sel-btn {
-            font-size:0.68rem; font-weight:600; padding:0.2rem 0.55rem;
-            border-radius:6px; border:1px solid rgba(255, 220, 200, 0.2); background:transparent;
-            color:rgba(245, 237, 224, 0.6); cursor:pointer; transition:all 0.15s;
+            font-family:inherit; font-size:0.72rem; font-weight:600; padding:0.3rem 0.85rem;
+            border-radius:999px; border:1px solid rgba(255, 220, 200, 0.18); background:rgba(255, 220, 200, 0.04);
+            color:rgba(245, 237, 224, 0.7); cursor:pointer; transition:transform 0.18s cubic-bezier(0.4,0,0.2,1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
         }
-        .track-sel-btn:hover { background:rgba(255, 220, 200, 0.1); color:#F5EDE0; }
-        .track-selector-list { display:flex; flex-direction:column; gap:0.35rem; max-height:260px; overflow-y:auto; }
+        .track-sel-btn:hover { transform:translateY(-1px); background:rgba(255, 184, 154, 0.1); border-color:rgba(255, 184, 154, 0.45); color:#F5EDE0; }
+        .track-selector-list { display:flex; flex-direction:column; gap:0.45rem; max-height:260px; overflow-y:auto; padding-right:0.15rem; }
         .track-check-item {
-            display:flex; align-items:center; gap:0.55rem; padding:0.5rem 0.75rem;
-            border-radius:8px; background:rgba(20, 10, 10, 0.3); border:1px solid rgba(255, 220, 200, 0.08);
-            cursor:pointer; transition:background 0.15s,border-color 0.15s; user-select:none;
+            position:relative; display:flex; align-items:center; gap:0.65rem; padding:0.6rem 0.9rem;
+            border-radius:12px; background:rgba(20, 10, 10, 0.3); backdrop-filter:blur(8px); border:1px solid rgba(255, 220, 200, 0.1);
+            cursor:pointer; transition:transform 0.18s cubic-bezier(0.4,0,0.2,1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; user-select:none;
         }
-        .track-check-item:hover { background:rgba(255, 220, 200, 0.08); }
-        .track-check-item.checked { border-color:#FFB89A; background:rgba(255, 184, 154, 0.12); }
-        .track-check-item input[type="checkbox"] { accent-color:#FFB89A; width:14px; height:14px; flex-shrink:0; cursor:pointer; }
-        .track-check-title { font-size:0.82rem; color:#F5EDE0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .track-check-item:hover { transform:translateY(-1px); background:rgba(255, 220, 200, 0.07); border-color:rgba(255, 220, 200, 0.22); }
+        .track-check-item.checked { border-color:transparent; background:linear-gradient(135deg, #E74C3C 0%, #C0392B 100%); box-shadow:0 3px 14px rgba(192, 57, 43, 0.3); }
+        .track-check-item.checked .track-check-title { color:#fff; }
+        .track-check-item input[type="checkbox"] { position:absolute; opacity:0; width:0; height:0; margin:0; pointer-events:none; }
+        .track-check-item::before {
+            content:''; width:16px; height:16px; flex-shrink:0; border-radius:50%;
+            border:1.5px solid rgba(255, 220, 200, 0.3); background:transparent;
+            transition:background 0.2s ease, border-color 0.2s ease;
+        }
+        .track-check-item.checked::before { border-color:transparent; background:rgba(255,255,255,0.9); box-shadow:inset 0 0 0 3px #C0392B; }
+        .track-check-title { font-size:0.85rem; font-weight:500; color:#F5EDE0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color 0.2s ease; }
         .track-selector.locked { opacity:0.5; pointer-events:none; }
-        .voice-load-progress { font-size:0.7rem; color:rgba(245, 237, 224, 0.4); font-style:italic; margin-top:0.35rem; min-height:1em; }
+        .voice-load-progress { font-size:0.72rem; color:rgba(255, 184, 154, 0.5); font-style:italic; margin-top:0.45rem; min-height:1em; }
 
         .ensayo-admin-section { margin-top:2.5rem; }
         .ensayo-admin-title { display: none; }
