@@ -295,11 +295,9 @@ class EnsayoApp {
     });
     if (mode === 'random') {
       this.step2Substep.classList.add('step-hidden');
-      this.trackSelector.style.display = 'none';
       this.engine.setSelectedVoices(null);
     } else {
       this.step2Substep.classList.remove('step-hidden');
-      this.trackSelector.style.display = '';
       this._applyTrackSelection();
     }
     if (persist) this._savePreferences();
@@ -387,12 +385,9 @@ class EnsayoApp {
       item.className = 'track-check-item checked';
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.checked = true; cb.dataset.ids = JSON.stringify(ids);
-      const mark = document.createElement('span');
-      mark.className = 'track-check-mark';
-      mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#C0392B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       const titleEl = document.createElement('span');
       titleEl.className = 'track-check-title'; titleEl.textContent = label;
-      item.appendChild(cb); item.appendChild(mark); item.appendChild(titleEl);
+      item.appendChild(cb); item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
         if ([...this.trackSelList.querySelectorAll('input:checked')].length === 0) {
@@ -481,13 +476,17 @@ class EnsayoApp {
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
+    if (this.stepPromptText) {
+      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
+      if (paloSpan) paloSpan.textContent = palo;
+    }
     if (this.step2Palo) this.step2Palo.textContent = palo;
     this.step2Substep.classList.add('step-hidden');
-    this._goToStep(2);
     await this._loadPaloContent(palo);
   }
 
   async _loadPaloContent(palo) {
+    this._showLoading('Buscando contenido para ' + palo + '...');
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([
         ensayoAPI.getPalmasBaseByPalo(palo),
@@ -495,12 +494,12 @@ class EnsayoApp {
         ensayoAPI.getSamplesByPalo(palo).catch(() => []),
       ]);
       if (!palmasBase) {
-        this._goToStep(1);
+        this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
         return;
       }
       if (canteVoices.length === 0) {
-        this._goToStep(1);
+        this._hideLoading();
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
         return;
       }
@@ -513,9 +512,11 @@ class EnsayoApp {
         samplesRows.forEach(s => { samplesMeta[s.hit_type] = s.audio_url; });
       }
 
+      this._showLoading('Cargando palmas...');
       const result = await this.engine.load(palmasBase, palmasBase.audio_url, canteVoices, samplesMeta);
 
       this.isLoaded = true;
+      this._hideLoading();
       this.playBtn.disabled = false;
       this._renderTrackSelector(canteVoices);
       this._buildDebugBeatGrid();
@@ -523,6 +524,7 @@ class EnsayoApp {
       this._updateDebugStatic();
 
       await this._loadPreferences(palo);
+      this._goToStep(2);
 
       // Background voice load progress indicator
       const total = canteVoices.length;
@@ -538,7 +540,7 @@ class EnsayoApp {
 
       if (result.usingSampler) this._showCommandFlash('Sampler activo');
     } catch (err) {
-      this._goToStep(1);
+      this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
     }
   }
