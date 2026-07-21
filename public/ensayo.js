@@ -540,7 +540,6 @@ class EnsayoApp {
   }
 
   async _loadPaloContent(palo) {
-    this._showLoading('Buscando contenido para ' + palo + '...');
     try {
       const [palmasBase, canteVoices, samplesRows] = await Promise.all([
         ensayoAPI.getPalmasBaseByPalo(palo),
