@@ -503,6 +503,30 @@ export default class DualStreamEngine {
     };
   }
 
+  unload() {
+    if (this.isPlaying) this.stop();
+    this._loadGen += 1;
+    this.palmasBuffer = null;
+    this.palmasMeta = null;
+    this.canteVoices = [];
+    this.canteBuffers.clear();
+    this.canteQueue = [];
+    this.canteQueuePos = 0;
+    this.selectedVoiceIds = null;
+    this.traste_groups = new Map();
+    this.has_recorded_tempos = false;
+    this.useSampler = false;
+    this.loadedVoicesCount = 0;
+    this.syncInterval = 0;
+    this.nextCanteScheduledAt = null;
+    this.palmasStartContextTime = null;
+    this.falseta = false;
+    if (this.palmasSampler) {
+      this.palmasSampler.destroy();
+      this.palmasSampler = null;
+    }
+  }
+
   destroy() {
     this.stop();
     if (this.palmasSampler) {

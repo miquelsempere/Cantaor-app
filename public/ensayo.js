@@ -269,10 +269,23 @@ class EnsayoApp {
     this.currentPalo = null;
     this.playBtn.disabled = true;
     this._hideError();
+    this._hideLoading();
     this.trackSelector.style.display = 'none';
     this.trackSelList.innerHTML = '';
     if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
     this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.remove('selected'));
+    if (this.stepPromptText) {
+      const paloSpan = this.stepPromptText.querySelector('.step-question-palo');
+      if (paloSpan) paloSpan.textContent = '…';
+    }
+    this.tempoSlider.value = 1.0;
+    this.engine.setTempo(1.0);
+    this.tempoValue.textContent = '1.00x';
+    this.pitchSlider.value = 0;
+    this.engine.setPitchSemitones(0);
+    this.pitchValue.textContent = 'Traste 5';
+    this.voiceToggle.checked = false;
+    this.engine.unload();
     this.step1Intro.classList.remove('step-hidden');
     this.paloGrid.classList.remove('step-hidden');
     this.step2Intro.classList.add('step-hidden');
