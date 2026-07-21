@@ -12439,8 +12439,6 @@ class EnsayoApp {
     this.ensayo.stopVoice();
     this._updateVoiceIndicator('off');
     this._resetCanteInfo();
-    this.isLoaded = false;
-    this.playBtn.disabled = true;
     this._hideError();
     this.trackSelector.style.display = 'none';
     this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
