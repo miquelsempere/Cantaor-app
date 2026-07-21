@@ -254,11 +254,13 @@ body {
 }
 
 .step-intro.step-enter,
-.palo-grid.step-enter {
+.palo-grid.step-enter,
+.mode-switch-wrap.step-enter {
     animation: step-enter 0.4s ease both;
 }
 .step-intro.step-exit,
-.palo-grid.step-exit {
+.palo-grid.step-exit,
+.mode-switch-wrap.step-exit {
     animation: step-exit 0.25s ease both;
 }
 @keyframes step-enter {
