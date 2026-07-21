@@ -12430,7 +12430,7 @@ class EnsayoApp {
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
-    this.stepStartWrap.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('is-start-hidden');
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
   }
@@ -12449,7 +12449,7 @@ class EnsayoApp {
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
-    this.stepStartWrap.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('is-start-hidden');
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
     this.step2Intro.classList.remove('step-hidden');
@@ -12476,7 +12476,7 @@ class EnsayoApp {
     });
     if (mode === 'random') {
       this.trackSelector.style.display = 'none';
-      this.stepStartWrap.classList.add('step-hidden');
+      this.stepStartWrap.classList.add('is-start-hidden');
       this.engine.setSelectedVoices(null);
     } else {
       this.trackSelector.style.display = '';
@@ -12488,13 +12488,13 @@ class EnsayoApp {
   _updateStartButton() {
     if (!this.stepStartWrap) return;
     const anyChecked = this.trackSelList.querySelector('input[type="checkbox"]:checked');
-    this.stepStartWrap.classList.toggle('step-hidden', !anyChecked);
+    this.stepStartWrap.classList.toggle('is-start-hidden', !anyChecked);
   }
   _advanceToStep3() {
     this.step2Intro.classList.add('step-hidden');
     this.modeSwitch.classList.add('step-hidden');
     this.trackSelector.style.display = 'none';
-    this.stepStartWrap.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('is-start-hidden');
     this.ensayoLayout.classList.remove('step-hidden');
     this.preplay.classList.remove('step-hidden');
     this.colRight.classList.remove('step-hidden');
@@ -12670,7 +12670,7 @@ class EnsayoApp {
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
-    this.stepStartWrap.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('is-start-hidden');
     this._loadPaloContent(palo);
   }
   async _loadPaloContent(palo) {
@@ -12707,7 +12707,7 @@ class EnsayoApp {
       this.currentMode = null;
       this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
       this.trackSelector.style.display = 'none';
-      this.stepStartWrap.classList.add('step-hidden');
+      this.stepStartWrap.classList.add('is-start-hidden');
       this.ensayoLayout.classList.add('step-hidden');
       await this._loadPreferences(palo);
 
