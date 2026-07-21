@@ -351,44 +351,6 @@
 
         .player-section { display:flex; flex-direction:column; align-items:center; margin-bottom:0; }
 
-        /* ── Step flow: one step visible at a time ── */
-        .step { animation: scene-rise 0.4s ease both; }
-        .step.step-hidden { display: none !important; }
-        .step.step-leaving { animation: scene-fall 0.3s ease both; }
-
-        @keyframes scene-fall {
-            from { opacity: 1; transform: translateY(0); }
-            to   { opacity: 0; transform: translateY(-12px); }
-        }
-
-        .ensayo-loading-overlay {
-            display:flex; flex-direction:column; align-items:center; gap:0.75rem;
-            padding:2rem 0; margin-bottom:1rem;
-        }
-
-        .step-back-btn {
-            display:inline-flex; align-items:center; gap:0.35rem;
-            background:none; border:1px solid rgba(255, 220, 200, 0.2);
-            color:rgba(245, 237, 224, 0.7); font-size:0.78rem; font-weight:500;
-            padding:0.35rem 0.85rem; border-radius:20px; cursor:pointer;
-            font-family:inherit; margin-bottom:1.25rem; transition:all 0.2s ease;
-        }
-        .step-back-btn:hover { background:rgba(255, 220, 200, 0.1); border-color:rgba(255, 220, 200, 0.4); color:#F5EDE0; }
-
-        .step-2-substep {
-            display:flex; flex-direction:column; align-items:center; gap:1rem;
-            margin-top:1.5rem; animation: scene-rise 0.35s ease both;
-        }
-        .step-2-substep.step-hidden { display:none !important; }
-
-        .step-continue-btn {
-            padding:0.6rem 1.75rem; border:none; border-radius:12px;
-            background:linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-            color:white; font-size:0.9rem; font-weight:600; cursor:pointer;
-            font-family:inherit; transition:all 0.2s ease;
-        }
-        .step-continue-btn:hover { box-shadow:0 4px 14px rgba(192, 57, 43, 0.35); transform:translateY(-1px); }
-
         @media (max-width:680px) {
             .ensayo-container { max-width:100%; padding: 0 1rem; }
             .ensayo-layout { grid-template-columns:1fr; }
@@ -419,36 +381,35 @@
 
     <div class="app-container ensayo-container">
 
-        <div id="ensayoError" class="ensayo-error-msg" style="display:none"></div>
-        <div id="ensayoLoading" class="ensayo-loading-overlay" style="display:none">
-            <div class="loading-spinner-small"></div>
-            <div class="ensayo-loading-text" id="ensayoLoadingText">Cargando audio...</div>
+        <div class="step-intro">
+            <div class="step-eyebrow">Paso 1</div>
+            <h2 class="step-question" id="stepPromptText">Vamos a tocar un poquito por <span class="step-question-palo">…</span></h2>
+            <p class="step-sub">Elige un palo para empezar a practicar.</p>
+        </div>
+        <div class="palo-grid" id="ensayoPaloGrid"></div>
+
+        <div class="step-intro step-hidden" id="step2Intro">
+            <div class="step-eyebrow">Paso 2</div>
+            <h2 class="step-question">¿Cómo quieres ensayar por <span class="step-question-palo" id="step2Palo">…</span>?</h2>
+            <p class="step-sub">Elige reproducción aleatoria o selecciona las letras que quieres trabajar.</p>
+        </div>
+        <div class="mode-switch-wrap step-hidden" id="modeSwitch">
+            <div class="mode-switch">
+                <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
+                <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
+            </div>
         </div>
 
-        <section class="step step-1" id="step1">
-            <div class="step-intro">
-                <div class="step-eyebrow">Paso 1</div>
-                <h2 class="step-question" id="stepPromptText">Vamos a tocar un poquito por <span class="step-question-palo">…</span></h2>
-                <p class="step-sub">Elige un palo para empezar a practicar.</p>
-            </div>
-            <div class="palo-grid" id="ensayoPaloGrid"></div>
-        </section>
+        <div class="ensayo-layout step-single" id="ensayoLayout">
+            <div class="ensayo-col-left">
 
-        <section class="step step-2 step-hidden" id="step2">
-            <button class="step-back-btn" id="step2Back" type="button">&larr; Cambiar palo</button>
-            <div class="step-intro" id="step2Intro">
-                <div class="step-eyebrow">Paso 2</div>
-                <h2 class="step-question">¿Cómo quieres ensayar por <span class="step-question-palo" id="step2Palo">…</span>?</h2>
-                <p class="step-sub">Elige reproducción aleatoria o selecciona las letras que quieres trabajar.</p>
-            </div>
-            <div class="mode-switch-wrap" id="modeSwitch">
-                <div class="mode-switch">
-                    <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
-                    <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
+                <div id="ensayoError" class="ensayo-error-msg" style="display:none"></div>
+                <div id="ensayoLoading" class="ensayo-loading" style="display:none">
+                    <div class="loading-spinner-small"></div>
+                    <div class="ensayo-loading-text" id="ensayoLoadingText">Cargando audio...</div>
                 </div>
-            </div>
-            <div class="step-2-substep step-hidden" id="step2Substep">
-                <div class="track-selector ensayo-card" id="trackSelector">
+
+                <div class="track-selector ensayo-card" id="trackSelector" style="display:none">
                     <div class="track-selector-header">
                         <span class="track-selector-label">Pistas de cante</span>
                         <div class="track-selector-actions">
@@ -459,86 +420,82 @@
                     <div class="track-selector-list" id="trackSelectorList"></div>
                     <div class="voice-load-progress" id="voiceLoadProgress"></div>
                 </div>
-                <button class="step-continue-btn" id="step2Continue" type="button">Continuar</button>
-            </div>
-        </section>
 
-        <section class="step step-3 step-hidden" id="step3">
-            <button class="step-back-btn" id="step3Back" type="button">&larr; Cambiar modo</button>
-            <div class="ensayo-layout step-single" id="ensayoLayout">
-                <div class="ensayo-col-left">
-                    <div class="ensayo-card ensayo-preplay" id="ensayoPreplay">
-                        <div class="ensayo-card-label">Ajustes</div>
-                        <div class="ensayo-preplay-label">Configura antes de iniciar</div>
-                        <div class="controls-section" style="margin-bottom:0.5rem">
-                            <div class="control-group">
-                                <label class="control-label">Compas</label>
-                                <input type="range" id="ensayoTempoSlider" class="control-slider" min="0.5" max="1.5" step="0.05" value="1.0">
-                                <div class="control-value" id="ensayoTempoValue">1.00x</div>
-                            </div>
-                            <div class="control-group">
-                                <label class="control-label">Cejilla</label>
-                                <input type="range" id="ensayoPitchSlider" class="control-slider" min="-5" max="5" step="1" value="0">
-                                <div class="control-value" id="ensayoPitchValue">Traste 5</div>
-                            </div>
+                <div class="ensayo-card ensayo-preplay step-hidden" id="ensayoPreplay">
+                    <div class="ensayo-card-label">Ajustes</div>
+                    <div class="ensayo-preplay-label">Configura antes de iniciar</div>
+                    <div class="controls-section" style="margin-bottom:0.5rem">
+                        <div class="control-group">
+                            <label class="control-label">Compas</label>
+                            <input type="range" id="ensayoTempoSlider" class="control-slider" min="0.5" max="1.5" step="0.05" value="1.0">
+                            <div class="control-value" id="ensayoTempoValue">1.00x</div>
                         </div>
-                        <div class="locked-note" id="ensayoLockedNote">Ajusta compas y cejilla antes de reproducir</div>
+                        <div class="control-group">
+                            <label class="control-label">Cejilla</label>
+                            <input type="range" id="ensayoPitchSlider" class="control-slider" min="-5" max="5" step="1" value="0">
+                            <div class="control-value" id="ensayoPitchValue">Traste 5</div>
+                        </div>
+                    </div>
+                    <div class="locked-note" id="ensayoLockedNote">Ajusta compas y cejilla antes de reproducir</div>
+                </div>
+
+            </div>
+
+            <div class="ensayo-col-right step-hidden" id="ensayoColRight">
+
+                <div class="player-section" style="margin-bottom:0">
+                    <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
+                        <div class="play-icon">
+                            <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                        </div>
+                        <div class="pause-icon">
+                            <svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
+                        </div>
+                    </button>
+                    <div class="visualizer" id="ensayoVisualizer" style="width:100%;margin:0 0 0.25rem">
+                        <div class="visualizer-bars">
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                        </div>
+                    </div>
+                    <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
+                        <div class="ensayo-cante-label">Sonando ahora</div>
+                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
                     </div>
                 </div>
 
-                <div class="ensayo-col-right" id="ensayoColRight">
-                    <div class="player-section" style="margin-bottom:0">
-                        <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
-                            <div class="play-icon">
-                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
-                            </div>
-                            <div class="pause-icon">
-                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
-                            </div>
-                        </button>
-                        <div class="visualizer" id="ensayoVisualizer" style="width:100%;margin:0 0 0.25rem">
-                            <div class="visualizer-bars">
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            </div>
+                <div class="ensayo-card ensayo-falseta-card step-hidden" id="ensayoFalsetaCard">
+                    <div class="falseta-section-header">
+                        <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
+                        <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Act&iacute;valo con tu voz.</div>
+                    </div>
+                    <div class="ensayo-status-bar ensayo-falseta-status">
+                        <div class="status-mode">
+                            <span class="status-dot stopped" id="statusDot"></span>
+                            <span id="statusText">Listo para empezar</span>
                         </div>
-                        <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
-                            <div class="ensayo-cante-label">Sonando ahora</div>
-                            <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
+                    </div>
+                    <div class="falseta-voice-row">
+                        <div class="falseta-voice-label">
+                            <div class="falseta-voice-name">
+                                <span class="voice-dot" id="voiceDot"></span>
+                                Control por voz
+                            </div>
+                            <div class="falseta-voice-hint">Di &laquo;falseta&raquo; o &laquo;vamos alla&raquo;</div>
                         </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="voiceToggle" disabled>
+                            <span class="toggle-track"></span>
+                        </label>
                     </div>
 
-                    <div class="ensayo-card ensayo-falseta-card" id="ensayoFalsetaCard">
-                        <div class="falseta-section-header">
-                            <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
-                            <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Act&iacute;valo con tu voz.</div>
-                        </div>
-                        <div class="ensayo-status-bar ensayo-falseta-status">
-                            <div class="status-mode">
-                                <span class="status-dot stopped" id="statusDot"></span>
-                                <span id="statusText">Listo para empezar</span>
-                            </div>
-                        </div>
-                        <div class="falseta-voice-row">
-                            <div class="falseta-voice-label">
-                                <div class="falseta-voice-name">
-                                    <span class="voice-dot" id="voiceDot"></span>
-                                    Control por voz
-                                </div>
-                                <div class="falseta-voice-hint">Di &laquo;falseta&raquo; o &laquo;vamos alla&raquo;</div>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="voiceToggle" disabled>
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                    </div>
                 </div>
+
             </div>
-        </section>
+        </div>
 
         <div id="ensayoAdminSection" style="display:none">
             <div class="ensayo-admin-section">
