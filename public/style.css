@@ -1497,20 +1497,6 @@ body {
     font-size: 0.85rem;
 }
 
-.lyrics-spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255, 220, 200, 0.2);
-    border-top-color: #FFB89A;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
 .lyrics-error {
     color: #FF8A8A;
     font-size: 0.82rem;
