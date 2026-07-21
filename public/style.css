@@ -279,17 +279,12 @@ body {
 .step-start-wrap {
     text-align: center;
     margin: 1.25rem 0 1.5rem;
-    opacity: 1;
-    max-height: 80px;
-    overflow: hidden;
-    transition: opacity 0.35s ease, max-height 0.35s ease, margin 0.35s ease;
+    transition: opacity 0.3s ease;
 }
 .step-start-wrap.is-start-hidden {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    max-height: 0;
-    margin: 0;
 }
 .step-start-btn {
     padding: 0.6rem 1.75rem;
