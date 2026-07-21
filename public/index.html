@@ -59,14 +59,51 @@
         /* ── Paso 1: prompt abierto + rejilla de palos (sin cajas) ── */
         .step-intro { text-align: center; margin-bottom: 2rem; }
         .step-eyebrow {
-            display: inline-flex;
+            display: flex;
             align-items: center;
+            justify-content: center;
             gap: 0.5rem;
             font-size: 0.72rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.12em;
             color: rgba(255, 184, 154, 0.85);
+            position: relative;
+        }
+        .step-eyebrow-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .step-eyebrow-spacer { width: 110px; flex-shrink: 0; }
+        .step-back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(255, 184, 154, 0.7);
+            cursor: pointer;
+            transition: color 0.2s ease, transform 0.2s ease;
+            flex-shrink: 0;
+            width: 110px;
+            justify-content: flex-end;
+        }
+        .step-back-link:hover {
+            color: #FFD4B8;
+            transform: translateX(-2px);
+        }
+        .step-back-link:active { transform: scale(0.97); }
+        .step-back-link svg {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
         }
         .step-question {
             font-size: 1.55rem;
@@ -387,10 +424,16 @@
         <div class="palo-grid" id="ensayoPaloGrid"></div>
 
         <div class="step-intro step-hidden" id="step2Intro">
-            <div class="step-eyebrow">Paso 2</div>
+            <div class="step-eyebrow-row">
+                <button class="step-back-link" id="stepBackBtn" type="button" aria-label="Volver al paso 1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                    Cambiar de palo
+                </button>
+                <div class="step-eyebrow">Paso 2</div>
+                <div class="step-eyebrow-spacer" aria-hidden="true"></div>
+            </div>
             <h2 class="step-question">¿Cómo quieres ensayar por <span class="step-question-palo" id="step2Palo">…</span>?</h2>
             <p class="step-sub">Elige reproducción aleatoria o selecciona las letras que quieres trabajar.</p>
-            <button class="step-back-btn" id="stepBackBtn" type="button">Cambiar de palo</button>
         </div>
         <div class="mode-switch-wrap step-hidden" id="modeSwitch">
             <div class="mode-switch">
