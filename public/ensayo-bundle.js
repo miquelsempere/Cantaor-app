@@ -12153,8 +12153,10 @@ class EnsayoApp {
     this.colRight = document.getElementById('ensayoColRight');
     this.falsetaCard = document.getElementById('ensayoFalsetaCard');
     this.ensayoLayout = document.getElementById('ensayoLayout');
+    this.step1Intro = document.getElementById('step1Intro');
     this.step2Intro = document.getElementById('step2Intro');
     this.step2Palo = document.getElementById('step2Palo');
+    this.stepBackBtn = document.getElementById('stepBackBtn');
     this.modeSwitch = document.getElementById('modeSwitch');
     this.init();
   }
@@ -12358,6 +12360,30 @@ class EnsayoApp {
     this.voiceToggle.addEventListener('change', e => {
       if (e.target.checked) this.ensayo.startVoice();else this.ensayo.stopVoice();
     });
+    if (this.stepBackBtn) {
+      this.stepBackBtn.addEventListener('click', () => this._resetToStep1());
+    }
+  }
+  _resetToStep1() {
+    if (this.engine.isPlaying) this.engine.stop();
+    this.ensayo.stopVoice();
+    this._updateVoiceIndicator('off');
+    this._resetCanteInfo();
+    this.isLoaded = false;
+    this.currentPalo = null;
+    this.playBtn.disabled = true;
+    this._hideError();
+    this.trackSelector.style.display = 'none';
+    this.trackSelList.innerHTML = '';
+    if (this.voiceLoadProg) this.voiceLoadProg.textContent = '';
+    this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.remove('selected'));
+    this.step1Intro.classList.remove('step-hidden');
+    this.paloGrid.classList.remove('step-hidden');
+    this.step2Intro.classList.add('step-hidden');
+    this.modeSwitch.classList.add('step-hidden');
+    this.preplay.classList.add('step-hidden');
+    this.colRight.classList.add('step-hidden');
+    this.falsetaCard.classList.add('step-hidden');
   }
 
   // ─── Track selector ────────────────────────────────────────────────────────
@@ -12558,6 +12584,8 @@ class EnsayoApp {
   async _selectPalo(palo, chipEl) {
     if (this.engine.isPlaying) return;
     this.paloGrid.querySelectorAll('.palo-chip').forEach(c => c.classList.toggle('selected', c === chipEl));
+    this.step1Intro.classList.add('step-hidden');
+    this.paloGrid.classList.add('step-hidden');
     this.currentPalo = palo;
     this.isLoaded = false;
     this.playBtn.disabled = true;
@@ -12585,11 +12613,13 @@ class EnsayoApp {
       if (!palmasBase) {
         this._hideLoading();
         this._showError('No hay base de palmas para ' + palo + '. Sube una desde el panel de admin.');
+        this._restoreStep1();
         return;
       }
       if (canteVoices.length === 0) {
         this._hideLoading();
         this._showError('No hay pistas de voz para ' + palo + '. Sube voces desde el panel de admin.');
+        this._restoreStep1();
         return;
       }
       this.engine.setTempo(parseFloat(this.tempoSlider.value));
@@ -12633,7 +12663,12 @@ class EnsayoApp {
     } catch (err) {
       this._hideLoading();
       this._showError('Error cargando audio: ' + err.message);
+      this._restoreStep1();
     }
+  }
+  _restoreStep1() {
+    this.step1Intro.classList.remove('step-hidden');
+    this.paloGrid.classList.remove('step-hidden');
   }
 
   // ─── UI helpers ───────────────────────────────────────────────────────────

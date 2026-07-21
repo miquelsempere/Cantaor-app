@@ -253,6 +253,29 @@ body {
     display: none !important;
 }
 
+.step-back-btn {
+    margin-top: 1rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid rgba(255, 184, 154, 0.3);
+    border-radius: 999px;
+    background: transparent;
+    color: #FFB89A;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.step-back-btn:hover {
+    background: rgba(255, 184, 154, 0.12);
+    border-color: rgba(255, 184, 154, 0.5);
+    color: #FFD4B8;
+}
+
+.step-back-btn:active {
+    transform: scale(0.97);
+}
+
 .ensayo-layout.step-single {
     grid-template-columns: 1fr;
     max-width: 560px;
