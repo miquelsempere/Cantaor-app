@@ -396,31 +396,35 @@
         </div>
         <div class="mode-switch-wrap step-hidden" id="modeSwitch">
             <div class="mode-switch">
-                <button class="mode-switch-btn active" data-mode="random" type="button">Aleatorio</button>
+                <button class="mode-switch-btn" data-mode="random" type="button">Aleatorio</button>
                 <button class="mode-switch-btn" data-mode="selection" type="button">Selección</button>
             </div>
         </div>
 
-        <div class="ensayo-layout step-single" id="ensayoLayout">
+        <div id="ensayoError" class="ensayo-error-msg" style="display:none"></div>
+        <div id="ensayoLoading" class="ensayo-loading" style="display:none">
+            <div class="loading-spinner-small"></div>
+            <div class="ensayo-loading-text" id="ensayoLoadingText">Cargando audio...</div>
+        </div>
+
+        <div class="track-selector ensayo-card" id="trackSelector" style="display:none">
+            <div class="track-selector-header">
+                <span class="track-selector-label">Pistas de cante</span>
+                <div class="track-selector-actions">
+                    <button class="track-sel-btn" id="trackSelAll">Todas</button>
+                    <button class="track-sel-btn" id="trackSelNone">Ninguna</button>
+                </div>
+            </div>
+            <div class="track-selector-list" id="trackSelectorList"></div>
+            <div class="voice-load-progress" id="voiceLoadProgress"></div>
+        </div>
+
+        <div class="step-start-wrap step-hidden" id="stepStartWrap">
+            <button class="step-start-btn" id="stepStartBtn" type="button">Empezar a tocar</button>
+        </div>
+
+        <div class="ensayo-layout step-single step-hidden" id="ensayoLayout">
             <div class="ensayo-col-left">
-
-                <div id="ensayoError" class="ensayo-error-msg" style="display:none"></div>
-                <div id="ensayoLoading" class="ensayo-loading" style="display:none">
-                    <div class="loading-spinner-small"></div>
-                    <div class="ensayo-loading-text" id="ensayoLoadingText">Cargando audio...</div>
-                </div>
-
-                <div class="track-selector ensayo-card" id="trackSelector" style="display:none">
-                    <div class="track-selector-header">
-                        <span class="track-selector-label">Pistas de cante</span>
-                        <div class="track-selector-actions">
-                            <button class="track-sel-btn" id="trackSelAll">Todas</button>
-                            <button class="track-sel-btn" id="trackSelNone">Ninguna</button>
-                        </div>
-                    </div>
-                    <div class="track-selector-list" id="trackSelectorList"></div>
-                    <div class="voice-load-progress" id="voiceLoadProgress"></div>
-                </div>
 
                 <div class="ensayo-card ensayo-preplay step-hidden" id="ensayoPreplay">
                     <div class="ensayo-card-label">Ajustes</div>

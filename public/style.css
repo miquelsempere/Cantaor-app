@@ -276,6 +276,30 @@ body {
     transform: scale(0.97);
 }
 
+.step-start-wrap {
+    text-align: center;
+    margin: 1.25rem 0 1.5rem;
+}
+.step-start-btn {
+    padding: 0.6rem 1.75rem;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 18px rgba(192, 57, 43, 0.35);
+}
+.step-start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 26px rgba(192, 57, 43, 0.45);
+}
+.step-start-btn:active {
+    transform: scale(0.97);
+}
+
 .ensayo-layout.step-single {
     grid-template-columns: 1fr;
     max-width: 560px;

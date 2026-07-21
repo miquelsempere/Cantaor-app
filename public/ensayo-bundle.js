@@ -12124,7 +12124,7 @@ class EnsayoApp {
     this.currentPalo = null;
     this.isLoaded = false;
     this.currentUser = null;
-    this.currentMode = 'random';
+    this.currentMode = null;
     this.paloGrid = document.getElementById('ensayoPaloGrid');
     this.playBtn = document.getElementById('ensayoPlayBtn');
     this.voiceToggle = document.getElementById('voiceToggle');
@@ -12158,6 +12158,8 @@ class EnsayoApp {
     this.step2Palo = document.getElementById('step2Palo');
     this.stepBackBtn = document.getElementById('stepBackBtn');
     this.modeSwitch = document.getElementById('modeSwitch');
+    this.stepStartWrap = document.getElementById('stepStartWrap');
+    this.stepStartBtn = document.getElementById('stepStartBtn');
     this.init();
   }
   async init() {
@@ -12363,6 +12365,9 @@ class EnsayoApp {
     if (this.stepBackBtn) {
       this.stepBackBtn.addEventListener('click', () => this._resetToStep1());
     }
+    if (this.stepStartBtn) {
+      this.stepStartBtn.addEventListener('click', () => this._advanceToStep3());
+    }
   }
   _resetToStep1() {
     if (this.engine.isPlaying) this.engine.stop();
@@ -12384,6 +12389,10 @@ class EnsayoApp {
     this.preplay.classList.add('step-hidden');
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
+    this.ensayoLayout.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('step-hidden');
+    this.currentMode = null;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
   }
 
   // ─── Track selector ────────────────────────────────────────────────────────
@@ -12395,6 +12404,9 @@ class EnsayoApp {
         const mode = btn.dataset.mode;
         if (mode === this.currentMode) return;
         this._setMode(mode, true);
+        if (mode === 'random') {
+          this._advanceToStep3();
+        }
       });
     });
   }
@@ -12405,43 +12417,61 @@ class EnsayoApp {
     });
     if (mode === 'random') {
       this.trackSelector.style.display = 'none';
+      this.stepStartWrap.classList.add('step-hidden');
       this.engine.setSelectedVoices(null);
     } else {
       this.trackSelector.style.display = '';
       this._applyTrackSelection();
+      this._updateStartButton();
     }
     if (persist) this._savePreferences();
   }
+  _updateStartButton() {
+    if (!this.stepStartWrap) return;
+    const anyChecked = this.trackSelList.querySelector('input[type="checkbox"]:checked');
+    this.stepStartWrap.classList.toggle('step-hidden', !anyChecked);
+  }
+  _advanceToStep3() {
+    this.step2Intro.classList.add('step-hidden');
+    this.modeSwitch.classList.add('step-hidden');
+    this.trackSelector.style.display = 'none';
+    this.stepStartWrap.classList.add('step-hidden');
+    this.ensayoLayout.classList.remove('step-hidden');
+    this.preplay.classList.remove('step-hidden');
+    this.colRight.classList.remove('step-hidden');
+    this.falsetaCard.classList.remove('step-hidden');
+    this.ensayoLayout.classList.add('scene-enter');
+  }
   async _loadPreferences(palo) {
     if (!this.currentUser) {
-      this._setMode('random', false);
+      this.currentMode = null;
       return;
     }
     try {
       const prefs = await ensayoPreferencesAPI.getPreferences(palo);
-      const mode = prefs && prefs.mode || 'random';
+      const mode = prefs && prefs.mode || null;
       const savedTitles = prefs && prefs.selected_titles || [];
-      this.currentMode = mode;
-      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
-      });
-      if (mode === 'selection' && savedTitles.length > 0) {
-        this.trackSelector.style.display = '';
-        this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-          const ids = JSON.parse(cb.dataset.ids);
-          const label = cb.parentElement.querySelector('.track-check-title');
-          const titleText = label ? label.textContent : null;
-          const wasChecked = savedTitles.includes(titleText);
-          cb.checked = wasChecked;
-          cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
-        });
-        this._applyTrackSelection();
-      } else if (mode === 'random') {
-        this.trackSelector.style.display = 'none';
-        this.engine.setSelectedVoices(null);
+      if (mode === 'random') {
+        this._setMode('random', false);
+        this._advanceToStep3();
+      } else if (mode === 'selection') {
+        this._setMode('selection', false);
+        if (savedTitles.length > 0) {
+          this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            const label = cb.parentElement.querySelector('.track-check-title');
+            const titleText = label ? label.textContent : null;
+            const wasChecked = savedTitles.includes(titleText);
+            cb.checked = wasChecked;
+            cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
+          });
+          this._applyTrackSelection();
+        }
+        this._updateStartButton();
+      } else {
+        this.currentMode = null;
       }
     } catch (err) {
-      this._setMode('random', false);
+      this.currentMode = null;
     }
   }
   _getSelectedTitles() {
@@ -12465,6 +12495,7 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.add('checked');
       });
       this._applyTrackSelection();
+      this._updateStartButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
     document.getElementById('trackSelNone').addEventListener('click', () => {
@@ -12473,6 +12504,7 @@ class EnsayoApp {
         cb.closest('.track-check-item').classList.toggle('checked', i === 0);
       });
       this._applyTrackSelection();
+      this._updateStartButton();
       if (this.currentMode === 'selection') this._savePreferences();
     });
   }
@@ -12482,7 +12514,7 @@ class EnsayoApp {
       this.trackSelector.style.display = 'none';
       return;
     }
-    this.trackSelector.style.display = '';
+    this.trackSelector.style.display = 'none';
     const groups = new Map();
     voices.forEach(voice => {
       const key = voice.canonical_title || voice.title;
@@ -12508,6 +12540,7 @@ class EnsayoApp {
           item.classList.add('checked');
         }
         this._applyTrackSelection();
+        this._updateStartButton();
         if (this.currentMode === 'selection') this._savePreferences();
       });
       this.trackSelList.appendChild(item);
@@ -12603,6 +12636,11 @@ class EnsayoApp {
     this.preplay.classList.add('step-hidden');
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
+    this.ensayoLayout.classList.add('step-hidden');
+    this.stepStartWrap.classList.add('step-hidden');
+    this.trackSelector.style.display = 'none';
+    this.currentMode = null;
+    this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
     if (this.step2Palo) this.step2Palo.textContent = palo;
     await this._loadPaloContent(palo);
   }
@@ -12642,9 +12680,11 @@ class EnsayoApp {
       this._updateDebugStatic();
       this.step2Intro.classList.remove('step-hidden');
       this.modeSwitch.classList.remove('step-hidden');
-      this.preplay.classList.remove('step-hidden');
-      this.colRight.classList.remove('step-hidden');
-      this.falsetaCard.classList.remove('step-hidden');
+      this.currentMode = null;
+      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
+      this.trackSelector.style.display = 'none';
+      this.stepStartWrap.classList.add('step-hidden');
+      this.ensayoLayout.classList.add('step-hidden');
       this.step2Intro.classList.add('scene-enter');
       await this._loadPreferences(palo);
 
