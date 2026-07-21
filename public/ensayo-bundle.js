@@ -12468,36 +12468,7 @@ class EnsayoApp {
     this.ensayoLayout.classList.add('scene-enter');
   }
   async _loadPreferences(palo) {
-    if (!this.currentUser) {
-      this.currentMode = null;
-      return;
-    }
-    try {
-      const prefs = await ensayoPreferencesAPI.getPreferences(palo);
-      const mode = prefs && prefs.mode || null;
-      const savedTitles = prefs && prefs.selected_titles || [];
-      if (mode === 'random') {
-        this._setMode('random', false);
-        this._advanceToStep3();
-      } else if (mode === 'selection') {
-        this._setMode('selection', false);
-        if (savedTitles.length > 0) {
-          this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            const label = cb.parentElement.querySelector('.track-check-title');
-            const titleText = label ? label.textContent : null;
-            const wasChecked = savedTitles.includes(titleText);
-            cb.checked = wasChecked;
-            cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
-          });
-          this._applyTrackSelection();
-        }
-        this._updateStartButton();
-      } else {
-        this.currentMode = null;
-      }
-    } catch (err) {
-      this.currentMode = null;
-    }
+    this.currentMode = null;
   }
   _getSelectedTitles() {
     const allCbs = [...this.trackSelList.querySelectorAll('input[type="checkbox"]')];
