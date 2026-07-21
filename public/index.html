@@ -383,6 +383,9 @@
         .ensayo-falseta-card { display:flex; flex-direction:column; gap:0.6rem; padding:0.9rem; }
         .ensayo-falseta-card .ensayo-status-bar { background:rgba(30, 15, 15, 0.3); border:1px solid rgba(255, 220, 200, 0.1); margin:0; min-height:auto; padding:0.5rem 0.75rem; }
         .ensayo-falseta-card .action-btn { padding:0.5rem 0.75rem; font-size:0.82rem; }
+        .ensayo-player-card { display:flex; flex-direction:column; align-items:center; padding:1.1rem; }
+        .ensayo-player-card .player-section { width:100%; }
+        .falseta-section-header { display:flex; flex-direction:column; gap:0.2rem; margin-bottom:0.1rem; }
         .falseta-voice-toggle { display:flex; align-items:center; gap:0.4rem; }
         .falseta-section-title { display:flex; align-items:center; gap:0.45rem; font-size:0.9rem; font-weight:700; color:#F5EDE0; }
         .falseta-section-title .title-dot { width:8px; height:8px; border-radius:50%; background:#E67E22; flex-shrink:0; }
@@ -471,10 +474,21 @@
             <button class="step-start-btn" id="stepStartBtn" type="button">Empezar a tocar</button>
         </div>
 
+        <div class="step-intro step-hidden" id="step3Intro">
+            <div class="step-eyebrow-row">
+                <button class="step-back-link" id="ensayoBackBtn" type="button" aria-label="Volver al paso 2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                    Cambiar de modo
+                </button>
+                <div class="step-eyebrow">Paso 3</div>
+                <div class="step-eyebrow-spacer" aria-hidden="true"></div>
+            </div>
+            <h2 class="step-question">Acompa&ntilde;a al cante por <span class="step-question-palo" id="step3Palo">&hellip;</span></h2>
+            <p class="step-sub">Ajusta comp&aacute;s y cejilla, reproduce y usa el modo falseta con tu voz.</p>
+        </div>
+
         <div class="ensayo-layout step-single step-hidden" id="ensayoLayout">
             <div class="ensayo-col-left">
-
-                <button class="step-back-btn" id="ensayoBackBtn" type="button">Volver</button>
 
                 <div class="ensayo-card ensayo-preplay step-hidden" id="ensayoPreplay">
                     <div class="ensayo-card-label">Ajustes</div>
@@ -498,31 +512,35 @@
 
             <div class="ensayo-col-right step-hidden" id="ensayoColRight">
 
-                <div class="player-section" style="margin-bottom:0">
-                    <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
-                        <div class="play-icon">
-                            <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                <div class="ensayo-card ensayo-player-card">
+                    <div class="ensayo-card-label">Reproducir</div>
+                    <div class="player-section" style="margin-bottom:0">
+                        <button id="ensayoPlayBtn" class="play-button" disabled style="width:88px;height:88px;margin-bottom:0.75rem">
+                            <div class="play-icon">
+                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                            </div>
+                            <div class="pause-icon">
+                                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
+                            </div>
+                        </button>
+                        <div class="visualizer" id="ensayoVisualizer" style="width:100%;margin:0 0 0.25rem">
+                            <div class="visualizer-bars">
+                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                                <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
+                            </div>
                         </div>
-                        <div class="pause-icon">
-                            <svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
+                        <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
+                            <div class="ensayo-cante-label">Sonando ahora</div>
+                            <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
                         </div>
-                    </button>
-                    <div class="visualizer" id="ensayoVisualizer" style="width:100%;margin:0 0 0.25rem">
-                        <div class="visualizer-bars">
-                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                            <div class="visualizer-bar"></div><div class="visualizer-bar"></div>
-                        </div>
-                    </div>
-                    <div class="ensayo-cante-info" style="width:100%;margin-top:0.5rem">
-                        <div class="ensayo-cante-label">Sonando ahora</div>
-                        <div class="ensayo-cante-title empty" id="canteTitle">Esperando inicio...</div>
                     </div>
                 </div>
 
                 <div class="ensayo-card ensayo-falseta-card step-hidden" id="ensayoFalsetaCard">
+                    <div class="ensayo-card-label">Falseta</div>
                     <div class="falseta-section-header">
                         <div class="falseta-section-title"><span class="title-dot"></span>Modo falseta</div>
                         <div class="falseta-section-explain">Silencia el cante para tocar tu falseta sobre las palmas. Act&iacute;valo con tu voz.</div>

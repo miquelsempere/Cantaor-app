@@ -12179,6 +12179,8 @@ class EnsayoApp {
     this.step1Intro = document.getElementById('step1Intro');
     this.step2Intro = document.getElementById('step2Intro');
     this.step2Palo = document.getElementById('step2Palo');
+    this.step3Intro = document.getElementById('step3Intro');
+    this.step3Palo = document.getElementById('step3Palo');
     this.stepBackBtn = document.getElementById('stepBackBtn');
     this.ensayoBackBtn = document.getElementById('ensayoBackBtn');
     this.modeSwitch = document.getElementById('modeSwitch');
@@ -12430,6 +12432,7 @@ class EnsayoApp {
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
+    if (this.step3Intro) this.step3Intro.classList.add('step-hidden');
     this.stepStartWrap.classList.add('is-start-hidden');
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
@@ -12449,6 +12452,7 @@ class EnsayoApp {
     this.colRight.classList.add('step-hidden');
     this.falsetaCard.classList.add('step-hidden');
     this.ensayoLayout.classList.add('step-hidden');
+    if (this.step3Intro) this.step3Intro.classList.add('step-hidden');
     this.stepStartWrap.classList.add('is-start-hidden');
     this.currentMode = null;
     this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
@@ -12500,6 +12504,10 @@ class EnsayoApp {
     this.colRight.classList.remove('step-hidden');
     this.falsetaCard.classList.remove('step-hidden');
     this.ensayoLayout.classList.add('scene-enter');
+    if (this.step3Intro) {
+      this.step3Intro.classList.remove('step-hidden');
+      this.step3Intro.classList.add('scene-enter');
+    }
   }
   async _loadPreferences(palo) {
     this.currentMode = null;
@@ -12660,6 +12668,7 @@ class EnsayoApp {
       if (paloSpan) paloSpan.textContent = palo;
     }
     if (this.step2Palo) this.step2Palo.textContent = palo;
+    if (this.step3Palo) this.step3Palo.textContent = palo;
     // Show step 2 immediately — audio loads invisibly in the background
     this.step2Intro.classList.remove('step-hidden');
     this.modeSwitch.classList.remove('step-hidden');
