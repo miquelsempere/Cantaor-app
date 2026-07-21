@@ -253,6 +253,12 @@ body {
     display: none !important;
 }
 
+.step-continue-hidden {
+    opacity: 0 !important;
+    transform: translateY(10px) scale(0.96) !important;
+    pointer-events: none !important;
+}
+
 .ensayo-layout.step-single {
     grid-template-columns: 1fr;
     max-width: 560px;

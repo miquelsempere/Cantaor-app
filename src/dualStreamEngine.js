@@ -339,6 +339,12 @@ export default class DualStreamEngine {
     if (this.canteQueuePos >= this.canteQueue.length) {
       this._reshuffleQueue();
     }
+    if (this.canteQueue.length === 0) {
+      // Ninguna voz seleccionada: solo palmas, reprogramar siguiente entrada
+      const next = startContextTime + this.syncInterval;
+      this._scheduleNextCante(next);
+      return;
+    }
     const voiceIdx = this.canteQueue[this.canteQueuePos++];
     const voice = this.canteVoices[voiceIdx];
     const buffer = this.canteBuffers.get(voice.id);
@@ -448,10 +454,11 @@ export default class DualStreamEngine {
 
   /**
    * Restringe la rotacion de cante a los IDs indicados.
-   * Pasar null o un array vacio restaura "todas las pistas".
+   * Pasar null restaura "todas las pistas"; un array vacio significa
+   * ninguna voz (solo palmas).
    */
   setSelectedVoices(ids) {
-    if (!ids || ids.length === 0) {
+    if (ids === null) {
       this.selectedVoiceIds = null;
     } else {
       this.selectedVoiceIds = new Set(ids);
