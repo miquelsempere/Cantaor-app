@@ -448,10 +448,10 @@ export default class DualStreamEngine {
 
   /**
    * Restringe la rotacion de cante a los IDs indicados.
-   * Pasar null o un array vacio restaura "todas las pistas".
+   * null = todas las pistas; [] = ninguna; Set<id> = subconjunto elegido.
    */
   setSelectedVoices(ids) {
-    if (!ids || ids.length === 0) {
+    if (ids === null) {
       this.selectedVoiceIds = null;
     } else {
       this.selectedVoiceIds = new Set(ids);

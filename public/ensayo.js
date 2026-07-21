@@ -424,17 +424,14 @@ class EnsayoApp {
     });
     groups.forEach((ids, label) => {
       const item = document.createElement('label');
-      item.className = 'track-check-item checked';
+      item.className = 'track-check-item';
       const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.checked = true; cb.dataset.ids = JSON.stringify(ids);
+      cb.type = 'checkbox'; cb.checked = false; cb.dataset.ids = JSON.stringify(ids);
       const titleEl = document.createElement('span');
       titleEl.className = 'track-check-title'; titleEl.textContent = label;
       item.appendChild(cb); item.appendChild(titleEl);
       cb.addEventListener('change', () => {
         item.classList.toggle('checked', cb.checked);
-        if ([...this.trackSelList.querySelectorAll('input:checked')].length === 0) {
-          cb.checked = true; item.classList.add('checked');
-        }
         this._applyTrackSelection();
         this._updateStartButton();
         if (this.currentMode === 'selection') this._savePreferences();
@@ -446,7 +443,9 @@ class EnsayoApp {
   _applyTrackSelection() {
     const allCbs     = [...this.trackSelList.querySelectorAll('input')];
     const checkedCbs = allCbs.filter(cb => cb.checked);
-    if (checkedCbs.length === allCbs.length) {
+    if (checkedCbs.length === 0) {
+      this.engine.setSelectedVoices([]);
+    } else if (checkedCbs.length === allCbs.length) {
       this.engine.setSelectedVoices(null);
     } else {
       this.engine.setSelectedVoices(checkedCbs.flatMap(cb => JSON.parse(cb.dataset.ids)));
