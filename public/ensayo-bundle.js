@@ -12423,16 +12423,29 @@ class EnsayoApp {
     if (!this.currentUser) return;
     try {
       const prefs = await ensayoPreferencesAPI.getPreferences(palo);
+      const mode = prefs && prefs.mode || null;
       const savedTitles = prefs && prefs.selected_titles || [];
-      this._lastSavedTitles = savedTitles;
-      if (savedTitles.length > 0) {
+      if (!mode) return;
+      this.currentMode = mode;
+      this.modeSwitch.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      if (mode === 'selection' && savedTitles.length > 0) {
+        this.trackSelector.style.display = '';
+        this.step2Substep.classList.remove('step-hidden');
         this.trackSelList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          const ids = JSON.parse(cb.dataset.ids);
           const label = cb.parentElement.querySelector('.track-check-title');
           const titleText = label ? label.textContent : null;
           const wasChecked = savedTitles.includes(titleText);
           cb.checked = wasChecked;
           cb.closest('.track-check-item').classList.toggle('checked', wasChecked);
         });
+        this._applyTrackSelection();
+      } else if (mode === 'random') {
+        this.trackSelector.style.display = 'none';
+        this.step2Substep.classList.add('step-hidden');
+        this.engine.setSelectedVoices(null);
       }
     } catch (err) {
       /* sin preferencias: ningún modo preseleccionado */
@@ -12476,8 +12489,7 @@ class EnsayoApp {
       this.trackSelector.style.display = 'none';
       return;
     }
-    // No mode selected on load: keep the selector hidden until the user picks "Selección".
-    this.trackSelector.style.display = 'none';
+    this.trackSelector.style.display = '';
     const groups = new Map();
     voices.forEach(voice => {
       const key = voice.canonical_title || voice.title;
